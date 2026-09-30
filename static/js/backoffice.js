@@ -7,6 +7,11 @@
 
    Cada página diz quem ela é pelo atributo data-pagina do <body>.
    A página "em-construcao" recebe o nome da tela pelo endereço (?p=).
+
+   Páginas que não estão no menu (ex.: o detalhe de uma solicitação)
+   podem usar dois atributos opcionais no <body>:
+     data-menu="solicitacoes"  -> qual item do menu fica ativo
+     data-trilha="Detalhe"     -> texto da trilha no topo e do título da aba
    ===================================================================== */
 
 (function () {
@@ -22,6 +27,7 @@
     div.textContent = texto;
     return div.innerHTML;
   }
+  SF.escapar = escapar; // as páginas também usam ao montar HTML com dados
 
   /* "Centros de custo" -> "centros-de-custo" (para ids de HTML) */
   function paraId(texto) {
@@ -35,6 +41,8 @@
 
   /* ---------- Qual página está aberta? ---------- */
   var chavePagina = document.body.dataset.pagina;
+  var chaveMenu = document.body.dataset.menu || chavePagina; // item do menu que fica ativo
+  var trilhaPropria = document.body.dataset.trilha || null;
   var rotuloAtual = null;
   var grupoAtual = null;
 
@@ -45,18 +53,18 @@
   SF.menu.forEach(function (entrada) {
     if (entrada.itens) {
       entrada.itens.forEach(function (item) {
-        if (item.pagina === chavePagina || item.rotulo === rotuloAtual) {
+        if (item.pagina === chaveMenu || item.rotulo === rotuloAtual) {
           rotuloAtual = item.rotulo;
           grupoAtual = entrada.grupo;
         }
       });
-    } else if (entrada.pagina === chavePagina || entrada.rotulo === rotuloAtual) {
+    } else if (entrada.pagina === chaveMenu || entrada.rotulo === rotuloAtual) {
       rotuloAtual = entrada.rotulo;
     }
   });
 
-  SF.paginaAtual = { rotulo: rotuloAtual, grupo: grupoAtual };
-  document.title = rotuloAtual + " · SupplyFlow";
+  SF.paginaAtual = { rotulo: rotuloAtual, grupo: grupoAtual, trilha: trilhaPropria };
+  document.title = (trilhaPropria || rotuloAtual || "Backoffice") + " · SupplyFlow";
 
   /* ---------- Barra lateral ---------- */
   function htmlLink(item, dentroDeGrupo) {
@@ -101,7 +109,9 @@
   }
 
   /* ---------- Topo ---------- */
-  var trilha = (grupoAtual ? escapar(grupoAtual) + " / " : "") + escapar(rotuloAtual);
+  var trilha = trilhaPropria
+    ? escapar(trilhaPropria)
+    : (grupoAtual ? escapar(grupoAtual) + " / " : "") + escapar(rotuloAtual || "");
 
   document.getElementById("topbar").innerHTML =
     '<button class="topbar__menu d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebar"' +

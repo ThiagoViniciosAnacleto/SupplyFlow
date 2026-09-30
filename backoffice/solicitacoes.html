@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Solicitações · SupplyFlow</title>
+  <link rel="icon" href="../static/img/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../static/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="../static/vendor/bootstrap-icons/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="../static/css/supplyflow.css">
+</head>
+<body data-pagina="solicitacoes">
+  <div class="app">
+
+    <!-- Barra lateral: preenchida pelo backoffice.js -->
+    <div class="sidebar-trilho">
+      <aside class="sidebar offcanvas-lg offcanvas-start" tabindex="-1" id="sidebar" aria-label="Menu"></aside>
+    </div>
+
+    <div class="app__principal">
+      <!-- Topo: preenchido pelo backoffice.js -->
+      <header class="topbar" id="topbar"></header>
+
+      <main class="conteudo">
+        <h1 class="pagina-titulo">Solicitações</h1>
+        <p class="pagina-descricao">Acompanhamento e análise de solicitações excepcionais de EPIs e consumíveis.</p>
+
+        <!-- Abas: filtram a tabela sem recarregar (solicitacoes.js) -->
+        <div class="abas" role="tablist" aria-label="Filtrar solicitações">
+          <button class="abas__botao" type="button" role="tab" id="aba-excepcionais"
+                  data-filtro="excepcionais" aria-selected="true" aria-controls="painel-solicitacoes">Excepcionais</button>
+          <button class="abas__botao" type="button" role="tab" id="aba-aguardando"
+                  data-filtro="aguardando" aria-selected="false" aria-controls="painel-solicitacoes" tabindex="-1">Aguardando análise</button>
+          <button class="abas__botao" type="button" role="tab" id="aba-todas"
+                  data-filtro="todas" aria-selected="false" aria-controls="painel-solicitacoes" tabindex="-1">Todas</button>
+        </div>
+
+        <section class="cartao" id="painel-solicitacoes" role="tabpanel" aria-labelledby="aba-excepcionais">
+          <p class="tabela-dica d-lg-none">
+            <i class="bi bi-arrow-left-right" aria-hidden="true"></i>
+            Deslize a tabela para o lado para ver todas as colunas.
+          </p>
+
+          <!-- No celular, só esta caixa rola na horizontal; a página não -->
+          <div class="table-responsive" tabindex="0" role="region" aria-labelledby="legenda-tabela">
+            <table class="tabela-solicitacoes">
+              <caption class="visually-hidden" id="legenda-tabela">Solicitações excepcionais</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Nº</th>
+                  <th scope="col">Funcionário</th>
+                  <th scope="col">Função</th>
+                  <th scope="col">Centro de custo</th>
+                  <th scope="col">Produto</th>
+                  <th scope="col">Data</th>
+                  <th scope="col">Motivo</th>
+                  <th scope="col">Classificação IA</th>
+                  <th scope="col">Status</th>
+                  <th scope="col" class="tabela-solicitacoes__acao">Abrir</th>
+                </tr>
+              </thead>
+              <tbody id="corpo-tabela"></tbody>
+            </table>
+          </div>
+
+          <p class="tabela-nota">
+            <i class="bi bi-stars" aria-hidden="true"></i>
+            A classificação da IA é só uma sugestão para apoiar a análise: ela não aprova nem rejeita solicitações.
+            “—” indica retirada regular, que não tem justificativa para classificar.
+          </p>
+        </section>
+
+        <!-- Anuncia para leitores de tela quantas linhas o filtro mostrou -->
+        <p class="visually-hidden" aria-live="polite" id="resumo-filtro"></p>
+      </main>
+    </div>
+
+  </div>
+
+  <script src="../static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script src="../static/js/dados-demo.js"></script>
+  <script src="../static/js/sessao.js"></script>
+  <script src="../static/js/backoffice.js"></script>
+  <script src="../static/js/solicitacoes.js"></script>
+</body>
+</html>
