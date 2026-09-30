@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Em construção · SupplyFlow</title>
+  <link rel="icon" href="../static/img/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../static/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="../static/vendor/bootstrap-icons/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="../static/css/supplyflow.css">
+</head>
+<!-- Página provisória: aparece para toda tela do menu que ainda não foi feita.
+     O nome da tela chega pelo endereço, por exemplo: em-construcao.html?p=Produtos -->
+<body data-pagina="em-construcao">
+  <div class="app">
+
+    <div class="sidebar-trilho">
+      <aside class="sidebar offcanvas-lg offcanvas-start" tabindex="-1" id="sidebar" aria-label="Menu"></aside>
+    </div>
+
+    <div class="app__principal">
+      <header class="topbar" id="topbar"></header>
+
+      <main class="conteudo">
+        <section class="cartao vazio">
+          <span class="vazio__icone tom-azul" aria-hidden="true"><i class="bi bi-cone-striped"></i></span>
+          <h1 id="titulo-tela">Tela em construção</h1>
+          <p>Esta tela já existe no protótipo e será desenvolvida nas próximas etapas.</p>
+          <a class="btn btn-primary mt-2" href="visao-geral.html">Voltar para a Visão Geral</a>
+        </section>
+      </main>
+    </div>
+
+  </div>
+
+  <script src="../static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script src="../static/js/dados-demo.js"></script>
+  <script src="../static/js/sessao.js"></script>
+  <script src="../static/js/backoffice.js"></script>
+  <script>
+    // Mostra o nome da tela escolhida no menu
+    document.getElementById("titulo-tela").textContent = SF.paginaAtual.rotulo + " em construção";
+  </script>
+</body>
+</html>

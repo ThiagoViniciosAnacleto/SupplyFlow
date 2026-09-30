@@ -1,0 +1,14 @@
+# Editores e sistema
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+
+# Python / Django (proximas etapas)
+__pycache__/
+*.pyc
+venv/
+.venv/
+.env
+db.sqlite3
+staticfiles/

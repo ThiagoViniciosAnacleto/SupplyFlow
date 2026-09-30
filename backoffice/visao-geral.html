@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Visão Geral · SupplyFlow</title>
+  <link rel="icon" href="../static/img/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../static/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="../static/vendor/bootstrap-icons/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="../static/css/supplyflow.css">
+</head>
+<body data-pagina="visao-geral">
+  <div class="app">
+
+    <!-- Barra lateral: preenchida pelo backoffice.js -->
+    <div class="sidebar-trilho">
+      <aside class="sidebar offcanvas-lg offcanvas-start" tabindex="-1" id="sidebar" aria-label="Menu"></aside>
+    </div>
+
+    <div class="app__principal">
+      <!-- Topo: preenchido pelo backoffice.js -->
+      <header class="topbar" id="topbar"></header>
+
+      <main class="conteudo">
+        <h1 class="pagina-titulo" id="saudacao">Olá</h1>
+        <p class="pagina-descricao" id="descricao-painel"></p>
+
+        <section class="indicadores" id="indicadores" aria-label="Indicadores"></section>
+
+        <section class="cartao" aria-labelledby="titulo-solicitacoes">
+          <div class="cartao__cabecalho">
+            <h2 class="cartao__titulo" id="titulo-solicitacoes">Solicitações aguardando análise</h2>
+            <a class="link-ver-todas" href="solicitacoes.html">Ver todas →</a>
+          </div>
+          <div class="cartao__corpo">
+            <ul class="lista-solicitacoes" id="lista-solicitacoes"></ul>
+          </div>
+        </section>
+
+        <div class="graficos">
+          <section class="cartao" aria-labelledby="titulo-entregas">
+            <div class="cartao__cabecalho">
+              <i class="bi bi-graph-up-arrow text-primary" aria-hidden="true"></i>
+              <h2 class="cartao__titulo" id="titulo-entregas">Entregas por mês</h2>
+              <span class="cartao__meta">Últimos 6 meses</span>
+            </div>
+            <div class="cartao__corpo">
+              <div class="grafico">
+                <canvas id="grafico-entregas" role="img" aria-label="Gráfico de barras com a quantidade de entregas nos últimos seis meses"></canvas>
+              </div>
+            </div>
+          </section>
+
+          <section class="cartao" aria-labelledby="titulo-consumo">
+            <div class="cartao__cabecalho">
+              <i class="bi bi-pie-chart" style="color:#0d9488" aria-hidden="true"></i>
+              <h2 class="cartao__titulo" id="titulo-consumo">Consumo por centro de custo</h2>
+            </div>
+            <div class="cartao__corpo">
+              <div class="grafico">
+                <canvas id="grafico-consumo" role="img" aria-label="Gráfico de rosca com a distribuição do consumo por centro de custo"></canvas>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+  </div>
+
+  <script src="../static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script src="../static/vendor/chartjs/chart.umd.js"></script>
+  <script src="../static/js/dados-demo.js"></script>
+  <script src="../static/js/sessao.js"></script>
+  <script src="../static/js/backoffice.js"></script>
+  <script src="../static/js/visao-geral.js"></script>
+</body>
+</html>

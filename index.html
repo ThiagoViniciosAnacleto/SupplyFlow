@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Entrar · SupplyFlow</title>
+  <link rel="icon" href="static/img/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="static/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="static/vendor/bootstrap-icons/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="static/css/supplyflow.css">
+</head>
+<body>
+  <main class="login">
+
+    <!-- Painel escuro da esquerda: marca e apresentação do backoffice -->
+    <section class="login__marca" aria-label="Sobre o sistema">
+      <div class="marca">
+        <span class="marca__icone" aria-hidden="true">
+          <!-- Ícone de capacete: Lucide "hard-hat" (licença ISC) -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 10V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5"/><path d="M14 6a6 6 0 0 1 6 6v3"/><path d="M4 15v-3a6 6 0 0 1 6-6"/><rect x="2" y="15" width="20" height="4" rx="1"/></svg>
+        </span>
+        <span>
+          <span class="marca__nome">SupplyFlow</span>
+          <span class="marca__sub">Gestão de EPIs e consumíveis</span>
+        </span>
+      </div>
+
+      <div class="login__apresentacao">
+        <h1>Backoffice administrativo</h1>
+        <p>Gestão organizacional, produtos, estoque, políticas de fornecimento, solicitações, entregas, devoluções e auditoria.</p>
+        <ul class="login__recursos">
+          <li><i class="bi bi-shield-check" aria-hidden="true"></i> Menu e acesso validados por perfil</li>
+          <li><i class="bi bi-pc-display" aria-hidden="true"></i> Trilha de auditoria das ações</li>
+        </ul>
+      </div>
+
+      <a class="login__totem" href="backoffice/em-construcao.html?p=Autoatendimento%20(totem)">Ir para o autoatendimento (totem) →</a>
+    </section>
+
+    <!-- Formulário: escolha do usuário de demonstração -->
+    <section class="login__area">
+      <form class="login__form" id="form-login" novalidate>
+        <h2>Entrar no backoffice</h2>
+        <p class="login__instrucao">Selecione o usuário de demonstração e clique em Entrar.</p>
+
+        <fieldset class="usuarios" id="lista-usuarios">
+          <legend class="visually-hidden">Usuário de demonstração</legend>
+          <!-- Os cartões de usuário são criados pelo login.js a partir de dados-demo.js -->
+        </fieldset>
+
+        <label for="senha" class="form-label">Senha</label>
+        <input type="password" id="senha" class="form-control" placeholder="Não é necessária nesta versão" autocomplete="off">
+
+        <button type="submit" class="btn btn-primary w-100 login__entrar">
+          <i class="bi bi-box-arrow-in-right" aria-hidden="true"></i> Entrar
+        </button>
+
+        <p class="login__nota">Autenticação simulada — nenhuma senha é verificada.</p>
+      </form>
+    </section>
+
+  </main>
+
+  <script src="static/js/dados-demo.js"></script>
+  <script src="static/js/sessao.js"></script>
+  <script src="static/js/login.js"></script>
+</body>
+</html>
