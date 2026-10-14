@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Produtos e EPIs · SupplyFlow</title>
+  <link rel="icon" href="../static/img/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../static/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="../static/vendor/bootstrap-icons/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="../static/css/supplyflow.css">
+</head>
+<body data-pagina="produtos">
+  <div class="app">
+
+    <div class="sidebar-trilho">
+      <aside class="sidebar offcanvas-lg offcanvas-start" tabindex="-1" id="sidebar" aria-label="Menu"></aside>
+    </div>
+
+    <div class="app__principal">
+      <header class="topbar" id="topbar"></header>
+
+      <main class="conteudo">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+          <div>
+            <h1 class="pagina-titulo mb-1">Catálogo de Produtos</h1>
+            <p class="pagina-descricao mb-0">Gestão de Equipamentos de Proteção Individual (EPIs), consumíveis industriais e limites de retirada.</p>
+          </div>
+          <div>
+            <button type="button" class="btn btn-primary" id="btn-novo-produto">
+              <i class="bi bi-plus-circle"></i> Novo Produto
+            </button>
+          </div>
+        </div>
+
+        <!-- Filtros -->
+        <div class="cartao p-3 mb-4">
+          <div class="row g-3">
+            <div class="col-md-7">
+              <div class="input-group">
+                <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                <input type="text" id="filtro-termo-prod" class="form-control border-start-0" placeholder="Buscar por nome ou SKU...">
+              </div>
+            </div>
+            <div class="col-md-3">
+              <select id="filtro-categoria-prod" class="form-select">
+                <option value="">Todas as categorias</option>
+              </select>
+            </div>
+            <div class="col-md-2 d-grid">
+              <button type="button" id="btn-filtrar-prod" class="btn btn-outline-secondary">Filtrar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabela de Produtos -->
+        <section class="cartao" aria-label="Lista de produtos">
+          <div class="table-responsive">
+            <table class="tabela-solicitacoes">
+              <thead>
+                <tr>
+                  <th scope="col">SKU</th>
+                  <th scope="col">Produto</th>
+                  <th scope="col">Categoria</th>
+                  <th scope="col">Unidade</th>
+                  <th scope="col">Custo Unitário</th>
+                  <th scope="col">Cota Mensal</th>
+                  <th scope="col">Justificativa?</th>
+                  <th scope="col">Status</th>
+                  <th scope="col" class="text-end">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tabela-produtos-corpo">
+                <tr><td colspan="9" class="text-center py-4 text-muted">Carregando catálogo...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+  </div>
+
+  <!-- Modal de Cadastro / Edição -->
+  <div class="modal fade" id="modal-produto" tabindex="-1" aria-labelledby="modalProdTitulo" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content rounded-4 border-0 shadow">
+        <form id="form-produto">
+          <div class="modal-header border-bottom">
+            <h5 class="modal-title fw-bold" id="modalProdTitulo">Novo Produto</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+          </div>
+          <div class="modal-body p-4">
+            <input type="hidden" id="prod-id">
+
+            <div class="row g-2 mb-3">
+              <div class="col-5">
+                <label for="prod-sku" class="form-label small fw-semibold">SKU / Código *</label>
+                <input type="text" id="prod-sku" class="form-control text-uppercase" required placeholder="EPI-004">
+              </div>
+              <div class="col-7">
+                <label for="prod-categoria" class="form-label small fw-semibold">Categoria *</label>
+                <select id="prod-categoria" class="form-select" required>
+                  <option value="">Selecione...</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label for="prod-nome" class="form-label small fw-semibold">Nome do Produto *</label>
+              <input type="text" id="prod-nome" class="form-control" required placeholder="Ex.: Capacete de Segurança com Jugular">
+            </div>
+
+            <div class="mb-3">
+              <label for="prod-descricao" class="form-label small fw-semibold">Descrição Detalhada</label>
+              <textarea id="prod-descricao" class="form-control" rows="2" placeholder="Especificações técnicas, CA, tamanho..."></textarea>
+            </div>
+
+            <div class="row g-2 mb-3">
+              <div class="col-4">
+                <label for="prod-unidade" class="form-label small fw-semibold">Unidade</label>
+                <select id="prod-unidade" class="form-select">
+                  <option value="UN">UN</option>
+                  <option value="PAR">PAR</option>
+                  <option value="ROLO">ROLO</option>
+                  <option value="PACOTE">PACOTE</option>
+                  <option value="CJ">CJ</option>
+                </select>
+              </div>
+              <div class="col-4">
+                <label for="prod-custo" class="form-label small fw-semibold">Custo (R$)</label>
+                <input type="number" step="0.01" id="prod-custo" class="form-control" required placeholder="0.00">
+              </div>
+              <div class="col-4">
+                <label for="prod-limite" class="form-label small fw-semibold">Cota Mensal</label>
+                <input type="number" id="prod-limite" class="form-control" required value="1" min="1">
+              </div>
+            </div>
+
+            <div class="form-check form-switch pt-2 border-top">
+              <input class="form-check-input" type="checkbox" id="prod-requer-justificativa">
+              <label class="form-check-label fw-semibold small" for="prod-requer-justificativa">
+                Exigir justificativa prévia e aprovação para qualquer retirada
+              </label>
+            </div>
+          </div>
+          <div class="modal-footer border-top">
+            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-primary px-4 fw-bold">Salvar Produto</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="../static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script src="../static/js/dados-demo.js"></script>
+  <script src="../static/js/sessao.js"></script>
+  <script src="../static/js/backoffice.js"></script>
+  <script src="../static/js/produtos.js"></script>
+</body>
+</html>
+

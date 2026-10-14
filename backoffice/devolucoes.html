@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Devoluções de EPIs · SupplyFlow</title>
+  <link rel="icon" href="../static/img/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../static/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="../static/vendor/bootstrap-icons/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="../static/css/supplyflow.css">
+</head>
+<body data-pagina="devolucoes">
+  <div class="app">
+
+    <div class="sidebar-trilho">
+      <aside class="sidebar offcanvas-lg offcanvas-start" tabindex="-1" id="sidebar" aria-label="Menu"></aside>
+    </div>
+
+    <div class="app__principal">
+      <header class="topbar" id="topbar"></header>
+
+      <main class="conteudo">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+          <div>
+            <h1 class="pagina-titulo mb-1">Devoluções de EPIs</h1>
+            <p class="pagina-descricao mb-0">Gestão de retorno e descarte de equipamentos substituídos antecipadamente (RF-31 a RF-35).</p>
+          </div>
+        </div>
+
+        <section class="cartao" aria-label="Lista de devoluções">
+          <div class="table-responsive">
+            <table class="tabela-solicitacoes">
+              <thead>
+                <tr>
+                  <th scope="col">Solicitação de Origem</th>
+                  <th scope="col">Data</th>
+                  <th scope="col">Colaborador</th>
+                  <th scope="col">Setor</th>
+                  <th scope="col">Equipamento</th>
+                  <th scope="col">Condição Obrigatória?</th>
+                  <th scope="col">Status Devolução</th>
+                  <th scope="col">Observações / Parecer</th>
+                </tr>
+              </thead>
+              <tbody id="tabela-devolucoes-corpo">
+                <tr><td colspan="8" class="text-center py-4 text-muted">Carregando devoluções...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+  </div>
+
+  <script src="../static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script src="../static/js/dados-demo.js"></script>
+  <script src="../static/js/sessao.js"></script>
+  <script src="../static/js/backoffice.js"></script>
+  <script>
+    (function() {
+      var corpo = document.getElementById("tabela-devolucoes-corpo");
+      fetch("/api/devolucoes/")
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          var devolucoes = d.devolucoes || [];
+          if (devolucoes.length === 0) {
+            corpo.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">Nenhuma devolução pendente.</td></tr>';
+            return;
+          }
+          corpo.innerHTML = devolucoes.map(function(dev) {
+            var badgeCondicao = dev.condicao_obrigatoria
+              ? '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Sim (Devolução Exigida)</span>'
+              : '<span class="badge bg-light text-muted border">Não exigida</span>';
+
+            var badgeStatus = dev.status_devolucao.indexOf("pendente") !== -1
+              ? '<span class="selo selo--condicional">Devolução pendente</span>'
+              : '<span class="selo selo--entregue">Dispensada / Concluída</span>';
+
+            return '<tr>' +
+              '<td><span class="numero">' + dev.codigo + '</span></td>' +
+              '<td>' + dev.data_solicitacao + '</td>' +
+              '<td><strong>' + dev.colaborador + '</strong> <span class="small text-muted d-block">' + dev.matricula + '</span></td>' +
+              '<td>' + dev.setor + '</td>' +
+              '<td>' + dev.produto + '</td>' +
+              '<td>' + badgeCondicao + '</td>' +
+              '<td>' + badgeStatus + '</td>' +
+              '<td class="small text-secondary">' + dev.observacao + '</td>' +
+            '</tr>';
+          }).join("");
+        });
+    })();
+  </script>
+</body>
+</html>
+

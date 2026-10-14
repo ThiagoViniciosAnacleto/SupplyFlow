@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Autoatendimento EPI · Totem SupplyFlow</title>
+  <link rel="icon" href="/static/img/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="/static/vendor/bootstrap-icons/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="/static/css/supplyflow.css">
+  <link rel="stylesheet" href="/static/css/totem.css">
+</head>
+<body class="totem-body">
+
+  <!-- =====================================================================
+       TOPO DO TOTEM
+       ===================================================================== -->
+  <header class="totem-header">
+    <div class="totem-marca">
+      <span class="totem-marca__icone" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10 10V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5"/><path d="M14 6a6 6 0 0 1 6 6v3"/><path d="M4 15v-3a6 6 0 0 1 6-6"/><rect x="2" y="15" width="20" height="4" rx="1"/>
+        </svg>
+      </span>
+      <div>
+        <div class="totem-marca__titulo">Autoatendimento EPI</div>
+        <div class="totem-marca__sub" id="totem-identificador">Totem Principal · Galpão A</div>
+      </div>
+    </div>
+
+    <div class="d-flex align-items-center gap-2">
+      <a href="/index.html" class="btn btn-outline-secondary btn-sm" title="Ir para o Backoffice">
+        <i class="bi bi-box-arrow-left"></i> Backoffice
+      </a>
+      <button type="button" class="btn-reiniciar" id="btn-reiniciar-sessao">
+        <i class="bi bi-house-door"></i> Reiniciar sessão
+      </button>
+    </div>
+  </header>
+
+  <!-- =====================================================================
+       CONTEÚDO PRINCIPAL (MÁQUINA DE ESTADOS / PASSOS)
+       ===================================================================== -->
+  <main class="totem-main">
+
+    <!-- PASSO 1: BOAS-VINDAS / ESCOLHA DO MÉTODO DE IDENTIFICAÇÃO -->
+    <section class="totem-passo ativo" id="passo-boas-vindas">
+      <div class="totem-hero-icone">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10 10V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5"/><path d="M14 6a6 6 0 0 1 6 6v3"/><path d="M4 15v-3a6 6 0 0 1 6-6"/><rect x="2" y="15" width="20" height="4" rx="1"/>
+        </svg>
+      </div>
+      <h1 class="totem-titulo">Bem-vindo</h1>
+      <p class="totem-subtitulo">
+        Identifique-se para consultar seus produtos autorizados e realizar retiradas de EPIs e materiais consumíveis.
+      </p>
+
+      <div class="totem-opcoes-grid">
+        <div class="totem-card-opcao" id="opcao-matricula" role="button" tabindex="0">
+          <div class="totem-card-opcao__icone">
+            <i class="bi bi-person-vcard"></i>
+          </div>
+          <div class="totem-card-opcao__titulo">Matrícula</div>
+          <div class="totem-card-opcao__sub">Digite sua matrícula de colaborador</div>
+        </div>
+
+        <div class="totem-card-opcao desabilitado" aria-disabled="true">
+          <div class="totem-card-opcao__icone">
+            <i class="bi bi-credit-card-2-front"></i>
+          </div>
+          <div class="totem-card-opcao__titulo">Crachá / RFID</div>
+          <div class="totem-card-opcao__sub">Indisponível no protótipo</div>
+        </div>
+      </div>
+
+      <div class="text-center mt-5 text-muted small">
+        <i class="bi bi-shield-check text-success"></i> Ambiente seguro de autoatendimento · Rastreabilidade integrada
+      </div>
+    </section>
+
+    <!-- PASSO 2: DIGITAÇÃO DA MATRÍCULA -->
+    <section class="totem-passo" id="passo-matricula">
+      <button type="button" class="btn-voltar-totem btn-voltar" data-destino="passo-boas-vindas">
+        <i class="bi bi-arrow-left"></i> Voltar
+      </button>
+
+      <div class="totem-hero-icone totem-hero-icone--lock">
+        <i class="bi bi-person-badge"></i>
+      </div>
+      <h2 class="totem-titulo">Digite sua Matrícula</h2>
+      <p class="totem-subtitulo">Utilize o teclado na tela ou o leitor para informar seu código.</p>
+
+      <div class="totem-teclado-container">
+        <input type="text" id="input-matricula" class="totem-display-input w-100" placeholder="MAT-2001" readonly>
+
+        <div class="totem-teclado">
+          <button type="button" class="btn-tecla tecla-num" data-val="1">1</button>
+          <button type="button" class="btn-tecla tecla-num" data-val="2">2</button>
+          <button type="button" class="btn-tecla tecla-num" data-val="3">3</button>
+          <button type="button" class="btn-tecla tecla-num" data-val="4">4</button>
+          <button type="button" class="btn-tecla tecla-num" data-val="5">5</button>
+          <button type="button" class="btn-tecla tecla-num" data-val="6">6</button>
+          <button type="button" class="btn-tecla tecla-num" data-val="7">7</button>
+          <button type="button" class="btn-tecla tecla-num" data-val="8">8</button>
+          <button type="button" class="btn-tecla tecla-num" data-val="9">9</button>
+          <button type="button" class="btn-tecla btn-tecla--acao btn-tecla--apagar" id="btn-matricula-apagar">
+            <i class="bi bi-backspace"></i>
+          </button>
+          <button type="button" class="btn-tecla tecla-num" data-val="0">0</button>
+          <button type="button" class="btn-tecla btn-tecla--acao btn-tecla--verde" id="btn-matricula-confirmar">
+            OK <i class="bi bi-arrow-right"></i>
+          </button>
+        </div>
+
+        <div class="totem-dica">
+          <strong>Acesso rápido de teste:</strong>
+          <div class="totem-chips">
+            <span class="totem-chip chip-demo" data-mat="MAT-2001">MAT-2001 (João · Soldador)</span>
+            <span class="totem-chip chip-demo" data-mat="MAT-2002">MAT-2002 (Fernanda · Operadora)</span>
+            <span class="totem-chip chip-demo" data-mat="MAT-2003">MAT-2003 (Ricardo · Eletricista)</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PASSO 3: INFORME SEU PIN -->
+    <section class="totem-passo" id="passo-pin">
+      <button type="button" class="btn-voltar-totem btn-voltar" data-destino="passo-matricula">
+        <i class="bi bi-arrow-left"></i> Voltar
+      </button>
+
+      <div class="totem-hero-icone totem-hero-icone--lock">
+        <i class="bi bi-lock"></i>
+      </div>
+      <h2 class="totem-titulo">Informe seu PIN</h2>
+      <p class="totem-subtitulo">
+        Olá, <strong id="pin-colaborador-nome">Colaborador</strong>. Digite sua senha de acesso de 4 dígitos.
+      </p>
+
+      <div class="totem-teclado-container">
+        <!-- Indicador das 4 bolinhas preenchidas -->
+        <div class="totem-pin-dots" id="pin-dots">
+          <div class="pin-dot" id="dot-0"></div>
+          <div class="pin-dot" id="dot-1"></div>
+          <div class="pin-dot" id="dot-2"></div>
+          <div class="pin-dot" id="dot-3"></div>
+        </div>
+
+        <div class="totem-teclado">
+          <button type="button" class="btn-tecla tecla-pin" data-val="1">1</button>
+          <button type="button" class="btn-tecla tecla-pin" data-val="2">2</button>
+          <button type="button" class="btn-tecla tecla-pin" data-val="3">3</button>
+          <button type="button" class="btn-tecla tecla-pin" data-val="4">4</button>
+          <button type="button" class="btn-tecla tecla-pin" data-val="5">5</button>
+          <button type="button" class="btn-tecla tecla-pin" data-val="6">6</button>
+          <button type="button" class="btn-tecla tecla-pin" data-val="7">7</button>
+          <button type="button" class="btn-tecla tecla-pin" data-val="8">8</button>
+          <button type="button" class="btn-tecla tecla-pin" data-val="9">9</button>
+          <button type="button" class="btn-tecla btn-tecla--acao text-secondary" id="btn-pin-limpar">Limpar</button>
+          <button type="button" class="btn-tecla tecla-pin" data-val="0">0</button>
+          <button type="button" class="btn-tecla btn-tecla--acao btn-tecla--apagar" id="btn-pin-apagar">
+            <i class="bi bi-backspace"></i>
+          </button>
+        </div>
+
+        <div class="totem-dica mt-4" id="pin-dica-conteudo">
+          PIN de teste da matrícula <span id="dica-mat-atual">MAT-2001</span>: <strong id="dica-pin-num">1122</strong>
+        </div>
+      </div>
+    </section>
+
+    <!-- PASSO 4: VITRINE DE PRODUTOS DISPONÍVEIS -->
+    <section class="totem-passo" id="passo-vitrine">
+      <div class="totem-vitrine-topo">
+        <div class="totem-vitrine-usuario">
+          <h2>Olá, <span id="vitrine-nome">Colaborador</span>!</h2>
+          <p>
+            Função: <strong id="vitrine-cargo">Soldador</strong> · Setor: <strong id="vitrine-setor">Produção Industrial</strong>
+          </p>
+        </div>
+
+        <div>
+          <button type="button" class="btn-minhas-sols" id="btn-abrir-minhas-sols">
+            <i class="bi bi-clock-history"></i> Minhas solicitações
+            <span class="badge-sols-count" id="count-minhas-sols">0</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="totem-produtos-grid" id="grid-produtos-totem">
+        <!-- Renderizado dinamicamente via totem.js a partir de /api/totem/produtos/ -->
+      </div>
+    </section>
+
+    <!-- PASSO 5: JUSTIFICATIVA DE SUBSTITUIÇÃO ANTECIPADA -->
+    <section class="totem-passo" id="passo-justificativa">
+      <button type="button" class="btn-voltar-totem btn-voltar" data-destino="passo-vitrine">
+        <i class="bi bi-arrow-left"></i> Voltar aos produtos
+      </button>
+
+      <div class="totem-alerta-substituicao">
+        <div class="totem-alerta-substituicao__titulo">
+          <i class="bi bi-exclamation-triangle-fill"></i> Substituição antecipada
+        </div>
+        <p class="totem-alerta-substituicao__texto">
+          Este EPI está fora do período regular de retirada ou acima do limite mensal. Informe o motivo detalhado para análise técnica pelo gestor.
+        </p>
+      </div>
+
+      <div class="totem-card-resumo-produto">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <div>
+            <h3 class="h5 fw-bold mb-1" id="just-prod-nome">Luva Nitrílica Anticorte</h3>
+            <span class="text-muted small" id="just-prod-detalhes">SKU: EPI-001 · Tamanho M · Periodicidade 90 dias</span>
+          </div>
+          <span class="badge bg-warning text-dark px-3 py-2 rounded-pill">Fora do período</span>
+        </div>
+
+        <div class="row g-3 mt-2 pt-2 border-top">
+          <div class="col-6">
+            <div class="small text-muted">Última retirada</div>
+            <div class="fw-bold" id="just-prod-ultima">17/08/2026</div>
+          </div>
+          <div class="col-6">
+            <div class="small text-muted">Próxima retirada regular</div>
+            <div class="fw-bold" id="just-prod-proxima">15/11/2026</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-4 border-0 shadow-sm rounded-4">
+        <label for="texto-justificativa" class="form-label fw-bold mb-2">
+          Justificativa da substituição antecipada
+        </label>
+
+        <!-- Sugestões rápidas de preenchimento para facilitar no totem touch -->
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          <button type="button" class="btn btn-outline-secondary btn-sm chip-sugestao" data-texto="A luva rasgou durante o trabalho com chapa metálica afiada na linha 2.">
+            Rasgou em serviço
+          </button>
+          <button type="button" class="btn btn-outline-secondary btn-sm chip-sugestao" data-texto="O equipamento endureceu e perdeu a vedação antes do prazo normal.">
+            Desgaste prematuro
+          </button>
+          <button type="button" class="btn btn-outline-secondary btn-sm chip-sugestao" data-texto="Material extraviado acidentalmente durante deslocamento operacional.">
+            Extravio / Perda
+          </button>
+          <button type="button" class="btn btn-outline-secondary btn-sm chip-sugestao" data-texto="Manutenção corretiva emergencial consumiu mais unidades que a cota padrão.">
+            Demanda emergencial
+          </button>
+        </div>
+
+        <textarea id="texto-justificativa" class="form-control totem-textarea-justificativa" rows="4"
+                  placeholder="Descreva o motivo (ex.: A luva rasgou durante o trabalho com uma peça metálica afiada...)"></textarea>
+
+        <div class="d-flex justify-content-end gap-3 mt-4">
+          <button type="button" class="btn btn-light px-4 btn-voltar" data-destino="passo-vitrine">Cancelar</button>
+          <button type="button" class="btn btn-primary px-4 fw-bold" id="btn-enviar-justificativa">
+            <i class="bi bi-send-check"></i> Confirmar e enviar solicitação
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- =====================================================================
+       MODAL: MINHAS SOLICITAÇÕES
+       ===================================================================== -->
+  <div class="modal fade" id="modal-minhas-sols" tabindex="-1" aria-labelledby="modalSolsTitulo" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content rounded-4 border-0 shadow">
+        <div class="modal-header border-bottom">
+          <h5 class="modal-title fw-bold" id="modalSolsTitulo">
+            <i class="bi bi-clock-history text-primary"></i> Minhas Solicitações Recentes
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Código</th>
+                  <th>Data</th>
+                  <th>Produto</th>
+                  <th>Tipo</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="lista-minhas-sols-body">
+                <tr><td colspan="5" class="text-center py-4 text-muted">Carregando histórico...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer border-top">
+          <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Fechar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       MODAL: SUCESSO / DISPENSAÇÃO
+       ===================================================================== -->
+  <div class="modal fade" id="modal-sucesso" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content rounded-4 border-0 text-center p-4 shadow-lg">
+        <div class="my-3">
+          <div class="totem-hero-icone bg-success text-white">
+            <i class="bi bi-check-lg" style="font-size: 40px;"></i>
+          </div>
+        </div>
+        <h3 class="fw-bold mb-2" id="sucesso-titulo">Solicitação Concluída!</h3>
+        <p class="text-muted mb-4" id="sucesso-mensagem">
+          Compartimento liberado. Retire seu material no totem.
+        </p>
+
+        <div id="sucesso-detalhe-ia" class="d-none alert alert-info text-start small mb-4">
+          <strong><i class="bi bi-stars text-primary"></i> Análise da IA:</strong>
+          <div id="sucesso-ia-texto">Classificado como 'Dano em Serviço' com 89% de confiança.</div>
+        </div>
+
+        <button type="button" class="btn btn-primary w-100 py-3 fw-bold rounded-3" id="btn-concluir-sucesso">
+          Concluir e voltar ao início (<span id="contagem-regressiva">5</span>s)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script src="/static/js/totem.js"></script>
+</body>
+</html>
+

@@ -31,20 +31,20 @@ SF.usuarioPadrao = "admin";
 SF.menu = [
   { rotulo: "Visão Geral", icone: "bi-grid-1x2", pagina: "visao-geral" },
   { grupo: "Pessoas", icone: "bi-people", itens: [
-      { rotulo: "Funcionários" }
+      { rotulo: "Funcionários", pagina: "funcionarios" }
   ]},
   { grupo: "Organização", icone: "bi-diagram-3", itens: [
-      { rotulo: "Funções" }, { rotulo: "Cargos" }, { rotulo: "Centros de custo" }
+      { rotulo: "Funções", pagina: "funcoes" }, { rotulo: "Cargos", pagina: "cargos" }, { rotulo: "Centros de custo", pagina: "centros-de-custo" }
   ]},
   { grupo: "Materiais", icone: "bi-box-seam", itens: [
-      { rotulo: "Produtos" }, { rotulo: "Fornecedores" }, { rotulo: "Estoque" }
+      { rotulo: "Produtos", pagina: "produtos" }, { rotulo: "Fornecedores" }, { rotulo: "Estoque", pagina: "estoque" }
   ]},
   { grupo: "Operações", icone: "bi-clipboard-check", itens: [
-      { rotulo: "Solicitações", pagina: "solicitacoes" }, { rotulo: "Entregas" }, { rotulo: "Devoluções" }
+      { rotulo: "Solicitações", pagina: "solicitacoes" }, { rotulo: "Entregas", pagina: "entregas" }, { rotulo: "Devoluções", pagina: "devolucoes" }
   ]},
   { grupo: "Gestão", icone: "bi-bar-chart-line", itens: [
       { rotulo: "Políticas de fornecimento" }, { rotulo: "Histórico" },
-      { rotulo: "Relatórios" }, { rotulo: "Avaliação do modelo (IA)" }
+      { rotulo: "Relatórios" }, { rotulo: "Avaliação do modelo (IA)", pagina: "avaliacao-ia" }
   ]},
   { grupo: "Governança", icone: "bi-shield-check", itens: [
       { rotulo: "Auditoria" }, { rotulo: "Usuários e permissões" }

@@ -46,6 +46,7 @@ TEMPLATES = [
         "DIRS": [
             BASE_DIR,
             BASE_DIR / "backoffice",
+            BASE_DIR / "totem",
         ],
         "APP_DIRS": True,
         "OPTIONS": {

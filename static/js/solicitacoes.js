@@ -72,7 +72,7 @@
       "<td>" + htmlClassificacao(s) + "</td>" +
       '<td class="tabela-solicitacoes__status"><span class="selo ' + status.selo + '">' + escapar(status.rotulo) + "</span></td>" +
       '<td class="tabela-solicitacoes__acao">' +
-        '<a class="link-abrir" href="em-construcao.html?p=' + encodeURIComponent("Detalhe da Solicitação " + numeroTexto) + '"' +
+        '<a class="link-abrir" href="solicitacao.html?id=' + encodeURIComponent(s.id) + '"' +
         ' aria-label="Abrir solicitação ' + escapar(numeroTexto) + '">' +
           'Abrir <i class="bi bi-chevron-right" aria-hidden="true"></i></a>' +
       "</td>" +

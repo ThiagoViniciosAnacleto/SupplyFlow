@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Funcionários · SupplyFlow</title>
+  <link rel="icon" href="../static/img/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../static/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="../static/vendor/bootstrap-icons/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="../static/css/supplyflow.css">
+</head>
+<body data-pagina="funcionarios">
+  <div class="app">
+
+    <div class="sidebar-trilho">
+      <aside class="sidebar offcanvas-lg offcanvas-start" tabindex="-1" id="sidebar" aria-label="Menu"></aside>
+    </div>
+
+    <div class="app__principal">
+      <header class="topbar" id="topbar"></header>
+
+      <main class="conteudo">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+          <div>
+            <h1 class="pagina-titulo mb-1">Funcionários</h1>
+            <p class="pagina-descricao mb-0">Gestão do quadro de colaboradores, matrículas, funções e controle de acesso.</p>
+          </div>
+          <div>
+            <button type="button" class="btn btn-primary" id="btn-novo-funcionario">
+              <i class="bi bi-person-plus"></i> Novo Funcionário
+            </button>
+          </div>
+        </div>
+
+        <!-- Filtros e Busca -->
+        <div class="cartao p-3 mb-4">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="input-group">
+                <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                <input type="text" id="filtro-termo" class="form-control border-start-0" placeholder="Buscar por nome, matrícula ou e-mail...">
+              </div>
+            </div>
+            <div class="col-md-4">
+              <select id="filtro-setor" class="form-select">
+                <option value="">Todos os setores</option>
+              </select>
+            </div>
+            <div class="col-md-2 d-grid">
+              <button type="button" id="btn-filtrar" class="btn btn-outline-secondary">Filtrar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabela de Funcionários -->
+        <section class="cartao" aria-label="Lista de funcionários">
+          <div class="table-responsive">
+            <table class="tabela-solicitacoes">
+              <thead>
+                <tr>
+                  <th scope="col">Colaborador</th>
+                  <th scope="col">Matrícula</th>
+                  <th scope="col">Cargo / Função</th>
+                  <th scope="col">Centro de Custo</th>
+                  <th scope="col">Perfil de Acesso</th>
+                  <th scope="col">Status</th>
+                  <th scope="col" class="text-end">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tabela-funcionarios-corpo">
+                <tr><td colspan="7" class="text-center py-4 text-muted">Carregando colaboradores...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+  </div>
+
+  <!-- Modal de Cadastro / Edição -->
+  <div class="modal fade" id="modal-funcionario" tabindex="-1" aria-labelledby="modalFuncTitulo" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content rounded-4 border-0 shadow">
+        <form id="form-funcionario">
+          <div class="modal-header border-bottom">
+            <h5 class="modal-title fw-bold" id="modalFuncTitulo">Novo Funcionário</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+          </div>
+          <div class="modal-body p-4">
+            <input type="hidden" id="func-id">
+
+            <div class="mb-3">
+              <label for="func-nome" class="form-label small fw-semibold">Nome Completo *</label>
+              <input type="text" id="func-nome" class="form-control" required placeholder="Ex.: Lucas Moreira">
+            </div>
+
+            <div class="row g-2 mb-3">
+              <div class="col-6">
+                <label for="func-matricula" class="form-label small fw-semibold">Matrícula *</label>
+                <input type="text" id="func-matricula" class="form-control" required placeholder="Ex.: MAT-2004">
+              </div>
+              <div class="col-6">
+                <label for="func-pin" class="form-label small fw-semibold">PIN (4 dígitos)</label>
+                <input type="password" id="func-pin" class="form-control" maxlength="4" placeholder="Padrão: 1234">
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label for="func-email" class="form-label small fw-semibold">E-mail Corporativo</label>
+              <input type="email" id="func-email" class="form-control" placeholder="lucas.moreira@supplyflow.com">
+            </div>
+
+            <div class="mb-3">
+              <label for="func-cargo" class="form-label small fw-semibold">Cargo / Função *</label>
+              <input type="text" id="func-cargo" class="form-control" required placeholder="Ex.: Operador de Caldeira">
+            </div>
+
+            <div class="row g-2">
+              <div class="col-6">
+                <label for="func-setor" class="form-label small fw-semibold">Setor / Centro Custo</label>
+                <select id="func-setor" class="form-select">
+                  <option value="">Selecione...</option>
+                </select>
+              </div>
+              <div class="col-6">
+                <label for="func-perfil" class="form-label small fw-semibold">Perfil de Acesso</label>
+                <select id="func-perfil" class="form-select">
+                  <option value="COLABORADOR">Colaborador (Totem)</option>
+                  <option value="OPERADOR">Almoxarife</option>
+                  <option value="TECNICO_SEGURANCA">Técnico de Segurança</option>
+                  <option value="GESTOR">Gestor / Supervisor</option>
+                  <option value="ADMIN">Administrador</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer border-top">
+            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-primary px-4 fw-bold">Salvar Funcionário</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="../static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script src="../static/js/dados-demo.js"></script>
+  <script src="../static/js/sessao.js"></script>
+  <script src="../static/js/backoffice.js"></script>
+  <script src="../static/js/funcionarios.js"></script>
+</body>
+</html>
+
