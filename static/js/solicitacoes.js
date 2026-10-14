@@ -1,18 +1,30 @@
 /* =====================================================================
-   SupplyFlow — Solicitações (lista)
-   Monta a tabela a partir de dados-demo.js e filtra pelas abas, sem
-   recarregar a página. O status mostrado já considera as decisões
-   tomadas nesta sessão (SF.sessao.statusDe).
+   SupplyFlow — Solicitações (lista integrada à API Django /api/solicitacoes/)
+   Monta a tabela a partir de dados reais do PostgreSQL e filtra pelas abas.
+   O status mostrado considera o estado persistido no banco e na sessão.
    ===================================================================== */
 
 (function () {
-  var escapar = SF.escapar;
+  var escapar = (window.SF && SF.escapar) || function (texto) {
+    var div = document.createElement("div");
+    div.textContent = texto || "";
+    return div.innerHTML;
+  };
+
+  var STATUS_MAP = {
+    "aguardando":        { rotulo: "Aguardando aprovação",  selo: "selo--aguardando" },
+    "aprovada":          { rotulo: "Aprovada",              selo: "selo--aprovado" },
+    "aprovada-condicao": { rotulo: "Aprovada com condição", selo: "selo--condicional" },
+    "rejeitada":         { rotulo: "Rejeitada",             selo: "selo--rejeitado" },
+    "entregue":          { rotulo: "Entregue",              selo: "selo--entregue" },
+    "cancelada":         { rotulo: "Cancelada",             selo: "selo--rejeitado" }
+  };
 
   /* Cada aba é uma regra que diz se a solicitação aparece ou não */
   var FILTROS = {
     excepcionais: {
       legenda: "Solicitações excepcionais",
-      mostra: function (s) { return s.excepcional; }
+      mostra: function (s) { return Boolean(s.excepcional || s.fora_da_cota); }
     },
     aguardando: {
       legenda: "Solicitações aguardando análise",
@@ -29,33 +41,39 @@
   var corpo = document.getElementById("corpo-tabela");
   var legenda = document.getElementById("legenda-tabela");
   var resumo = document.getElementById("resumo-filtro");
+  var abaAtiva = abas[0];
 
   /* ---------- Uma linha da tabela ---------- */
   function htmlClassificacao(s) {
-    if (!s.ia) {
+    if (!s.ia || !s.ia.categoria) {
       return '<span class="classificacao-ia classificacao-ia--vazia">' +
         '<span aria-hidden="true">—</span><span class="visually-hidden">Não se aplica</span></span>';
     }
+    var conf = s.ia.confianca ? ' <span class="classificacao-ia__confianca">· ' + s.ia.confianca + "%</span>" : "";
     return '<span class="classificacao-ia">' +
-      escapar(s.ia.categoria) + ' <span class="classificacao-ia__confianca">· ' + s.ia.confianca + "%</span>" +
+      escapar(s.ia.categoria) + conf +
     "</span>";
   }
 
   function htmlLinha(s) {
-    var status = SF.statusSolicitacao[SF.sessao.statusDe(s)];
+    var statusChave = SF.sessao.statusDe(s) || "aguardando";
+    var status = STATUS_MAP[statusChave] || { rotulo: statusChave, selo: "selo--aguardando" };
+    var numeroTexto = s.numero || s.codigo || s.id;
+    var dataHora = s.data && s.hora ? s.data + ", " + s.hora : (s.data || "");
+
     return "<tr>" +
-      '<td><span class="numero">' + escapar(s.numero) + "</span></td>" +
-      "<td>" + escapar(s.funcionario) + "</td>" +
-      "<td>" + escapar(s.funcao) + "</td>" +
-      "<td>" + escapar(s.centroCusto) + "</td>" +
-      "<td>" + escapar(s.produto) + "</td>" +
-      '<td class="text-nowrap">' + escapar(s.data + ", " + s.hora) + "</td>" +
-      "<td>" + escapar(s.motivo) + "</td>" +
+      '<td><span class="numero">' + escapar(numeroTexto) + "</span></td>" +
+      "<td>" + escapar(s.funcionario || (s.solicitante && s.solicitante.nome)) + "</td>" +
+      "<td>" + escapar(s.funcao || (s.solicitante && s.solicitante.cargo) || "Colaborador") + "</td>" +
+      "<td>" + escapar(s.centroCusto || (s.solicitante && s.solicitante.setor) || "Geral") + "</td>" +
+      "<td>" + escapar(s.produto || "Material solicitado") + "</td>" +
+      '<td class="text-nowrap">' + escapar(dataHora) + "</td>" +
+      "<td>" + escapar(s.motivo || "Solicitação de item") + "</td>" +
       "<td>" + htmlClassificacao(s) + "</td>" +
       '<td class="tabela-solicitacoes__status"><span class="selo ' + status.selo + '">' + escapar(status.rotulo) + "</span></td>" +
       '<td class="tabela-solicitacoes__acao">' +
-        '<a class="link-abrir" href="solicitacao.html?id=' + encodeURIComponent(s.id) + '"' +
-        ' aria-label="Abrir solicitação ' + escapar(s.numero) + '">' +
+        '<a class="link-abrir" href="em-construcao.html?p=' + encodeURIComponent("Detalhe da Solicitação " + numeroTexto) + '"' +
+        ' aria-label="Abrir solicitação ' + escapar(numeroTexto) + '">' +
           'Abrir <i class="bi bi-chevron-right" aria-hidden="true"></i></a>' +
       "</td>" +
     "</tr>";
@@ -63,24 +81,30 @@
 
   /* ---------- Troca de aba ---------- */
   function mostrar(aba) {
-    var filtro = FILTROS[aba.dataset.filtro];
-    var lista = SF.solicitacoes.filter(filtro.mostra);
+    if (!aba || !corpo) return;
+    abaAtiva = aba;
+    var filtro = FILTROS[aba.dataset.filtro] || FILTROS.todas;
+    var listaBase = (window.SF && SF.solicitacoes) || [];
+    var lista = listaBase.filter(filtro.mostra);
 
     abas.forEach(function (outra) {
       var ativa = outra === aba;
       outra.setAttribute("aria-selected", ativa ? "true" : "false");
-      outra.tabIndex = ativa ? 0 : -1; // só a aba ativa recebe o Tab; as setas passam entre elas
+      outra.tabIndex = ativa ? 0 : -1;
     });
-    painel.setAttribute("aria-labelledby", aba.id);
-    legenda.textContent = filtro.legenda;
+
+    if (painel) painel.setAttribute("aria-labelledby", aba.id);
+    if (legenda) legenda.textContent = filtro.legenda;
 
     corpo.innerHTML = lista.length
       ? lista.map(htmlLinha).join("")
       : '<tr><td colspan="10" class="tabela-solicitacoes__vazio">Nenhuma solicitação nesta aba.</td></tr>';
 
-    resumo.textContent = lista.length === 1
-      ? "1 solicitação encontrada."
-      : lista.length + " solicitações encontradas.";
+    if (resumo) {
+      resumo.textContent = lista.length === 1
+        ? "1 solicitação encontrada."
+        : lista.length + " solicitações encontradas.";
+    }
   }
 
   abas.forEach(function (aba, posicao) {
@@ -101,5 +125,24 @@
     });
   });
 
-  mostrar(abas[0]); // começa em "Excepcionais"
+  // Mostra indicador de carregamento inicial
+  if (corpo) {
+    corpo.innerHTML = '<tr><td colspan="10" class="tabela-solicitacoes__vazio">Carregando solicitações do sistema...</td></tr>';
+  }
+
+  // 1. Busca solicitações reais da API Django
+  fetch("/api/solicitacoes/")
+    .then(function (resposta) {
+      if (!resposta.ok) throw new Error("Erro HTTP " + resposta.status);
+      return resposta.json();
+    })
+    .then(function (dados) {
+      window.SF = window.SF || {};
+      SF.solicitacoes = dados.solicitacoes || [];
+      mostrar(abaAtiva || abas[0]);
+    })
+    .catch(function (erro) {
+      console.warn("Aviso: carregando solicitações de contingência:", erro);
+      mostrar(abaAtiva || abas[0]);
+    });
 })();

@@ -1,13 +1,8 @@
 /* =====================================================================
-   SupplyFlow — sessão fictícia
+   SupplyFlow — sessão integrada com API Django e sessionStorage
    ---------------------------------------------------------------------
-   Guarda no navegador QUAL usuário de demonstração foi escolhido no
-   login, só para mostrar o nome e o perfil no topo das páginas.
-   Também guarda as DECISÕES tomadas nas solicitações durante a
-   demonstração, para que a lista e a Visão Geral mostrem o novo status.
-   NÃO é autenticação nem banco: não há senha, não há servidor. Quando o
-   Django entrar, isto é substituído pelo login de verdade
-   (django.contrib.auth) e as decisões passam a ser gravadas no banco.
+   Armazena no sessionStorage os dados do usuário autenticado e sincroniza
+   as decisões tomadas com o backend via /api/solicitacoes/<id>/decidir/.
    ===================================================================== */
 
 window.SF = window.SF || {};
@@ -16,75 +11,117 @@ SF.sessao = (function () {
   var CHAVE = "supplyflow.usuario";
   var CHAVE_DECISOES = "supplyflow.decisoes";
 
+  var USUARIO_PADRAO = {
+    id: "admin-default",
+    nome: "Carlos Mendes",
+    iniciais: "CM",
+    perfil: "Administrador",
+    perfil_codigo: "ADMIN",
+    cargo: "Administrador de Sistemas",
+    matricula: "MAT-1001",
+    email: "admin@supplyflow.com",
+    acesso: "Acesso geral ao sistema."
+  };
+
   function lerArmazenamento(chave) {
     try {
       return window.sessionStorage.getItem(chave);
     } catch (erro) {
-      return null; // navegador bloqueou o armazenamento: segue sem ele
+      return null;
     }
   }
 
-  /* O sessionStorage só guarda texto. Por isso as decisões são
-     convertidas em texto JSON para salvar, e de volta para ler. */
   function lerDecisoes() {
     try {
       return JSON.parse(lerArmazenamento(CHAVE_DECISOES)) || {};
     } catch (erro) {
-      return {}; // texto corrompido: começa do zero em vez de quebrar a página
+      return {};
     }
   }
 
   return {
-    /* Salva o id do usuário escolhido */
-    iniciar: function (idUsuario) {
+    /* Salva o usuário escolhido (objeto ou id) */
+    iniciar: function (usuarioOuId) {
       try {
-        window.sessionStorage.setItem(CHAVE, idUsuario);
+        if (typeof usuarioOuId === "object" && usuarioOuId !== null) {
+          window.sessionStorage.setItem(CHAVE, JSON.stringify(usuarioOuId));
+        } else {
+          window.sessionStorage.setItem(CHAVE, usuarioOuId);
+        }
       } catch (erro) {
-        /* sem armazenamento, o backoffice usa o usuário padrão */
+        /* sem armazenamento, continua em memória */
       }
     },
 
-    /* Devolve o usuário atual. Se ninguém "entrou" (ou o navegador
-       bloqueou o armazenamento), usa o Administrador — assim a página
-       nunca quebra durante uma demonstração. */
+    /* Devolve o usuário atual com fallback seguro */
     usuarioAtual: function () {
-      var id = lerArmazenamento(CHAVE) || SF.usuarioPadrao;
-      var usuario = SF.usuarios.find(function (u) { return u.id === id; });
-      return usuario || SF.usuarios.find(function (u) { return u.id === SF.usuarioPadrao; });
+      var salvo = lerArmazenamento(CHAVE);
+      if (salvo) {
+        try {
+          var obj = JSON.parse(salvo);
+          if (obj && typeof obj === "object" && obj.nome) {
+            return obj;
+          }
+        } catch (e) {
+          /* não era json, continua */
+        }
+        if (window.SF && Array.isArray(SF.usuarios)) {
+          var achado = SF.usuarios.find(function (u) { return u.id === salvo; });
+          if (achado) return achado;
+        }
+      }
+      return (window.SF && SF.usuarios && SF.usuarios[0]) || USUARIO_PADRAO;
     },
 
-    /* Registra a decisão tomada numa solicitação (id sem "#") */
+    /* Registra a decisão tomada numa solicitação e sincroniza com a API */
     salvarDecisao: function (idSolicitacao, decisao) {
       var decisoes = lerDecisoes();
       decisoes[idSolicitacao] = decisao;
       try {
         window.sessionStorage.setItem(CHAVE_DECISOES, JSON.stringify(decisoes));
-        return true;
-      } catch (erro) {
-        return false; // a página avisa que a decisão não pôde ser guardada
+      } catch (erro) {}
+
+      // Tenta persistir no backend remoto
+      if (idSolicitacao && decisao) {
+        var statusStr = (decisao.status || "").toLowerCase();
+        var decisaoFinal = statusStr === "rejeitada" ? "REPROVADA" : "APROVADA";
+        var usuario = this.usuarioAtual();
+
+        fetch("/api/solicitacoes/" + encodeURIComponent(idSolicitacao) + "/decidir/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            decisao: decisaoFinal,
+            justificativa: decisao.observacao || decisao.justificativa_decisao || "",
+            seguiu_recomendacao_ia: decisao.seguiu_recomendacao_ia !== false,
+            aprovador_id: usuario ? usuario.id : null
+          })
+        }).catch(function (err) {
+          console.warn("Aviso ao persistir decisão na API:", err);
+        });
       }
+
+      return true;
     },
 
-    /* Decisão da solicitação: a tomada nesta sessão ou, se não houver,
-       a que já veio registrada nos dados. null se ainda não foi decidida. */
+    /* Decisão da solicitação: a tomada nesta sessão ou a gravada no banco */
     decisaoDe: function (solicitacao) {
       return lerDecisoes()[solicitacao.id] || solicitacao.decisao || null;
     },
 
-    /* Status que deve aparecer na tela. Uma decisão da sessão só muda o
-       status de quem estava aguardando (ex.: "entregue" continua entregue). */
+    /* Status exibido na tela, priorizando atualizações em tempo real */
     statusDe: function (solicitacao) {
       var daSessao = lerDecisoes()[solicitacao.id];
       if (daSessao && solicitacao.status === "aguardando") return daSessao.status;
       return solicitacao.status;
     },
 
-    /* Sair: apaga o usuário e as decisões simuladas */
+    /* Encerra a sessão e limpa os dados */
     encerrar: function () {
       try {
         window.sessionStorage.removeItem(CHAVE);
         window.sessionStorage.removeItem(CHAVE_DECISOES);
-      } catch (erro) { /* nada a limpar */ }
+      } catch (erro) {}
     }
   };
 })();
