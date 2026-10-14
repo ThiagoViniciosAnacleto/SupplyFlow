@@ -348,34 +348,28 @@ def api_totem_solicitar(request):
     ultimo = Solicitacao.objects.count()
     codigo_solic = f"SOL-2026-{ultimo + 1:04d}"
     valor_total = float(produto.custo_unitario) * quantidade
-    status_inicial = "AGUARDANDO_DECISAO" if eh_excepcional else "RETIRADA"
+    # RF-26 a RF-39: Todas as solicitações criadas via Totem iniciam aguardando decisão humana
+    status_inicial = "AGUARDANDO_DECISAO"
 
     solicitacao = Solicitacao.objects.create(
         codigo=codigo_solic,
         solicitante=colaborador,
         totem=totem,
         status=status_inicial,
-        justificativa_solicitante=justificativa if eh_excepcional else None,
+        justificativa_solicitante=justificativa if eh_excepcional else (justificativa or "Retirada regular de suprimento dentro da cota"),
         motivo_categoria="Substituição antecipada" if eh_excepcional else "Retirada regular",
         fora_da_cota=eh_excepcional,
         valor_total_estimado=valor_total,
-        data_conclusao=timezone.now() if not eh_excepcional else None,
+        data_conclusao=None,
     )
 
     SolicitacaoItem.objects.create(
         solicitacao=solicitacao,
         produto=produto,
         quantidade_solicitada=quantidade,
-        quantidade_aprovada=quantidade if not eh_excepcional else None,
+        quantidade_aprovada=None,
         custo_unitario_momento=produto.custo_unitario,
     )
-
-    # Se retirada regular, baixa imediatamente do totem
-    if not eh_excepcional and totem:
-        estoque_item = EstoqueTotem.objects.filter(totem=totem, produto=produto).first()
-        if estoque_item and estoque_item.quantidade_disponivel >= quantidade:
-            estoque_item.quantidade_disponivel -= quantidade
-            estoque_item.save()
 
     # Se substituição antecipada, classifica via IA supervisionada
     analise_ia_info = None
@@ -443,11 +437,7 @@ def api_totem_solicitar(request):
         "codigo": solicitacao.codigo,
         "status": status_inicial,
         "eh_excepcional": eh_excepcional,
-        "mensagem": (
-            "Retirada regular autorizada! Compartimento do totem liberado com sucesso."
-            if not eh_excepcional
-            else "Solicitação enviada com sucesso! A justificativa foi classificada pela IA e aguarda aprovação."
-        ),
+        "mensagem": "Solicitação enviada com sucesso! Sua solicitação foi encaminhada para a análise do gestor/almoxarifado.",
         "analise_ia": analise_ia_info,
     })
 
@@ -843,7 +833,15 @@ def api_decidir_solicitacao(request, solicitacao_id):
         aprovador = Usuario.objects.filter(perfil__in=["ADMIN", "GESTOR"]).first()
 
     solicitacao.status = status_final
-    solicitacao.data_conclusao = timezone.now()
+    if status_final == "REPROVADA":
+        solicitacao.data_conclusao = timezone.now()
+    else:
+        # Aprovada: aguarda confirmação de retirada física no almoxarifado/totem (RF-40)
+        solicitacao.data_conclusao = None
+        for it in solicitacao.itens.all():
+            if it.quantidade_aprovada is None:
+                it.quantidade_aprovada = it.quantidade_solicitada
+                it.save()
     solicitacao.save()
 
     DecisaoSolicitacao.objects.update_or_create(
@@ -1342,7 +1340,17 @@ def api_confirmar_entrega(request, solicitacao_id):
     s.data_conclusao = timezone.now()
     s.save()
 
-    return JsonResponse({"sucesso": True, "mensagem": f"Entrega da solicitação {s.codigo} confirmada com sucesso."})
+    # RF-40 e RF-41: Baixa definitiva no estoque do totem correspondente
+    totem = s.totem or Totem.objects.filter(status_online=True).first() or Totem.objects.first()
+    for item in s.itens.all():
+        qtd = item.quantidade_aprovada if item.quantidade_aprovada is not None else item.quantidade_solicitada
+        if totem and qtd > 0:
+            estoque_item = EstoqueTotem.objects.filter(totem=totem, produto=item.produto).first()
+            if estoque_item:
+                estoque_item.quantidade_disponivel = max(0, estoque_item.quantidade_disponivel - qtd)
+                estoque_item.save()
+
+    return JsonResponse({"sucesso": True, "mensagem": f"Entrega da solicitação {s.codigo} confirmada com sucesso e estoque atualizado."})
 
 
 def api_listar_devolucoes(request):

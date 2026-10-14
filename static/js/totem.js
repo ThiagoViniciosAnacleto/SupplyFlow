@@ -375,8 +375,8 @@
         if (!res.sucesso) throw new Error(res.erro || "Falha ao processar solicitação.");
 
         // Atualiza modal de sucesso
-        document.getElementById("sucesso-titulo").textContent = res.eh_excepcional ? "Solicitação Registrada!" : "Retirada Liberada!";
-        document.getElementById("sucesso-mensagem").textContent = res.mensagem;
+        document.getElementById("sucesso-titulo").textContent = "Solicitação Registrada!";
+        document.getElementById("sucesso-mensagem").textContent = res.mensagem || "Solicitação enviada com sucesso! Sua solicitação foi encaminhada para a análise do gestor/almoxarifado.";
 
         var elIa = document.getElementById("sucesso-detalhe-ia");
         var elIaTxt = document.getElementById("sucesso-ia-texto");
