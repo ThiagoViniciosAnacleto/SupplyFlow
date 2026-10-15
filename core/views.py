@@ -2,8 +2,7 @@ import hashlib
 import json
 import uuid
 from decimal import Decimal
-from django.db import connection
-from django.db.models import F, Sum, Count, Q
+from django.db.models import Avg, F, Sum, Count, Q
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.utils import timezone
@@ -99,6 +98,13 @@ def mapear_status_front(status_db: str, decisao=None) -> str:
     if status_db == "RETIRADA":
         return "entregue"
     return "aguardando"
+
+
+def fmt(dt, padrao):
+    """Formata data/hora no fuso do sistema (America/Sao_Paulo), não em UTC."""
+    if not dt:
+        return None
+    return timezone.localtime(dt).strftime(padrao)
 
 
 def gerar_iniciais(nome: str) -> str:
@@ -247,7 +253,7 @@ def api_totem_produtos(request):
         saldo_cota = max(0, limite_mensal - consumido_mes)
 
         ultima_data = ultimas_retiradas.get(p.id)
-        ultima_data_str = ultima_data.strftime("%d/%m/%Y") if ultima_data else None
+        ultima_data_str = fmt(ultima_data, "%d/%m/%Y") if ultima_data else None
 
         tipo_categoria = "EPI" if p.categoria and "EPI" in p.categoria.nome.upper() else "Consumível"
 
@@ -456,7 +462,7 @@ def api_totem_solicitacoes_usuario(request):
         prod_nome = primeiro_item.produto.nome if primeiro_item else "Material"
         resultado.append({
             "codigo": s.codigo,
-            "data": s.data_solicitacao.strftime("%d/%m/%Y às %H:%M"),
+            "data": fmt(s.data_solicitacao, "%d/%m/%Y às %H:%M"),
             "produto": prod_nome,
             "status": s.status,
             "status_rotulo": (
@@ -511,17 +517,7 @@ def api_listar_usuarios(request):
 
 
 def api_dashboard_kpis(request):
-    """Retorna os KPIs consolidados da VIEW e das tabelas reais."""
-    with connection.cursor() as cursor:
-        cursor.execute("SELECT * FROM vw_dashboard_visao_geral;")
-        colunas = [col[0] for col in cursor.description]
-        linha = cursor.fetchone()
-        kpis_view = dict(zip(colunas, linha)) if linha else {}
-
-    for chave, valor in kpis_view.items():
-        if hasattr(valor, "__float__"):
-            kpis_view[chave] = float(valor)
-
+    """Retorna os KPIs consolidados calculados a partir das tabelas."""
     produtos_cadastrados = Produto.objects.filter(ativo=True).count()
     funcionarios_ativos = Usuario.objects.filter(ativo=True).count()
     aguardando_aprovacao = Solicitacao.objects.filter(
@@ -567,7 +563,6 @@ def api_dashboard_kpis(request):
             valores_consumo.append(0.0)
 
     resposta = {
-        **kpis_view,
         "indicadores": indicadores,
         "entregasPorMes": entregas_por_mes,
         "consumoPorCentro": {"centros": centros, "valores": valores_consumo},
@@ -623,7 +618,7 @@ def api_listar_solicitacoes(request):
                 "justificativa_decisao": decisao.justificativa_decisao,
                 "responsavel": decisao.aprovador.nome if decisao.aprovador else "Gestor Responsável",
                 "perfil": decisao.aprovador.cargo if decisao.aprovador else "Gestor",
-                "dataHora": decisao.data_decisao.strftime("%d/%m/%Y, %H:%M"),
+                "dataHora": fmt(decisao.data_decisao, "%d/%m/%Y, %H:%M"),
             }
 
         resultado.append(
@@ -635,8 +630,8 @@ def api_listar_solicitacoes(request):
                 "status_db": s.status,
                 "excepcional": bool(s.fora_da_cota),
                 "fora_da_cota": bool(s.fora_da_cota),
-                "data": s.data_solicitacao.strftime("%d/%m/%Y"),
-                "hora": s.data_solicitacao.strftime("%H:%M"),
+                "data": fmt(s.data_solicitacao, "%d/%m/%Y"),
+                "hora": fmt(s.data_solicitacao, "%H:%M"),
                 "data_solicitacao": s.data_solicitacao.isoformat(),
                 "data_conclusao": s.data_conclusao.isoformat() if s.data_conclusao else None,
                 "motivo": motivo_texto,
@@ -717,7 +712,7 @@ def api_detalhe_solicitacao(request, solicitacao_id):
     )
     for ant in anteriores:
         historico.append({
-            "data": ant.data_solicitacao.strftime("%d/%m/%Y"),
+            "data": fmt(ant.data_solicitacao, "%d/%m/%Y"),
             "tipo": ant.motivo_categoria or ("Substituição antecipada" if ant.fora_da_cota else "Entrega regular"),
             "status": ant.status,
         })
@@ -729,8 +724,8 @@ def api_detalhe_solicitacao(request, solicitacao_id):
         "status": status_front,
         "status_db": s.status,
         "excepcional": s.fora_da_cota,
-        "data": s.data_solicitacao.strftime("%d/%m/%Y"),
-        "hora": s.data_solicitacao.strftime("%H:%M"),
+        "data": fmt(s.data_solicitacao, "%d/%m/%Y"),
+        "hora": fmt(s.data_solicitacao, "%H:%M"),
         "data_solicitacao": s.data_solicitacao.isoformat(),
         "motivo": s.motivo_categoria or "Substituição antecipada",
         "justificativa": s.justificativa_solicitante,
@@ -789,7 +784,7 @@ def api_detalhe_solicitacao(request, solicitacao_id):
                 "justificativa_decisao": decisao.justificativa_decisao,
                 "responsavel": decisao.aprovador.nome if decisao.aprovador else "Gestor",
                 "perfil": decisao.aprovador.cargo if decisao.aprovador else "Gestor",
-                "dataHora": decisao.data_decisao.strftime("%d/%m/%Y, %H:%M"),
+                "dataHora": fmt(decisao.data_decisao, "%d/%m/%Y, %H:%M"),
             }
             if decisao
             else None
@@ -895,7 +890,7 @@ def api_listar_funcionarios(request):
             "setor_nome": u.setor.nome if u.setor else "Sem setor",
             "centro_custo": u.setor.centro_custo if u.setor else "—",
             "ativo": u.ativo,
-            "created_at": u.created_at.strftime("%d/%m/%Y") if u.created_at else "—",
+            "created_at": fmt(u.created_at, "%d/%m/%Y") if u.created_at else "—",
         }
         for u in qs
     ]
@@ -1187,7 +1182,7 @@ def api_listar_estoque(request):
             "quantidade_minima": minimo,
             "slot_posicao": e.slot_posicao or "Padrão",
             "status_estoque": status_estoque,
-            "updated_at": e.updated_at.strftime("%d/%m/%Y às %H:%M") if e.updated_at else "—",
+            "updated_at": fmt(e.updated_at, "%d/%m/%Y às %H:%M") if e.updated_at else "—",
         })
 
     totens_dados = [
@@ -1245,11 +1240,13 @@ def api_repor_estoque(request):
 # ============================================================================
 def api_avaliacao_ia(request):
     """Retorna dados de acurácia, matriz de confusão e feedbacks do classificador."""
-    with connection.cursor() as cursor:
-        cursor.execute("SELECT * FROM vw_dashboard_visao_geral;")
-        colunas = [col[0] for col in cursor.description]
-        linha = cursor.fetchone()
-        kpis = dict(zip(colunas, linha)) if linha else {}
+    media = AnaliseIA.objects.aggregate(m=Avg("score_confianca"))["m"]
+    total_decisoes = DecisaoSolicitacao.objects.count()
+    seguiu = DecisaoSolicitacao.objects.filter(seguiu_recomendacao_ia=True).count()
+    kpis = {
+        "media_confianca_ia": float(media) if media is not None else 0.0,
+        "taxa_aderencia_ia_percentual": round(seguiu * 100 / total_decisoes, 2) if total_decisoes else 0.0,
+    }
 
     avaliacoes = AvaliacaoModeloIA.objects.select_related("analise_ia__solicitacao", "avaliador").all().order_by("-created_at")
 
@@ -1262,7 +1259,7 @@ def api_avaliacao_ia(request):
             "nota": a.nota_precisao,
             "feedback": a.feedback_comentario or "Sem comentário adicional.",
             "tags": a.tags_erro or [],
-            "data": a.created_at.strftime("%d/%m/%Y"),
+            "data": fmt(a.created_at, "%d/%m/%Y"),
         }
         for a in avaliacoes
     ]
@@ -1315,8 +1312,8 @@ def api_listar_entregas(request):
         resultado.append({
             "id": str(s.id),
             "codigo": s.codigo,
-            "data": s.data_solicitacao.strftime("%d/%m/%Y às %H:%M"),
-            "data_conclusao": s.data_conclusao.strftime("%d/%m/%Y às %H:%M") if s.data_conclusao else "Pendente",
+            "data": fmt(s.data_solicitacao, "%d/%m/%Y às %H:%M"),
+            "data_conclusao": fmt(s.data_conclusao, "%d/%m/%Y às %H:%M") if s.data_conclusao else "Pendente",
             "colaborador": s.solicitante.nome,
             "matricula": s.solicitante.codigo_matricula,
             "setor": s.solicitante.setor.nome if s.solicitante.setor else "Operações",
@@ -1369,7 +1366,7 @@ def api_listar_devolucoes(request):
         resultado.append({
             "id": str(s.id),
             "codigo": s.codigo,
-            "data_solicitacao": s.data_solicitacao.strftime("%d/%m/%Y"),
+            "data_solicitacao": fmt(s.data_solicitacao, "%d/%m/%Y"),
             "colaborador": s.solicitante.nome,
             "matricula": s.solicitante.codigo_matricula,
             "setor": s.solicitante.setor.nome if s.solicitante.setor else "Operações",

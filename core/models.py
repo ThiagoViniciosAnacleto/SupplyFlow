@@ -10,7 +10,6 @@ class Setor(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        managed = False
         db_table = "setores"
 
     def __str__(self):
@@ -35,7 +34,6 @@ class Usuario(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        managed = False
         db_table = "usuarios"
 
     def __str__(self):
@@ -52,7 +50,6 @@ class Totem(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        managed = False
         db_table = "totens"
 
     def __str__(self):
@@ -65,7 +62,6 @@ class CategoriaProduto(models.Model):
     descricao = models.TextField(blank=True, null=True)
 
     class Meta:
-        managed = False
         db_table = "categorias_produtos"
 
     def __str__(self):
@@ -93,7 +89,6 @@ class Produto(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        managed = False
         db_table = "produtos"
 
     def __str__(self):
@@ -112,7 +107,6 @@ class EstoqueTotem(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        managed = False
         db_table = "estoque_totem"
 
 
@@ -137,7 +131,6 @@ class Solicitacao(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        managed = False
         db_table = "solicitacoes"
 
     def __str__(self):
@@ -162,7 +155,6 @@ class SolicitacaoItem(models.Model):
     )
 
     class Meta:
-        managed = False
         db_table = "solicitacao_itens"
 
 
@@ -184,7 +176,6 @@ class AnaliseIA(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        managed = False
         db_table = "analises_ia"
 
 
@@ -205,7 +196,6 @@ class DecisaoSolicitacao(models.Model):
     data_decisao = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        managed = False
         db_table = "decisoes_solicitacao"
 
 
@@ -227,5 +217,4 @@ class AvaliacaoModeloIA(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        managed = False
         db_table = "avaliacoes_modelo_ia"
