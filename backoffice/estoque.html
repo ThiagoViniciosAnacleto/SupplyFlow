@@ -124,6 +124,7 @@
 
   <script src="../static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
   <script src="../static/js/dados-demo.js"></script>
+  <script src="../static/js/api.js"></script>
   <script src="../static/js/sessao.js"></script>
   <script src="../static/js/backoffice.js"></script>
   <script>
@@ -135,8 +136,7 @@
       var estoqueCache = [];
 
       function carregarEstoque() {
-        fetch("/api/estoque/")
-          .then(function(r) { return r.json(); })
+        SF.api.get("/api/estoque/")
           .then(function(d) {
             estoqueCache = d.estoque || [];
             document.getElementById("res-total-estoque").textContent = d.resumo.total_registros || 0;
@@ -197,12 +197,7 @@
             quantidade: parseInt(document.getElementById("repor-qtd").value, 10),
           };
 
-          fetch("/api/estoque/repor/", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          })
-            .then(function(r) { return r.json(); })
+          SF.api.post("/api/estoque/repor/", payload)
             .then(function(res) {
               if (!res.sucesso) throw new Error(res.erro || "Falha na reposição");
               if (modalBs) modalBs.hide();

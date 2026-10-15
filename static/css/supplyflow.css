@@ -640,3 +640,11 @@
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
+
+/* Cabeçalho de linha (th dentro do corpo da tabela): texto normal, não maiúsculo */
+.tabela-solicitacoes tbody th {
+  color: var(--sf-texto);
+  font-size: 14px;
+  letter-spacing: 0;
+  text-transform: none;
+}

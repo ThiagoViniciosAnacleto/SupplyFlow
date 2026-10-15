@@ -1,6 +1,9 @@
 from django.contrib import admin
+from django.contrib.auth import views as auth_views
 from django.urls import path
+
 from core import views
+from core.contas import FormularioRedefinicao
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -29,16 +32,54 @@ urlpatterns = [
     path("backoffice/avaliacao-ia.html", views.pagina_avaliacao_ia, name="avaliacao_ia"),
     path("backoffice/entregas.html", views.pagina_entregas, name="entregas"),
     path("backoffice/devolucoes.html", views.pagina_devolucoes, name="devolucoes"),
+    path("backoffice/usuarios.html", views.pagina_usuarios, name="usuarios"),
+    path("backoffice/auditoria.html", views.pagina_auditoria, name="auditoria"),
     path("backoffice/em-construcao.html", views.pagina_em_construcao, name="em_construcao"),
+
+    # "Esqueci minha senha" (telas prontas do Django, com o visual do SupplyFlow)
+    path(
+        "senha/esqueci/",
+        auth_views.PasswordResetView.as_view(
+            form_class=FormularioRedefinicao,
+            template_name="registration/esqueci-senha.html",
+            subject_template_name="registration/assunto_redefinicao.txt",
+            email_template_name="registration/email_redefinicao.txt",
+            success_url="/senha/enviada/",
+        ),
+        name="senha_esqueci",
+    ),
+    path(
+        "senha/enviada/",
+        auth_views.PasswordResetDoneView.as_view(template_name="registration/senha-enviada.html"),
+        name="senha_enviada",
+    ),
+    path(
+        "senha/nova/<uidb64>/<token>/",
+        views.RedefinirSenhaView.as_view(),
+        name="password_reset_confirm",
+    ),
+    path(
+        "senha/concluida/",
+        auth_views.PasswordResetCompleteView.as_view(template_name="registration/senha-concluida.html"),
+        name="senha_concluida",
+    ),
 
     # =========================================================================
     # ENDPOINTS DA API DO TOTEM DE AUTOATENDIMENTO
     # =========================================================================
     path("api/totem/identificar/", views.api_totem_identificar, name="api_totem_identificar"),
     path("api/totem/login/", views.api_totem_login, name="api_totem_login"),
+    path("api/totem/sair/", views.api_totem_sair, name="api_totem_sair"),
     path("api/totem/produtos/", views.api_totem_produtos, name="api_totem_produtos"),
     path("api/totem/solicitar/", views.api_totem_solicitar, name="api_totem_solicitar"),
     path("api/totem/solicitacoes/", views.api_totem_solicitacoes_usuario, name="api_totem_solicitacoes_usuario"),
+
+    # =========================================================================
+    # AUTENTICAÇÃO DO BACKOFFICE
+    # =========================================================================
+    path("api/login/", views.api_login, name="api_login"),
+    path("api/logout/", views.api_logout, name="api_logout"),
+    path("api/sessao/", views.api_sessao, name="api_sessao"),
 
     # =========================================================================
     # ENDPOINTS DA API DO BACKOFFICE E DASHBOARD
@@ -54,6 +95,7 @@ urlpatterns = [
     path("api/funcionarios/", views.api_listar_funcionarios, name="api_funcionarios"),
     path("api/funcionarios/salvar/", views.api_salvar_funcionario, name="api_salvar_funcionario"),
     path("api/funcionarios/<uuid:funcionario_id>/toggle/", views.api_toggle_funcionario, name="api_toggle_funcionario"),
+    path("api/funcionarios/<uuid:funcionario_id>/enviar-link-senha/", views.api_enviar_link_senha, name="api_enviar_link_senha"),
     path("api/setores/", views.api_listar_setores, name="api_setores"),
     path("api/setores/salvar/", views.api_salvar_setor, name="api_salvar_setor"),
     path("api/setores/<uuid:setor_id>/toggle/", views.api_toggle_setor, name="api_toggle_setor"),
@@ -63,5 +105,5 @@ urlpatterns = [
     path("api/entregas/", views.api_listar_entregas, name="api_entregas"),
     path("api/entregas/<uuid:solicitacao_id>/confirmar/", views.api_confirmar_entrega, name="api_confirmar_entrega"),
     path("api/devolucoes/", views.api_listar_devolucoes, name="api_devolucoes"),
-    path("api/login/", views.api_login, name="api_login"),
+    path("api/auditoria/", views.api_listar_auditoria, name="api_auditoria"),
 ]

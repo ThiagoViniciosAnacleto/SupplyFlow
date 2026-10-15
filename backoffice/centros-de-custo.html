@@ -86,6 +86,7 @@
 
   <script src="../static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
   <script src="../static/js/dados-demo.js"></script>
+  <script src="../static/js/api.js"></script>
   <script src="../static/js/sessao.js"></script>
   <script src="../static/js/backoffice.js"></script>
   <script>
@@ -97,8 +98,7 @@
       var setoresCache = [];
 
       function carregarSetores() {
-        fetch("/api/setores/")
-          .then(function(r) { return r.json(); })
+        SF.api.get("/api/setores/")
           .then(function(d) {
             setoresCache = d.setores || [];
             if (setoresCache.length === 0) {
@@ -135,7 +135,7 @@
 
             document.querySelectorAll(".btn-toggle-setor").forEach(function(b) {
               b.addEventListener("click", function() {
-                fetch("/api/setores/" + encodeURIComponent(b.dataset.id) + "/toggle/", { method: "POST" })
+                SF.api.post("/api/setores/" + encodeURIComponent(b.dataset.id) + "/toggle/")
                   .then(function() { carregarSetores(); });
               });
             });
@@ -160,12 +160,7 @@
             nome: document.getElementById("setor-nome").value.trim(),
             centro_custo: document.getElementById("setor-cc").value.trim(),
           };
-          fetch("/api/setores/salvar/", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          })
-            .then(function(r) { return r.json(); })
+          SF.api.post("/api/setores/salvar/", payload)
             .then(function(res) {
               if (!res.sucesso) throw new Error(res.erro || "Falha ao salvar");
               if (modalBs) modalBs.hide();

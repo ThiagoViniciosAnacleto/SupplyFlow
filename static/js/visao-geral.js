@@ -89,7 +89,7 @@
   function renderizarPainel(indicadores, solicitacoes, entregasPorMes, consumoPorCentro) {
     // 1. Identifica solicitações pendentes (considerando decisões na sessão se houver)
     var pendentes = solicitacoes.filter(function (s) {
-      return SF.sessao.statusDe(s) === "aguardando";
+      return s.status === "aguardando";
     });
 
     // 2. Indicadores (Cards)

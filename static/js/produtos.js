@@ -18,8 +18,7 @@
   function carregarProdutos() {
     tabelaCorpo.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Carregando catálogo de produtos...</td></tr>';
 
-    fetch("/api/produtos/?todos=true")
-      .then(function (r) { return r.json(); })
+    SF.api.get("/api/produtos/?todos=true")
       .then(function (dados) {
         produtosCache = dados.produtos || [];
         categoriasCache = dados.categorias || [];
@@ -128,8 +127,7 @@
     document.querySelectorAll(".btn-toggle-prod").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var id = this.dataset.id;
-        fetch("/api/produtos/" + encodeURIComponent(id) + "/toggle/", { method: "POST" })
-          .then(function (r) { return r.json(); })
+        SF.api.post("/api/produtos/" + encodeURIComponent(id) + "/toggle/")
           .then(function () {
             carregarProdutos();
           });
@@ -163,12 +161,7 @@
         requer_justificativa: document.getElementById("prod-requer-justificativa").checked,
       };
 
-      fetch("/api/produtos/salvar/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      })
-        .then(function (r) { return r.json(); })
+      SF.api.post("/api/produtos/salvar/", payload)
         .then(function (res) {
           if (!res.sucesso) throw new Error(res.erro || "Falha ao salvar produto.");
           if (modalBs) modalBs.hide();

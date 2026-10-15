@@ -1,4 +1,6 @@
 import uuid
+
+from django.conf import settings
 from django.db import models
 
 
@@ -21,10 +23,21 @@ class Usuario(models.Model):
     setor = models.ForeignKey(
         Setor, on_delete=models.SET_NULL, null=True, db_column="setor_id"
     )
+    # Conta de login do backoffice (django.contrib.auth). Só quem tem perfil
+    # administrativo possui conta; colaboradores usam apenas o PIN no totem.
+    conta = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="usuario",
+    )
     codigo_matricula = models.CharField(max_length=30, unique=True)
     nome = models.CharField(max_length=150)
     email = models.CharField(max_length=150, unique=True, blank=True, null=True)
+    # Legado: senhas antigas em MD5. São migradas para a conta no 1º login e apagadas.
     senha_hash = models.CharField(max_length=255, blank=True, null=True)
+    # PIN do totem com hash forte do Django (PBKDF2); hashes MD5 antigos são convertidos no 1º uso.
     pin_hash = models.CharField(max_length=255, blank=True, null=True)
     cargo = models.CharField(max_length=100, blank=True, null=True)
     perfil = models.CharField(max_length=30, default="COLABORADOR")
@@ -218,3 +231,28 @@ class AvaliacaoModeloIA(models.Model):
 
     class Meta:
         db_table = "avaliacoes_modelo_ia"
+
+
+class RegistroAuditoria(models.Model):
+    """Trilha de auditoria (RF-46, RNF-07): quem fez o quê, quando e em qual registro.
+    Os registros só são criados, nunca editados ou apagados pela aplicação."""
+
+    id = models.BigAutoField(primary_key=True)
+    usuario = models.ForeignKey(
+        Usuario, on_delete=models.SET_NULL, null=True, blank=True, db_column="usuario_id"
+    )
+    usuario_nome = models.CharField(max_length=150, blank=True)  # cópia: sobrevive à exclusão
+    acao = models.CharField(max_length=50, db_index=True)
+    entidade = models.CharField(max_length=50, blank=True)
+    entidade_id = models.CharField(max_length=64, blank=True)
+    descricao = models.CharField(max_length=255, blank=True)
+    detalhes = models.JSONField(default=dict, blank=True)
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    data = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        db_table = "auditoria"
+        ordering = ["-data"]
+
+    def __str__(self):
+        return f"{self.data:%d/%m/%Y %H:%M} {self.acao} {self.usuario_nome}"

@@ -1,73 +1,116 @@
-"""API de login."""
-import hashlib
-import json
-import uuid
-from decimal import Decimal
-from django.db.models import Avg, F, Sum, Count, Q
+"""Login, logout e sessão do backoffice (RF-08, RNF-03)."""
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.views import PasswordResetConfirmView
 from django.http import JsonResponse
-from django.shortcuts import render, get_object_or_404
 from django.utils import timezone
-from django.views.decorators.csrf import csrf_exempt
-from ..models import (
-    Solicitacao,
-    SolicitacaoItem,
-    Produto,
-    CategoriaProduto,
-    Usuario,
-    Setor,
-    Totem,
-    EstoqueTotem,
-    DecisaoSolicitacao,
-    AnaliseIA,
-    AvaliacaoModeloIA,
-)
+from django.views.decorators.http import require_GET, require_POST
+
+from ..auditoria import registrar
+from ..contas import garantir_conta
+from ..models import Usuario
+from ..permissoes import DESCRICAO_ACESSO, PERFIS, PERFIS_BACKOFFICE, acoes_do_perfil, usuario_da_requisicao
+from ..seguranca import bloqueado, limpar_falhas, registrar_falha, senha_legada_confere
+from .util import gerar_iniciais, ler_json
+
+MENSAGEM_FALHA = "E-mail ou senha incorretos."
 
 
-from .util import fmt, gerar_iniciais, mapear_status_front
+def dados_da_sessao(usuario):
+    """O que o front precisa saber sobre quem está logado (sem dados sensíveis)."""
+    return {
+        "id": str(usuario.id),
+        "nome": usuario.nome,
+        "iniciais": gerar_iniciais(usuario.nome),
+        "email": usuario.email,
+        "matricula": usuario.codigo_matricula,
+        "perfil_codigo": usuario.perfil,
+        "perfil": PERFIS.get(usuario.perfil, usuario.perfil),
+        "cargo": usuario.cargo,
+        "acesso": DESCRICAO_ACESSO.get(usuario.perfil, ""),
+        "acoes": sorted(acoes_do_perfil(usuario.perfil)),
+    }
 
 
-# ============================================================================
-# LOGIN DE BACKOFFICE (EMAIL + SENHA) OU TOTEM (MATRÍCULA + PIN)
-# ============================================================================
-@csrf_exempt
+@require_POST
 def api_login(request):
-    """Autentica via Backoffice (email + senha) ou via Totem (matricula + pin)."""
-    if request.method != "POST":
-        return JsonResponse({"erro": "Método não permitido"}, status=405)
+    """Autentica o backoffice por e-mail + senha e abre a sessão no servidor."""
+    dados, erro = ler_json(request)
+    if erro:
+        return erro
 
-    try:
-        body = json.loads(request.body)
-    except json.JSONDecodeError:
-        return JsonResponse({"erro": "JSON inválido"}, status=400)
+    email = (dados.get("email") or "").strip().lower()
+    senha = dados.get("senha") or ""
+    if not email or not senha:
+        return JsonResponse({"autenticado": False, "erro": "Informe e-mail e senha."}, status=400)
 
-    email = body.get("email")
-    senha = body.get("senha")
-    matricula = body.get("matricula")
-    pin = body.get("pin")
+    if bloqueado("login", email):
+        return JsonResponse(
+            {"autenticado": False, "erro": "Muitas tentativas. Aguarde 15 minutos e tente de novo."},
+            status=429,
+        )
 
-    if email and senha:
-        senha_md5 = hashlib.md5(senha.encode()).hexdigest()
-        user = Usuario.objects.filter(email=email, senha_hash=senha_md5, ativo=True).first()
-    elif matricula and pin:
-        pin_md5 = hashlib.md5(pin.encode()).hexdigest()
-        user = Usuario.objects.filter(codigo_matricula=matricula, pin_hash=pin_md5, ativo=True).first()
-    else:
-        return JsonResponse({"autenticado": False, "erro": "Credenciais incompletas"}, status=400)
-
-    if not user:
-        return JsonResponse({"autenticado": False, "erro": "Credenciais inválidas"}, status=401)
-
-    return JsonResponse(
-        {
-            "autenticado": True,
-            "usuario": {
-                "id": str(user.id),
-                "nome": user.nome,
-                "iniciais": gerar_iniciais(user.nome),
-                "email": user.email,
-                "matricula": user.codigo_matricula,
-                "perfil": user.perfil,
-                "cargo": user.cargo,
-            },
-        }
+    usuario = (
+        Usuario.objects.filter(email__iexact=email, ativo=True, perfil__in=PERFIS_BACKOFFICE)
+        .select_related("conta")
+        .first()
     )
+    conta = None
+    if usuario:
+        conta = garantir_conta(usuario)
+        if conta is not None and not conta.has_usable_password() and senha_legada_confere(usuario, senha):
+            # Senha antiga em MD5 correta: passa para o hash forte e apaga o MD5.
+            conta.set_password(senha)
+            conta.save(update_fields=["password"])
+            usuario.senha_hash = None
+            usuario.save(update_fields=["senha_hash"])
+        if conta is not None:
+            conta = authenticate(request, username=conta.username, password=senha)
+
+    if conta is None:
+        registrar_falha("login", email)
+        registrar(request, "LOGIN_FALHOU", descricao=f"Tentativa de login para {email}", usuario=usuario)
+        return JsonResponse({"autenticado": False, "erro": MENSAGEM_FALHA}, status=401)
+
+    limpar_falhas("login", email)
+    login(request, conta)
+    usuario.ultimo_acesso = timezone.now()
+    usuario.save(update_fields=["ultimo_acesso"])
+    registrar(request, "LOGIN", usuario, "Entrou no backoffice", usuario=usuario)
+    return JsonResponse({"autenticado": True, "usuario": dados_da_sessao(usuario)})
+
+
+@require_POST
+def api_logout(request):
+    usuario = usuario_da_requisicao(request)
+    if usuario:
+        registrar(request, "LOGOUT", usuario, "Saiu do backoffice", usuario=usuario)
+    logout(request)
+    return JsonResponse({"sucesso": True})
+
+
+@require_GET
+def api_sessao(request):
+    """Quem está logado agora. 401 se a sessão expirou."""
+    usuario = usuario_da_requisicao(request)
+    if usuario is None:
+        return JsonResponse({"autenticado": False}, status=401)
+    return JsonResponse({"autenticado": True, "usuario": dados_da_sessao(usuario)})
+
+
+class RedefinirSenhaView(PasswordResetConfirmView):
+    """Tela do link recebido por e-mail: a pessoa cria a própria senha."""
+
+    template_name = "registration/nova-senha.html"
+    success_url = "/senha/concluida/"
+
+    def form_valid(self, form):
+        resposta = super().form_valid(form)
+        usuario = getattr(form.user, "usuario", None)
+        if usuario is not None:
+            usuario.senha_hash = None  # descarta qualquer hash MD5 antigo
+            usuario.save(update_fields=["senha_hash"])
+        registrar(self.request, "SENHA_DEFINIDA", usuario, "Senha criada/redefinida pelo link", usuario=usuario)
+        return resposta
+
+
+__all__ = ["api_login", "api_logout", "api_sessao", "RedefinirSenhaView"]

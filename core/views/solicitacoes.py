@@ -7,7 +7,7 @@ from django.db.models import Avg, F, Sum, Count, Q
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.utils import timezone
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_GET, require_POST
 from ..models import (
     Solicitacao,
     SolicitacaoItem,
@@ -23,47 +23,55 @@ from ..models import (
 )
 
 
+from ..permissoes import ACOES, DESCRICAO_ACESSO, PERFIS, PERFIS_BACKOFFICE, api_backoffice
 from .util import fmt, gerar_iniciais, mapear_status_front
 
 
 # ============================================================================
 # ENDPOINTS DO BACKOFFICE ADMINISTRATIVO
 # ============================================================================
+@require_GET
+@api_backoffice("pessoas")
 def api_listar_usuarios(request):
-    """Lista usuários cadastrados para seleção na demonstração do Backoffice/Totem."""
-    usuarios = Usuario.objects.select_related("setor").filter(ativo=True).order_by("nome")
-
-    PERFIL_MAP = {
-        "ADMIN": ("Administrador", "Acesso geral ao sistema."),
-        "GESTOR": ("Gestor / Supervisor", "Aprovações e acompanhamento da equipe."),
-        "OPERADOR": ("Almoxarife", "Estoque, entregas e devoluções."),
-        "TECNICO_SEGURANCA": ("Técnico de Segurança", "Análise de solicitações e segurança do trabalho."),
-        "COLABORADOR": ("Colaborador", "Autoatendimento e consulta de retiradas."),
-    }
-
+    """Usuários com acesso ao backoffice, situação da conta e matriz de permissões (RF-08, RF-09)."""
+    usuarios = (
+        Usuario.objects.select_related("setor", "conta")
+        .filter(perfil__in=PERFIS_BACKOFFICE)
+        .order_by("nome")
+    )
     resultado = []
     for u in usuarios:
-        perfil_desc, acesso_desc = PERFIL_MAP.get(
-            u.perfil, (u.cargo or u.perfil, "Acesso operacional ao sistema.")
-        )
-        resultado.append(
-            {
-                "id": str(u.id),
-                "nome": u.nome,
-                "iniciais": gerar_iniciais(u.nome),
-                "perfil": perfil_desc,
-                "perfil_codigo": u.perfil,
-                "cargo": u.cargo or perfil_desc,
-                "matricula": u.codigo_matricula,
-                "email": u.email,
-                "setor": u.setor.nome if u.setor else None,
-                "acesso": acesso_desc,
-            }
-        )
+        if not u.ativo:
+            situacao = "inativo"
+        elif u.conta_id and u.conta.has_usable_password() and u.conta.is_active:
+            situacao = "ativo"
+        elif u.email:
+            situacao = "convite_pendente"
+        else:
+            situacao = "sem_email"
+        resultado.append({
+            "id": str(u.id),
+            "nome": u.nome,
+            "iniciais": gerar_iniciais(u.nome),
+            "email": u.email,
+            "matricula": u.codigo_matricula,
+            "perfil_codigo": u.perfil,
+            "perfil": PERFIS.get(u.perfil, u.perfil),
+            "setor": u.setor.nome if u.setor else None,
+            "situacao": situacao,
+            "ultimo_acesso": fmt(u.ultimo_acesso, "%d/%m/%Y %H:%M") if u.ultimo_acesso else None,
+        })
 
-    return JsonResponse({"usuarios": resultado})
+    matriz = [
+        {"perfil_codigo": codigo, "perfil": nome, "acesso": DESCRICAO_ACESSO.get(codigo, ""),
+         "acoes": sorted(ACOES.get(codigo, set()))}
+        for codigo, nome in PERFIS.items()
+    ]
+    return JsonResponse({"usuarios": resultado, "permissoes": matriz})
 
 
+@require_GET
+@api_backoffice("ver")
 def api_dashboard_kpis(request):
     """Retorna os KPIs consolidados calculados a partir das tabelas."""
     produtos_cadastrados = Produto.objects.filter(ativo=True).count()
@@ -118,6 +126,8 @@ def api_dashboard_kpis(request):
     return JsonResponse(resposta)
 
 
+@require_GET
+@api_backoffice("ver")
 def api_listar_solicitacoes(request):
     """Lista solicitações com compatibilidade relacional e plana."""
     solicitacoes = (
@@ -232,6 +242,8 @@ def api_listar_solicitacoes(request):
     return JsonResponse({"solicitacoes": resultado})
 
 
+@require_GET
+@api_backoffice("ver")
 def api_detalhe_solicitacao(request, solicitacao_id):
     """Retorna o detalhe minucioso de uma solicitação para a tela solicitacao.html."""
     try:
@@ -342,7 +354,8 @@ def api_detalhe_solicitacao(request, solicitacao_id):
     return JsonResponse({"solicitacao": dados})
 
 
-@csrf_exempt
+@require_POST
+@api_backoffice("decidir")
 def api_decidir_solicitacao(request, solicitacao_id):
     """Registra uma aprovação ou reprovação para uma solicitação."""
     if request.method != "POST":
@@ -363,17 +376,8 @@ def api_decidir_solicitacao(request, solicitacao_id):
 
     justificativa = body.get("justificativa", "")
     seguiu_ia = body.get("seguiu_recomendacao_ia", True)
-    aprovador_id = body.get("aprovador_id")
-
-    aprovador = None
-    if aprovador_id:
-        try:
-            aprovador = Usuario.objects.filter(id=aprovador_id).first()
-        except Exception:
-            pass
-
-    if not aprovador:
-        aprovador = Usuario.objects.filter(perfil__in=["ADMIN", "GESTOR"]).first()
+    # Quem decide é quem está logado — nunca um id enviado pelo navegador (RNF-04, RNF-07).
+    aprovador = request.usuario
 
     solicitacao.status = status_final
     if status_final == "REPROVADA":

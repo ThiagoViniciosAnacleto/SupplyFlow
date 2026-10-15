@@ -17,19 +17,14 @@
   };
 
   function carregarDetalhes() {
-    fetch("/api/solicitacoes/" + encodeURIComponent(solicId) + "/")
-      .then(function (r) {
-        if (!r.ok) throw new Error("Solicitação não encontrada");
-        return r.json();
-      })
+    SF.api.get("/api/solicitacoes/" + encodeURIComponent(solicId) + "/")
       .then(function (dados) {
         solicitacaoAtual = dados.solicitacao;
         renderizarTela(solicitacaoAtual);
       })
       .catch(function (err) {
         console.warn("Erro ao buscar da API, tentando lista:", err);
-        fetch("/api/solicitacoes/")
-          .then(function (r) { return r.json(); })
+        SF.api.get("/api/solicitacoes/")
           .then(function (d) {
             var s = (d.solicitacoes || []).find(function (item) {
               return item.id === solicId || item.codigo === solicId || item.numero === solicId;
@@ -145,19 +140,11 @@
       obs = "Liberado mediante devolução obrigatória do EPI antigo ao almoxarifado.";
     }
 
-    var usuarioSessao = SF.sessao ? SF.sessao.usuarioAtual() : null;
-
-    fetch("/api/solicitacoes/" + encodeURIComponent(solicitacaoAtual.id) + "/decidir/", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        decisao: decisaoFinal,
-        justificativa: obs,
-        seguiu_recomendacao_ia: true,
-        aprovador_id: usuarioSessao ? usuarioSessao.id : null,
-      }),
+    SF.api.post("/api/solicitacoes/" + encodeURIComponent(solicitacaoAtual.id) + "/decidir/", {
+      decisao: decisaoFinal,
+      justificativa: obs,
+      seguiu_recomendacao_ia: true,
     })
-      .then(function (r) { return r.json(); })
       .then(function (res) {
         if (!res.sucesso) throw new Error(res.erro || "Falha ao registrar decisão");
         alert(res.mensagem || "Decisão gravada com sucesso!");

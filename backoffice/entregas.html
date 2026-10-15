@@ -56,6 +56,7 @@
 
   <script src="../static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
   <script src="../static/js/dados-demo.js"></script>
+  <script src="../static/js/api.js"></script>
   <script src="../static/js/sessao.js"></script>
   <script src="../static/js/backoffice.js"></script>
   <script>
@@ -63,8 +64,7 @@
       var corpo = document.getElementById("tabela-entregas-corpo");
 
       function carregarEntregas() {
-        fetch("/api/entregas/")
-          .then(function(r) { return r.json(); })
+        SF.api.get("/api/entregas/")
           .then(function(d) {
             var entregas = d.entregas || [];
             if (entregas.length === 0) {
@@ -97,8 +97,7 @@
             document.querySelectorAll(".btn-confirmar-entrega").forEach(function(btn) {
               btn.addEventListener("click", function() {
                 var id = this.dataset.id;
-                fetch("/api/entregas/" + encodeURIComponent(id) + "/confirmar/", { method: "POST" })
-                  .then(function(r) { return r.json(); })
+                SF.api.post("/api/entregas/" + encodeURIComponent(id) + "/confirmar/")
                   .then(function() { carregarEntregas(); });
               });
             });

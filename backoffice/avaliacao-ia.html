@@ -135,12 +135,12 @@
 
   <script src="../static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
   <script src="../static/js/dados-demo.js"></script>
+  <script src="../static/js/api.js"></script>
   <script src="../static/js/sessao.js"></script>
   <script src="../static/js/backoffice.js"></script>
   <script>
     (function() {
-      fetch("/api/avaliacao-ia/")
-        .then(function(r) { return r.json(); })
+      SF.api.get("/api/avaliacao-ia/")
         .then(function(dados) {
           document.getElementById("kpi-acuracia").textContent = dados.acuracia_global + "%";
           document.getElementById("kpi-exemplos").textContent = dados.total_exemplos;

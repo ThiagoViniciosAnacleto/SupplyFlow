@@ -55,13 +55,13 @@
 
   <script src="../static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
   <script src="../static/js/dados-demo.js"></script>
+  <script src="../static/js/api.js"></script>
   <script src="../static/js/sessao.js"></script>
   <script src="../static/js/backoffice.js"></script>
   <script>
     (function() {
       var corpo = document.getElementById("tabela-devolucoes-corpo");
-      fetch("/api/devolucoes/")
-        .then(function(r) { return r.json(); })
+      SF.api.get("/api/devolucoes/")
         .then(function(d) {
           var devolucoes = d.devolucoes || [];
           if (devolucoes.length === 0) {

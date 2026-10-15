@@ -4,6 +4,7 @@
    ===================================================================== */
 
 (function () {
+  var TAMANHO_MAX_MATRICULA = 12;
   // Estado da sessão no Totem
   var estado = {
     matricula: "",
@@ -15,14 +16,6 @@
     timerSucesso: null,
   };
 
-  var DICAS_PIN = {
-    "MAT-2001": "1122",
-    "MAT-2002": "3344",
-    "MAT-2003": "9988",
-    "MAT-1001": "1234",
-    "MAT-1002": "5678",
-    "MAT-1003": "4321",
-  };
 
   // Elementos do DOM
   var inputMatricula = document.getElementById("input-matricula");
@@ -53,6 +46,10 @@
     if (bsModalSucesso) bsModalSucesso.hide();
     if (bsModalSols) bsModalSols.hide();
 
+    // Encerra a sessão do totem no servidor (o próximo colaborador começa do zero)
+    if (estado.colaborador) {
+      SF.api.post("/api/totem/sair/", {}, { semRedirecionar: true }).catch(function () {});
+    }
     estado.matricula = "";
     estado.pin = "";
     estado.colaborador = null;
@@ -77,10 +74,7 @@
   document.querySelectorAll(".tecla-num").forEach(function (btn) {
     btn.addEventListener("click", function () {
       var val = this.dataset.val;
-      if (!estado.matricula.startsWith("MAT-")) {
-        estado.matricula = "MAT-";
-      }
-      if (estado.matricula.length < 8) {
+      if (estado.matricula.length < TAMANHO_MAX_MATRICULA) {
         estado.matricula += val;
         inputMatricula.value = estado.matricula;
       }
@@ -90,11 +84,7 @@
   var btnMatriculaApagar = document.getElementById("btn-matricula-apagar");
   if (btnMatriculaApagar) {
     btnMatriculaApagar.addEventListener("click", function () {
-      if (estado.matricula.length > 4) {
-        estado.matricula = estado.matricula.slice(0, -1);
-      } else {
-        estado.matricula = "";
-      }
+      estado.matricula = estado.matricula.slice(0, -1);
       inputMatricula.value = estado.matricula;
     });
   }
@@ -121,26 +111,12 @@
       alert("Por favor, digite ou selecione uma matrícula.");
       return;
     }
-    if (!mat.startsWith("MAT-")) {
-      mat = "MAT-" + mat;
-      estado.matricula = mat;
-      inputMatricula.value = mat;
-    }
+    estado.matricula = mat;
 
     // Chama o endpoint de identificação
-    fetch("/api/totem/identificar/", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ matricula: mat }),
-    })
-      .then(function (r) {
-        if (!r.ok) throw new Error("Matrícula não encontrada.");
-        return r.json();
-      })
+    SF.api.post("/api/totem/identificar/", { matricula: mat }, { semRedirecionar: true })
       .then(function (dados) {
-        document.getElementById("pin-colaborador-nome").textContent = dados.primeiro_nome || dados.nome;
-        document.getElementById("dica-mat-atual").textContent = mat;
-        document.getElementById("dica-pin-num").textContent = DICAS_PIN[mat] || "1234";
+        document.getElementById("pin-colaborador-nome").textContent = dados.primeiro_nome;
 
         estado.pin = "";
         atualizarPinDots();
@@ -198,20 +174,7 @@
   }
 
   function autenticarPin() {
-    fetch("/api/totem/login/", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        matricula: estado.matricula,
-        pin: estado.pin,
-      }),
-    })
-      .then(function (res) {
-        if (!res.ok) {
-          return res.json().then(function (err) { throw new Error(err.erro || "PIN incorreto"); });
-        }
-        return res.json();
-      })
+    SF.api.post("/api/totem/login/", { matricula: estado.matricula, pin: estado.pin }, { semRedirecionar: true })
       .then(function (dados) {
         estado.colaborador = dados.colaborador;
         carregarVitrineProdutos();
@@ -232,8 +195,7 @@
     gridProdutos.innerHTML = '<div class="text-center py-5 w-100 text-muted"><div class="spinner-border text-primary" role="status"></div><div class="mt-2">Consultando estoque do totem...</div></div>';
     mostrarPasso("passo-vitrine");
 
-    fetch("/api/totem/produtos/?matricula=" + encodeURIComponent(estado.matricula) + "&totem_codigo=" + encodeURIComponent(estado.totemCodigo))
-      .then(function (res) { return res.json(); })
+    SF.api.get("/api/totem/produtos/?totem_codigo=" + encodeURIComponent(estado.totemCodigo), { semRedirecionar: true })
       .then(function (dados) {
         estado.produtos = dados.produtos || [];
         document.getElementById("count-minhas-sols").textContent = dados.total_solicitacoes_pendentes || "0";
@@ -357,7 +319,6 @@
   /* ---------- Envio e Processamento da Solicitação ---------- */
   function executarSolicitacao(prodId, tipo, justificativa) {
     var payload = {
-      matricula: estado.matricula,
       produto_id: prodId,
       quantidade: 1,
       tipo: tipo,
@@ -365,12 +326,7 @@
       totem_codigo: estado.totemCodigo,
     };
 
-    fetch("/api/totem/solicitar/", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    })
-      .then(function (r) { return r.json(); })
+    SF.api.post("/api/totem/solicitar/", payload, { semRedirecionar: true })
       .then(function (res) {
         if (!res.sucesso) throw new Error(res.erro || "Falha ao processar solicitação.");
 
@@ -424,8 +380,7 @@
       corpoTabela.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Buscando seu histórico...</td></tr>';
       if (bsModalSols) bsModalSols.show();
 
-      fetch("/api/totem/solicitacoes/?matricula=" + encodeURIComponent(estado.matricula))
-        .then(function (res) { return res.json(); })
+      SF.api.get("/api/totem/solicitacoes/", { semRedirecionar: true })
         .then(function (dados) {
           var sols = dados.solicitacoes || [];
           if (sols.length === 0) {
@@ -480,14 +435,12 @@
 
     if (passoAtual.id === "passo-matricula") {
       if (e.key >= "0" && e.key <= "9") {
-        if (!estado.matricula.startsWith("MAT-")) estado.matricula = "MAT-";
-        if (estado.matricula.length < 8) {
+        if (estado.matricula.length < TAMANHO_MAX_MATRICULA) {
           estado.matricula += e.key;
           inputMatricula.value = estado.matricula;
         }
       } else if (e.key === "Backspace") {
-        if (estado.matricula.length > 4) estado.matricula = estado.matricula.slice(0, -1);
-        else estado.matricula = "";
+        estado.matricula = estado.matricula.slice(0, -1);
         inputMatricula.value = estado.matricula;
       } else if (e.key === "Enter") {
         validarMatriculaEAvancar();

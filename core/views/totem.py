@@ -1,117 +1,160 @@
-"""APIs do totem de autoatendimento."""
-import hashlib
-import json
-import uuid
-from decimal import Decimal
-from django.db.models import Avg, F, Sum, Count, Q
+"""APIs do totem de autoatendimento (RF-10, RF-11, RF-16 a RF-21).
+
+Depois do PIN correto o servidor abre uma "sessão do totem" (guardada no
+servidor, não no navegador) que expira após 10 minutos sem uso. Todas as
+outras chamadas do totem usam o colaborador dessa sessão — nunca uma
+matrícula enviada pelo navegador.
+"""
+import time
+from functools import wraps
+
+from django.db.models import Sum
 from django.http import JsonResponse
-from django.shortcuts import render, get_object_or_404
 from django.utils import timezone
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_GET, require_POST
+
+from ..auditoria import registrar
 from ..models import (
+    AnaliseIA,
+    EstoqueTotem,
+    Produto,
     Solicitacao,
     SolicitacaoItem,
-    Produto,
-    CategoriaProduto,
-    Usuario,
-    Setor,
     Totem,
-    EstoqueTotem,
-    DecisaoSolicitacao,
-    AnaliseIA,
-    AvaliacaoModeloIA,
+    Usuario,
 )
+from ..seguranca import bloqueado, limpar_falhas, registrar_falha, verificar_pin
+from .util import fmt, ler_json
+
+CHAVE_SESSAO = "totem_colaborador_id"
+CHAVE_EXPIRA = "totem_expira_em"
+INATIVIDADE_SEGUNDOS = 10 * 60
 
 
-from .util import fmt, gerar_iniciais, mapear_status_front
+def normalizar_matricula(valor):
+    return (valor or "").strip().upper()
+
+
+def primeiro_nome(nome):
+    partes = (nome or "").strip().split()
+    return partes[0] if partes else ""
+
+
+def colaborador_da_sessao(request):
+    """Colaborador autenticado no totem (renova o prazo de inatividade) ou None."""
+    colaborador_id = request.session.get(CHAVE_SESSAO)
+    if not colaborador_id or time.time() > request.session.get(CHAVE_EXPIRA, 0):
+        encerrar_sessao_totem(request)
+        return None
+    colaborador = Usuario.objects.select_related("setor").filter(id=colaborador_id, ativo=True).first()
+    if colaborador is None:
+        encerrar_sessao_totem(request)
+        return None
+    request.session[CHAVE_EXPIRA] = time.time() + INATIVIDADE_SEGUNDOS
+    return colaborador
+
+
+def encerrar_sessao_totem(request):
+    request.session.pop(CHAVE_SESSAO, None)
+    request.session.pop(CHAVE_EXPIRA, None)
+
+
+def api_totem(view):
+    """Exige a sessão do totem aberta pelo PIN. Disponibiliza request.colaborador."""
+
+    @wraps(view)
+    def protegida(request, *args, **kwargs):
+        colaborador = colaborador_da_sessao(request)
+        if colaborador is None:
+            return JsonResponse(
+                {"sucesso": False, "erro": "Sua sessão no totem expirou. Identifique-se novamente."},
+                status=401,
+            )
+        request.colaborador = colaborador
+        return view(request, *args, **kwargs)
+
+    return protegida
 
 
 # ============================================================================
-# ENDPOINTS DO TOTEM DE AUTOATENDIMENTO
+# IDENTIFICAÇÃO E PIN
 # ============================================================================
-@csrf_exempt
+@require_POST
 def api_totem_identificar(request):
-    """Verifica se a matrícula existe antes de pedir o PIN."""
-    if request.method != "POST":
-        return JsonResponse({"erro": "Método não permitido"}, status=405)
-
-    try:
-        dados = json.loads(request.body)
-    except json.JSONDecodeError:
-        return JsonResponse({"erro": "JSON inválido"}, status=400)
-
-    matricula = (dados.get("matricula") or "").strip().upper()
-    user = Usuario.objects.select_related("setor").filter(codigo_matricula=matricula, ativo=True).first()
-
-    if not user:
+    """Confere se a matrícula existe. Devolve só o primeiro nome (como no protótipo),
+    sem cargo, setor ou outros dados pessoais antes do PIN (RNF-05)."""
+    dados, erro_json = ler_json(request)
+    if erro_json:
+        return erro_json
+    matricula = normalizar_matricula(dados.get("matricula"))
+    if bloqueado("pin", matricula):
+        return JsonResponse(
+            {"encontrado": False, "erro": "Muitas tentativas. Aguarde 15 minutos ou procure o almoxarifado."},
+            status=429,
+        )
+    colaborador = Usuario.objects.filter(codigo_matricula=matricula, ativo=True).first()
+    if not colaborador:
         return JsonResponse({"encontrado": False, "erro": "Matrícula não localizada no sistema."}, status=404)
-
-    partes_nome = user.nome.strip().split()
-    primeiro_nome = partes_nome[0] if partes_nome else user.nome
-
-    return JsonResponse({
-        "encontrado": True,
-        "matricula": user.codigo_matricula,
-        "nome": user.nome,
-        "primeiro_nome": primeiro_nome,
-        "cargo": user.cargo or "Colaborador",
-        "setor": user.setor.nome if user.setor else "Operações",
-    })
+    return JsonResponse({"encontrado": True, "matricula": matricula, "primeiro_nome": primeiro_nome(colaborador.nome)})
 
 
-@csrf_exempt
+@require_POST
 def api_totem_login(request):
-    """Autentica o colaborador no Totem via matrícula + PIN (compatível com md5)."""
-    if request.method != "POST":
-        return JsonResponse({"erro": "Método não permitido"}, status=405)
-
-    try:
-        dados = json.loads(request.body)
-    except json.JSONDecodeError:
-        return JsonResponse({"erro": "JSON inválido"}, status=400)
-
-    matricula = (dados.get("matricula") or "").strip().upper()
-    pin = (dados.get("pin") or "").strip()
-
+    """Autentica o colaborador por matrícula + PIN e abre a sessão do totem (RF-11)."""
+    dados, erro_json = ler_json(request)
+    if erro_json:
+        return erro_json
+    matricula = normalizar_matricula(dados.get("matricula"))
+    pin = str(dados.get("pin") or "").strip()
     if not matricula or not pin:
         return JsonResponse({"sucesso": False, "erro": "Informe matrícula e PIN."}, status=400)
 
-    pin_md5 = hashlib.md5(pin.encode()).hexdigest()
-    colaborador = Usuario.objects.select_related("setor").filter(
-        codigo_matricula=matricula, ativo=True
-    ).first()
+    if bloqueado("pin", matricula):
+        return JsonResponse(
+            {"sucesso": False, "erro": "Muitas tentativas. Aguarde 15 minutos ou procure o almoxarifado."},
+            status=429,
+        )
 
-    if not colaborador:
-        return JsonResponse({"sucesso": False, "erro": "Matrícula não encontrada ou inativa."}, status=404)
+    colaborador = Usuario.objects.select_related("setor").filter(codigo_matricula=matricula, ativo=True).first()
+    if colaborador is None or not verificar_pin(colaborador, pin):
+        registrar_falha("pin", matricula)
+        registrar(request, "TOTEM_PIN_INCORRETO", colaborador, f"PIN incorreto para a matrícula {matricula}",
+                  usuario=colaborador)
+        return JsonResponse({"sucesso": False, "erro": "PIN incorreto. Tente novamente."}, status=401)
 
-    if colaborador.pin_hash != pin_md5:
-        return JsonResponse({"sucesso": False, "erro": "PIN de segurança incorreto. Tente novamente."}, status=401)
-
-    partes_nome = colaborador.nome.strip().split()
-    primeiro_nome = partes_nome[0] if partes_nome else colaborador.nome
+    limpar_falhas("pin", matricula)
+    request.session.cycle_key()  # novo identificador de sessão a cada login
+    request.session[CHAVE_SESSAO] = str(colaborador.id)
+    request.session[CHAVE_EXPIRA] = time.time() + INATIVIDADE_SEGUNDOS
+    colaborador.ultimo_acesso = timezone.now()
+    colaborador.save(update_fields=["ultimo_acesso"])
+    registrar(request, "TOTEM_LOGIN", colaborador, "Entrou no totem", usuario=colaborador)
 
     return JsonResponse({
         "sucesso": True,
         "colaborador": {
-            "id": str(colaborador.id),
             "nome": colaborador.nome,
-            "primeiro_nome": primeiro_nome,
+            "primeiro_nome": primeiro_nome(colaborador.nome),
             "matricula": colaborador.codigo_matricula,
             "cargo": colaborador.cargo or "Colaborador",
-            "setor": colaborador.setor.nome if colaborador.setor else "Operações Industriais",
-            "centro_custo": colaborador.setor.centro_custo if colaborador.setor else "CC-Geral",
-        }
+            "setor": colaborador.setor.nome if colaborador.setor else "Sem setor",
+            "centro_custo": colaborador.setor.centro_custo if colaborador.setor else "",
+        },
     })
 
 
+@require_POST
+def api_totem_sair(request):
+    encerrar_sessao_totem(request)
+    return JsonResponse({"sucesso": True})
+
+
+@require_GET
+@api_totem
 def api_totem_produtos(request):
     """Retorna o catálogo de produtos no totem com cota, elegibilidade e estoque."""
-    matricula = request.GET.get("matricula", "").strip().upper()
     totem_codigo = request.GET.get("totem_codigo", "TOTEM-01")
-
-    colaborador = None
-    if matricula:
-        colaborador = Usuario.objects.filter(codigo_matricula=matricula, ativo=True).first()
+    colaborador = request.colaborador
 
     totem = Totem.objects.filter(codigo=totem_codigo).first() or Totem.objects.filter(status_online=True).first()
 
@@ -227,27 +270,20 @@ def api_totem_produtos(request):
     })
 
 
-@csrf_exempt
+@require_POST
+@api_totem
 def api_totem_solicitar(request):
     """Processa a solicitação de retirada regular ou substituição antecipada via Totem."""
-    if request.method != "POST":
-        return JsonResponse({"erro": "Método não permitido"}, status=405)
-
-    try:
-        dados = json.loads(request.body)
-    except json.JSONDecodeError:
-        return JsonResponse({"erro": "JSON inválido"}, status=400)
-
-    matricula = (dados.get("matricula") or "").strip().upper()
+    dados, erro_json = ler_json(request)
+    if erro_json:
+        return erro_json
     produto_id = dados.get("produto_id")
     quantidade = int(dados.get("quantidade") or 1)
     tipo = (dados.get("tipo") or "retirada").lower()
     justificativa = (dados.get("justificativa") or "").strip()
     totem_codigo = dados.get("totem_codigo") or "TOTEM-01"
 
-    colaborador = Usuario.objects.filter(codigo_matricula=matricula, ativo=True).first()
-    if not colaborador:
-        return JsonResponse({"sucesso": False, "erro": "Colaborador não encontrado."}, status=404)
+    colaborador = request.colaborador
 
     produto = Produto.objects.filter(id=produto_id, ativo=True).first()
     if not produto:
@@ -358,12 +394,11 @@ def api_totem_solicitar(request):
     })
 
 
+@require_GET
+@api_totem
 def api_totem_solicitacoes_usuario(request):
-    """Lista as solicitações do colaborador autenticado no autoatendimento."""
-    matricula = request.GET.get("matricula", "").strip().upper()
-    colaborador = Usuario.objects.filter(codigo_matricula=matricula, ativo=True).first()
-    if not colaborador:
-        return JsonResponse({"solicitacoes": []})
+    """Lista as solicitações do colaborador autenticado no autoatendimento (RF-21)."""
+    colaborador = request.colaborador
 
     sols = Solicitacao.objects.filter(solicitante=colaborador).prefetch_related("itens__produto").order_by("-data_solicitacao")[:15]
     resultado = []

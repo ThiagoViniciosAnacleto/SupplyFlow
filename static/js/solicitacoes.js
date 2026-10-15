@@ -28,7 +28,7 @@
     },
     aguardando: {
       legenda: "Solicitações aguardando análise",
-      mostra: function (s) { return SF.sessao.statusDe(s) === "aguardando"; }
+      mostra: function (s) { return s.status === "aguardando"; }
     },
     todas: {
       legenda: "Todas as solicitações",
@@ -56,7 +56,7 @@
   }
 
   function htmlLinha(s) {
-    var statusChave = SF.sessao.statusDe(s) || "aguardando";
+    var statusChave = s.status || "aguardando";
     var status = STATUS_MAP[statusChave] || { rotulo: statusChave, selo: "selo--aguardando" };
     var numeroTexto = s.numero || s.codigo || s.id;
     var dataHora = s.data && s.hora ? s.data + ", " + s.hora : (s.data || "");

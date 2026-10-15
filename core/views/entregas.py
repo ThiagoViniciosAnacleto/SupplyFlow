@@ -7,7 +7,7 @@ from django.db.models import Avg, F, Sum, Count, Q
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.utils import timezone
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_GET, require_POST
 from ..models import (
     Solicitacao,
     SolicitacaoItem,
@@ -23,12 +23,15 @@ from ..models import (
 )
 
 
+from ..permissoes import api_backoffice
 from .util import fmt, gerar_iniciais, mapear_status_front
 
 
 # ============================================================================
 # ENTREGAS E DEVOLUÇÕES
 # ============================================================================
+@require_GET
+@api_backoffice("ver")
 def api_listar_entregas(request):
     """Lista entregas confirmadas e entregas pendentes de baixa física."""
     entregas = (
@@ -57,7 +60,8 @@ def api_listar_entregas(request):
     return JsonResponse({"entregas": resultado})
 
 
-@csrf_exempt
+@require_POST
+@api_backoffice("entregar")
 def api_confirmar_entrega(request, solicitacao_id):
     """Almoxarife confirma a entrega física do produto."""
     if request.method != "POST":
@@ -81,6 +85,8 @@ def api_confirmar_entrega(request, solicitacao_id):
     return JsonResponse({"sucesso": True, "mensagem": f"Entrega da solicitação {s.codigo} confirmada com sucesso e estoque atualizado."})
 
 
+@require_GET
+@api_backoffice("ver")
 def api_listar_devolucoes(request):
     """Lista EPIs com devolução obrigatória ou registradas."""
     devolucoes = (

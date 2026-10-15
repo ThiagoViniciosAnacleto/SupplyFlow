@@ -7,7 +7,7 @@ from django.db.models import Avg, F, Sum, Count, Q
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.utils import timezone
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_GET, require_POST
 from ..models import (
     Solicitacao,
     SolicitacaoItem,
@@ -23,12 +23,15 @@ from ..models import (
 )
 
 
+from ..permissoes import api_backoffice
 from .util import fmt, gerar_iniciais, mapear_status_front
 
 
 # ============================================================================
 # GESTÃO DE AVALIAÇÃO DO MODELO DE IA
 # ============================================================================
+@require_GET
+@api_backoffice("ver")
 def api_avaliacao_ia(request):
     """Retorna dados de acurácia, matriz de confusão e feedbacks do classificador."""
     media = AnaliseIA.objects.aggregate(m=Avg("score_confianca"))["m"]

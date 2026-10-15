@@ -7,7 +7,7 @@ from django.db.models import Avg, F, Sum, Count, Q
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.utils import timezone
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_GET, require_POST
 from ..models import (
     Solicitacao,
     SolicitacaoItem,
@@ -23,12 +23,15 @@ from ..models import (
 )
 
 
+from ..permissoes import api_backoffice
 from .util import fmt, gerar_iniciais, mapear_status_front
 
 
 # ============================================================================
 # GESTÃO DE ESTOQUE NOS TOTENS
 # ============================================================================
+@require_GET
+@api_backoffice("ver")
 def api_listar_estoque(request):
     """Lista o saldo de produtos em cada totem e itens abaixo do ponto de pedido."""
     totens = Totem.objects.all().order_by("codigo")
@@ -92,7 +95,8 @@ def api_listar_estoque(request):
     })
 
 
-@csrf_exempt
+@require_POST
+@api_backoffice("estoque")
 def api_repor_estoque(request):
     """Registra uma reposição de itens no totem."""
     if request.method != "POST":

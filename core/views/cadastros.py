@@ -7,7 +7,7 @@ from django.db.models import Avg, F, Sum, Count, Q
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.utils import timezone
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_GET, require_POST
 from ..models import (
     Solicitacao,
     SolicitacaoItem,
@@ -23,12 +23,23 @@ from ..models import (
 )
 
 
-from .util import fmt, gerar_iniciais, mapear_status_front
+import re
+
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
+
+from ..auditoria import registrar
+from ..contas import enviar_link_de_senha, garantir_conta
+from ..permissoes import PERFIS, PERFIS_BACKOFFICE, api_backoffice
+from ..seguranca import definir_pin, validar_novo_pin
+from .util import EntradaInvalida, erro, fmt, gerar_iniciais, ler_json, mapear_status_front, texto
 
 
 # ============================================================================
 # GESTÃO DE FUNCIONÁRIOS / USUÁRIOS
 # ============================================================================
+@require_GET
+@api_backoffice("pessoas")
 def api_listar_funcionarios(request):
     """Lista todos os funcionários cadastrados com paginação ou filtros."""
     setor_filtro = request.GET.get("setor")
@@ -60,79 +71,132 @@ def api_listar_funcionarios(request):
     return JsonResponse({"funcionarios": resultado})
 
 
-@csrf_exempt
+@require_POST
+@api_backoffice("pessoas")
 def api_salvar_funcionario(request):
-    """Cadastra ou atualiza um funcionário."""
-    if request.method != "POST":
-        return JsonResponse({"erro": "Método não permitido"}, status=405)
+    """Cadastra ou atualiza um funcionário (RF-01) e, se o perfil for administrativo,
+    a conta de acesso ao backoffice (RF-08, RF-09)."""
+    dados, erro_json = ler_json(request)
+    if erro_json:
+        return erro_json
 
     try:
-        dados = json.loads(request.body)
-    except json.JSONDecodeError:
-        return JsonResponse({"erro": "JSON inválido"}, status=400)
+        nome = texto(dados.get("nome"), "Nome", obrigatorio=True, maximo=150)
+        matricula = texto(dados.get("matricula"), "Matrícula", obrigatorio=True, maximo=30).upper()
+        email = texto(dados.get("email"), "E-mail", maximo=150).lower() or None
+        cargo = texto(dados.get("cargo"), "Cargo", maximo=100)
+        perfil = texto(dados.get("perfil"), "Perfil").upper() or "COLABORADOR"
+        pin = texto(dados.get("pin"), "PIN")
+    except EntradaInvalida as e:
+        return erro(str(e))
 
-    func_id = dados.get("id")
-    nome = dados.get("nome", "").strip()
-    matricula = dados.get("matricula", "").strip().upper()
-    email = dados.get("email", "").strip() or None
-    cargo = dados.get("cargo", "").strip()
-    perfil = dados.get("perfil", "COLABORADOR").strip().upper()
+    if not re.fullmatch(r"[A-Z0-9-]+", matricula):
+        return erro("Matrícula: use apenas letras, números e hífen.")
+    if perfil not in PERFIS:
+        return erro("Perfil de acesso inválido.")
+    if email:
+        try:
+            validate_email(email)
+        except ValidationError:
+            return erro("E-mail inválido.")
+    if perfil in PERFIS_BACKOFFICE and not email:
+        return erro("Perfis com acesso ao backoffice precisam de e-mail (para receber o link de senha).")
+    if pin:
+        problema = validar_novo_pin(pin)
+        if problema:
+            return erro(problema)
+
     setor_id = dados.get("setor_id")
-    pin = dados.get("pin", "").strip()
-
-    if not nome or not matricula:
-        return JsonResponse({"sucesso": False, "erro": "Nome e Matrícula são obrigatórios."}, status=400)
-
     setor = Setor.objects.filter(id=setor_id).first() if setor_id else None
 
+    func_id = dados.get("id")
     if func_id:
-        func = get_object_or_404(Usuario, id=func_id)
-        func.nome = nome
-        func.codigo_matricula = matricula
-        func.email = email
-        func.cargo = cargo
-        func.perfil = perfil
-        func.setor = setor
-        if pin:
-            func.pin_hash = hashlib.md5(pin.encode()).hexdigest()
-        func.save()
-        msg = "Funcionário atualizado com sucesso."
+        func = Usuario.objects.filter(id=func_id).first()
+        if func is None:
+            return erro("Funcionário não encontrado.", status=404)
     else:
-        if Usuario.objects.filter(codigo_matricula=matricula).exists():
-            return JsonResponse({"sucesso": False, "erro": "Já existe colaborador com esta matrícula."}, status=400)
+        func = Usuario(ativo=True)
+        if not pin:
+            return erro("Defina um PIN de 4 a 6 números para o colaborador usar no totem.")
 
-        pin_default = pin or "1234"
-        func = Usuario.objects.create(
-            nome=nome,
-            codigo_matricula=matricula,
-            email=email,
-            cargo=cargo,
-            perfil=perfil,
-            setor=setor,
-            pin_hash=hashlib.md5(pin_default.encode()).hexdigest(),
-            ativo=True,
-        )
-        msg = "Funcionário cadastrado com sucesso."
+    if Usuario.objects.filter(codigo_matricula=matricula).exclude(pk=func.pk).exists():
+        return erro("Já existe colaborador com esta matrícula.")
+    if email and Usuario.objects.filter(email__iexact=email).exclude(pk=func.pk).exists():
+        return erro("Já existe colaborador com este e-mail.")
+    if func.pk == request.usuario.pk and perfil != "ADMIN":
+        return erro("Você não pode remover o seu próprio perfil de Administrador.")
 
-    return JsonResponse({"sucesso": True, "mensagem": msg, "id": str(func.id)})
-
-
-@csrf_exempt
-def api_toggle_funcionario(request, funcionario_id):
-    """Ativa ou inativa um funcionário."""
-    if request.method != "POST":
-        return JsonResponse({"erro": "Método não permitido"}, status=405)
-
-    func = get_object_or_404(Usuario, id=funcionario_id)
-    func.ativo = not func.ativo
+    perfil_anterior = func.perfil if func.pk else None
+    tinha_acesso = bool(func.pk and func.conta_id and func.conta.has_usable_password())
+    func.nome = nome
+    func.codigo_matricula = matricula
+    func.email = email
+    func.cargo = cargo
+    func.perfil = perfil
+    func.setor = setor
+    if pin:
+        definir_pin(func, pin)
     func.save()
+
+    conta = garantir_conta(func)
+    convite_enviado = False
+    if conta is not None and not tinha_acesso and not conta.has_usable_password():
+        convite_enviado = enviar_link_de_senha(request, func)
+
+    registrar(
+        request,
+        "FUNCIONARIO_ATUALIZADO" if func_id else "FUNCIONARIO_CADASTRADO",
+        func,
+        f"{'Atualizou' if func_id else 'Cadastrou'} {func.nome} ({func.codigo_matricula})",
+        perfil=perfil,
+        perfil_anterior=perfil_anterior,
+        pin_alterado=bool(pin),
+        convite_enviado=convite_enviado,
+    )
+
+    msg = "Funcionário atualizado com sucesso." if func_id else "Funcionário cadastrado com sucesso."
+    if convite_enviado:
+        msg += f" Enviamos para {email} o link para criar a senha de acesso."
+    return JsonResponse({"sucesso": True, "mensagem": msg, "id": str(func.id), "convite_enviado": convite_enviado})
+
+
+@require_POST
+@api_backoffice("pessoas")
+def api_toggle_funcionario(request, funcionario_id):
+    """Ativa ou inativa um funcionário (e a conta de acesso dele, se houver)."""
+    func = Usuario.objects.filter(id=funcionario_id).first()
+    if func is None:
+        return erro("Funcionário não encontrado.", status=404)
+    if func.pk == request.usuario.pk:
+        return erro("Você não pode inativar o seu próprio usuário.")
+    func.ativo = not func.ativo
+    func.save(update_fields=["ativo", "updated_at"])
+    garantir_conta(func)
     status_txt = "ativado" if func.ativo else "inativado"
+    registrar(request, "FUNCIONARIO_ATIVADO" if func.ativo else "FUNCIONARIO_INATIVADO", func,
+              f"{func.nome} {status_txt}")
     return JsonResponse({"sucesso": True, "ativo": func.ativo, "mensagem": f"Colaborador {status_txt}."})
+
+
+@require_POST
+@api_backoffice("pessoas")
+def api_enviar_link_senha(request, funcionario_id):
+    """Reenvia o link para o usuário criar/redefinir a própria senha (o ADMIN não vê senhas)."""
+    func = Usuario.objects.filter(id=funcionario_id, ativo=True).first()
+    if func is None or func.perfil not in PERFIS_BACKOFFICE or not func.email:
+        return erro("Este colaborador não tem acesso ao backoffice ou está sem e-mail.")
+    garantir_conta(func)
+    if not enviar_link_de_senha(request, func):
+        return erro("Não foi possível enviar o e-mail. Verifique o cadastro.")
+    registrar(request, "LINK_SENHA_ENVIADO", func, f"Link de senha enviado para {func.email}")
+    return JsonResponse({"sucesso": True, "mensagem": f"Link enviado para {func.email}."})
 
 
 # ============================================================================
 # GESTÃO DE PRODUTOS / CATÁLOGO
 # ============================================================================
+@require_GET
+@api_backoffice("ver")
 def api_listar_produtos(request):
     """Lista os produtos do catálogo (ativos e inativos se solicitado)."""
     todos = request.GET.get("todos", "false").lower() == "true"
@@ -165,7 +229,8 @@ def api_listar_produtos(request):
     return JsonResponse({"produtos": dados, "categorias": categorias})
 
 
-@csrf_exempt
+@require_POST
+@api_backoffice("produtos")
 def api_salvar_produto(request):
     """Cadastra ou edita um produto."""
     if request.method != "POST":
@@ -226,7 +291,8 @@ def api_salvar_produto(request):
     return JsonResponse({"sucesso": True, "mensagem": msg, "id": str(prod.id)})
 
 
-@csrf_exempt
+@require_POST
+@api_backoffice("produtos")
 def api_toggle_produto(request, produto_id):
     """Ativa ou inativa um produto."""
     if request.method != "POST":
@@ -242,6 +308,8 @@ def api_toggle_produto(request, produto_id):
 # ============================================================================
 # GESTÃO DE SETORES E CENTROS DE CUSTO
 # ============================================================================
+@require_GET
+@api_backoffice("ver")
 def api_listar_setores(request):
     """Lista todos os setores e centros de custo cadastrados."""
     setores = Setor.objects.annotate(total_funcionarios=Count("usuario")).order_by("nome")
@@ -258,7 +326,8 @@ def api_listar_setores(request):
     return JsonResponse({"setores": resultado})
 
 
-@csrf_exempt
+@require_POST
+@api_backoffice("pessoas")
 def api_salvar_setor(request):
     """Cria ou edita um setor."""
     if request.method != "POST":
@@ -291,7 +360,8 @@ def api_salvar_setor(request):
     return JsonResponse({"sucesso": True, "mensagem": msg, "id": str(setor.id)})
 
 
-@csrf_exempt
+@require_POST
+@api_backoffice("pessoas")
 def api_toggle_setor(request, setor_id):
     """Ativa ou inativa um setor."""
     if request.method != "POST":

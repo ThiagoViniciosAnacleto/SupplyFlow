@@ -26,12 +26,13 @@ SF.usuarios = [
 SF.usuarioPadrao = "admin";
 
 /* Menu lateral do backoffice (mesma estrutura do protótipo).
+   "acao" = permissão exigida (padrão "ver"); o menu esconde o que o perfil não pode usar.
    "pagina" = nome do arquivo em /backoffice. Telas ainda não
    construídas apontam para em-construcao.html. */
 SF.menu = [
   { rotulo: "Visão Geral", icone: "bi-grid-1x2", pagina: "visao-geral" },
   { grupo: "Pessoas", icone: "bi-people", itens: [
-      { rotulo: "Funcionários", pagina: "funcionarios" }
+      { rotulo: "Funcionários", pagina: "funcionarios", acao: "pessoas" }
   ]},
   { grupo: "Organização", icone: "bi-diagram-3", itens: [
       { rotulo: "Funções", pagina: "funcoes" }, { rotulo: "Cargos", pagina: "cargos" }, { rotulo: "Centros de custo", pagina: "centros-de-custo" }
@@ -47,9 +48,10 @@ SF.menu = [
       { rotulo: "Relatórios" }, { rotulo: "Avaliação do modelo (IA)", pagina: "avaliacao-ia" }
   ]},
   { grupo: "Governança", icone: "bi-shield-check", itens: [
-      { rotulo: "Auditoria" }, { rotulo: "Usuários e permissões" }
+      { rotulo: "Auditoria", pagina: "auditoria", acao: "auditoria" },
+      { rotulo: "Usuários e permissões", pagina: "usuarios", acao: "pessoas" }
   ]},
-  { rotulo: "Configurações", icone: "bi-gear" }
+  { rotulo: "Configurações", icone: "bi-gear", acao: "pessoas" }
 ];
 
 /* Indicadores da Visão Geral.

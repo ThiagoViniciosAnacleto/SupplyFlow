@@ -15,8 +15,7 @@
   var funcionariosCache = [];
 
   function carregarSetores() {
-    fetch("/api/setores/")
-      .then(function (r) { return r.json(); })
+    SF.api.get("/api/setores/")
       .then(function (d) {
         var setores = d.setores || [];
         var selectFiltro = document.getElementById("filtro-setor");
@@ -44,8 +43,7 @@
     var url = "/api/funcionarios/?q=" + encodeURIComponent(termo) + "&setor=" + encodeURIComponent(setor);
     tabelaCorpo.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Carregando colaboradores...</td></tr>';
 
-    fetch(url)
-      .then(function (r) { return r.json(); })
+    SF.api.get(url)
       .then(function (dados) {
         funcionariosCache = dados.funcionarios || [];
         renderizarTabela(funcionariosCache);
@@ -121,8 +119,7 @@
     document.querySelectorAll(".btn-toggle").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var id = this.dataset.id;
-        fetch("/api/funcionarios/" + encodeURIComponent(id) + "/toggle/", { method: "POST" })
-          .then(function (r) { return r.json(); })
+        SF.api.post("/api/funcionarios/" + encodeURIComponent(id) + "/toggle/")
           .then(function (res) {
             carregarFuncionarios();
           });
@@ -155,16 +152,12 @@
         perfil: document.getElementById("func-perfil").value,
       };
 
-      fetch("/api/funcionarios/salvar/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      })
-        .then(function (r) { return r.json(); })
+      SF.api.post("/api/funcionarios/salvar/", payload)
         .then(function (res) {
           if (!res.sucesso) throw new Error(res.erro || "Falha ao salvar funcionário.");
           if (modalBs) modalBs.hide();
           carregarFuncionarios();
+          if (res.convite_enviado) alert(res.mensagem);
         })
         .catch(function (err) {
           alert(err.message);
