@@ -1,0 +1,251 @@
+texto,categoria
+"Perdi a luva no vestiário ontem e não encontrei mais",Perda
+"Esqueci o protetor auricular no ônibus da empresa",Perda
+"Meu óculos de proteção sumiu do armário",Perda
+"A botina foi furtada do meu armário no fim de semana",Perda
+"Deixei o capacete na obra anterior e não consegui recuperar",Perda
+"Extraviei a máscara durante a mudança de turno",Perda
+"Não acho mais minha luva, procurei em todo o setor",Perda
+"Caiu do bolso o protetor auricular enquanto eu andava no pátio",Perda
+"Roubaram minha bolsa com os EPIs dentro",Perda
+"Esqueci o óculos em casa e moro longe, não dá para buscar",Perda
+"Perdi o par de luvas durante a viagem a serviço",Perda
+"O respirador ficou no carro de um colega que foi transferido",Perda
+"Minha botina desapareceu do vestiário masculino",Perda
+"Não sei onde deixei o abafador de ruído",Perda
+"Levaram meu capacete por engano e não devolveram",Perda
+"Sumiu meu protetor facial depois da limpeza do setor",Perda
+"Perdi a viseira quando estava no telhado e ela caiu no rio",Perda
+"Esqueceram minha luva na lavanderia e ela foi descartada",Perda
+"O cinto de segurança foi levado para outra unidade e não voltou",Perda
+"Deixei o óculos em cima da máquina e alguém pegou",Perda
+"Minha mochila com o protetor auricular foi extraviada",Perda
+"Procurei o dia todo e não encontrei a máscara",Perda
+"Perdi um dos plugues do protetor auricular",Perda
+"Meu capacete ficou esquecido no refeitório e sumiu",Perda
+"Não encontro a luva desde a troca de armários",Perda
+"Uso a botina há mais de seis meses e o solado está liso",Desgaste normal
+"A luva está gasta pelo tempo de uso, já passou do prazo",Desgaste normal
+"Protetor auricular velho, já deu o tempo de troca",Desgaste normal
+"O óculos está riscado depois de muito tempo de uso",Desgaste normal
+"Chegou a data de troca do capacete, ele já está vencido",Desgaste normal
+"A máscara chegou ao fim da vida útil indicada pelo fabricante",Desgaste normal
+"A botina está gasta no calcanhar depois de um ano de uso",Desgaste normal
+"A luva ficou fina de tanto usar no dia a dia",Desgaste normal
+"Filtro do respirador saturado pelo uso contínuo",Desgaste normal
+"O uniforme e a luva já estão desgastados pelo uso diário",Desgaste normal
+"Elástico do protetor auricular perdeu a força com o tempo",Desgaste normal
+"O óculos está amarelado e com a visão embaçada por ser antigo",Desgaste normal
+"Uso a mesma botina desde o ano passado e ela está deformada",Desgaste normal
+"A jugular do capacete está ressecada pelo tempo",Desgaste normal
+"Luva com a palma lisa, perdeu a aderência depois de meses",Desgaste normal
+"Prazo de validade do filtro venceu",Desgaste normal
+"O abafador está com as espumas gastas pelo uso",Desgaste normal
+"Já faz mais de 90 dias e a luva está no fim",Desgaste normal
+"A sola da botina está gasta e escorrega no piso molhado",Desgaste normal
+"A viseira está opaca de tanto uso",Desgaste normal
+"Troca periódica, a luva atual está bastante usada",Desgaste normal
+"O cinto paraquedista atingiu o tempo máximo de uso",Desgaste normal
+"Óculos com lente arranhada pelo uso normal",Desgaste normal
+"Botina antiga, costura gasta e couro rachado pelo tempo",Desgaste normal
+"Luva usada todo dia, agora está com furinhos de desgaste",Desgaste normal
+"A luva descolou a palma com menos de um mês de uso",Desgaste prematuro
+"O protetor endureceu rápido e não veda mais o ouvido",Desgaste prematuro
+"A botina abriu o solado em duas semanas",Desgaste prematuro
+"O óculos ficou embaçado definitivamente em poucos dias",Desgaste prematuro
+"A máscara ressecou antes do prazo previsto",Desgaste prematuro
+"Recebi a luva há pouco tempo e ela já está se desfazendo",Desgaste prematuro
+"Capacete trincou sozinho com pouco tempo de uso",Desgaste prematuro
+"O elástico da máscara arrebentou na primeira semana",Desgaste prematuro
+"A luva perdeu a cobertura antes da metade do período",Desgaste prematuro
+"O couro da botina rachou cedo demais",Desgaste prematuro
+"O protetor auricular ficou duro em vez de macio em poucos dias",Desgaste prematuro
+"A tinta da lente do óculos saiu muito cedo",Desgaste prematuro
+"Antes do prazo de troca a luva já estava gasta",Desgaste prematuro
+"O filtro saturou muito rápido, antes do esperado",Desgaste prematuro
+"Com quinze dias de uso a botina já estava descolando",Desgaste prematuro
+"A espuma do abafador esfarelou em pouco tempo",Desgaste prematuro
+"A luva ficou rígida rapidamente com o calor do forno",Desgaste prematuro
+"A viseira ficou opaca em menos de um mês",Desgaste prematuro
+"O cadarço e o solado da botina se soltaram cedo",Desgaste prematuro
+"A luva nova durou muito menos que a anterior",Desgaste prematuro
+"Desgastou antes do tempo por causa do produto abrasivo",Desgaste prematuro
+"A jugular do capacete ressecou com poucas semanas",Desgaste prematuro
+"Mesmo usando pouco, o óculos já está riscado",Desgaste prematuro
+"A palma da luva afinou em uma semana de uso",Desgaste prematuro
+"Botina com menos de dois meses e já com furo na sola",Desgaste prematuro
+"A luva veio com a costura solta, nem cheguei a usar",Defeito de fabricação
+"O óculos veio com a haste quebrada na embalagem",Defeito de fabricação
+"A botina nova veio com um pé maior que o outro",Defeito de fabricação
+"O protetor auricular veio sem o cordão",Defeito de fabricação
+"O capacete veio com a carneira solta",Defeito de fabricação
+"A máscara veio com a válvula travada",Defeito de fabricação
+"Luva com defeito de fábrica, o tecido está falhado",Defeito de fabricação
+"O lote novo de luvas veio rasgado no punho",Defeito de fabricação
+"Abri a embalagem e o óculos estava trincado",Defeito de fabricação
+"A botina veio com o bico solto por dentro",Defeito de fabricação
+"O filtro da máscara não encaixa, problema de fabricação",Defeito de fabricação
+"A fivela do cinto veio quebrada",Defeito de fabricação
+"A luva veio com o tamanho errado na etiqueta",Defeito de fabricação
+"O protetor facial veio com a viseira riscada de fábrica",Defeito de fabricação
+"A costura da botina está aberta desde a entrega",Defeito de fabricação
+"Peça nova e já apresentou falha no velcro",Defeito de fabricação
+"O capacete veio sem a jugular",Defeito de fabricação
+"O óculos novo descola a lente sozinho, defeito",Defeito de fabricação
+"A luva tem um furo que já veio da fábrica",Defeito de fabricação
+"A máscara veio com o elástico solto da costura",Defeito de fabricação
+"O abafador veio com a concha rachada",Defeito de fabricação
+"Botina do lote novo com o solado mal colado",Defeito de fabricação
+"A trava do respirador não fecha, veio com problema",Defeito de fabricação
+"O EPI veio com falha de acabamento e machuca a mão",Defeito de fabricação
+"Recebi a luva e o reforço do polegar estava descosturado",Defeito de fabricação
+"A luva rasgou durante o trabalho com uma peça metálica",Dano durante atividade
+"Cortei a luva manuseando chapa de aço",Dano durante atividade
+"O óculos quebrou quando bateu na estrutura do equipamento",Dano durante atividade
+"A botina furou ao pisar em um prego na obra",Dano durante atividade
+"A luva rasgou na esteira durante a operação",Dano durante atividade
+"O capacete trincou com a queda de uma ferramenta",Dano durante atividade
+"A faca escapou e cortou a luva anticorte",Dano durante atividade
+"Rasgou a manga do avental na solda",Dano durante atividade
+"A máscara rasgou ao enroscar na máquina",Dano durante atividade
+"O óculos caiu da plataforma enquanto eu trabalhava e partiu",Dano durante atividade
+"A luva furou com uma rebarba de metal",Dano durante atividade
+"A ponta da botina amassou com a queda de uma peça",Dano durante atividade
+"Na hora de cortar o vergalhão a luva abriu",Dano durante atividade
+"A respingo de solda furou a luva de raspa",Dano durante atividade
+"O protetor facial rachou com o impacto de um estilhaço",Dano durante atividade
+"A luva prendeu no torno e rasgou",Dano durante atividade
+"Rasguei a luva tirando a caixa da prateleira com arame",Dano durante atividade
+"O protetor auricular quebrou ao cair na prensa",Dano durante atividade
+"A luva foi danificada no manuseio de vidro",Dano durante atividade
+"O cinto rasgou ao enroscar na estrutura do andaime",Dano durante atividade
+"Durante a manutenção a botina foi cortada por uma lâmina",Dano durante atividade
+"O capacete amassou ao bater em uma viga baixa",Dano durante atividade
+"A lente do óculos trincou com uma lasca de madeira",Dano durante atividade
+"A luva rasgou na palma ao puxar o cabo de aço",Dano durante atividade
+"Danifiquei a luva na serra durante o corte",Dano durante atividade
+"Caiu óleo na luva e ela ficou encharcada",Contaminação
+"A máscara ficou contaminada com produto químico",Contaminação
+"Respingou solvente na botina e ela está impregnada",Contaminação
+"A luva ficou suja de graxa e não sai mais",Contaminação
+"Tive contato com ácido e precisei descartar a luva",Contaminação
+"O protetor auricular caiu no esgoto",Contaminação
+"O avental foi contaminado com sangue no atendimento",Contaminação
+"A luva absorveu tinta e está com cheiro forte",Contaminação
+"O óculos ficou manchado com produto corrosivo",Contaminação
+"A máscara foi exposta a vapor tóxico e precisa ser trocada",Contaminação
+"Derramou soda cáustica na luva",Contaminação
+"O respirador foi usado em área com amianto e deve ser descartado",Contaminação
+"Caiu combustível na botina durante o abastecimento",Contaminação
+"A luva teve contato com material biológico",Contaminação
+"O capacete ficou coberto de piche",Contaminação
+"Produto químico respingou no protetor facial",Contaminação
+"A luva ficou impregnada de resina",Contaminação
+"Molhei a luva com defensivo agrícola",Contaminação
+"A botina pisou em poça de óleo hidráulico e ficou encharcada",Contaminação
+"O abafador caiu na caixa de lodo",Contaminação
+"Contaminação por fungicida no avental",Contaminação
+"A máscara ficou com pó de cimento entupindo o filtro e cheiro químico",Contaminação
+"A luva encostou em produto tóxico na limpeza do tanque",Contaminação
+"Respingos de tinta epóxi cobriram a viseira",Contaminação
+"Sujou de graxa e óleo queimado e ficou inutilizada",Contaminação
+"A luva está apertada e machuca os dedos",Tamanho inadequado
+"A botina ficou grande e escorrega no pé",Tamanho inadequado
+"O capacete é pequeno para a minha cabeça",Tamanho inadequado
+"A luva é larga e atrapalha a pegada da ferramenta",Tamanho inadequado
+"Recebi a botina número 40 mas calço 42",Tamanho inadequado
+"O óculos não serve, fica apertado no rosto",Tamanho inadequado
+"A máscara não veda porque é grande para o meu rosto",Tamanho inadequado
+"Preciso de uma numeração maior da luva",Tamanho inadequado
+"A botina aperta e está causando bolhas",Tamanho inadequado
+"O cinto não fecha, preciso de tamanho maior",Tamanho inadequado
+"Pedi tamanho M e veio G",Tamanho inadequado
+"A luva sobra na ponta dos dedos",Tamanho inadequado
+"O protetor auricular é grande para o meu ouvido e incomoda",Tamanho inadequado
+"A jaqueta térmica ficou pequena",Tamanho inadequado
+"A botina folgada me faz tropeçar",Tamanho inadequado
+"O macacão ficou curto nas pernas",Tamanho inadequado
+"Luva tamanho P não entra na minha mão",Tamanho inadequado
+"O abafador fica frouxo na cabeça",Tamanho inadequado
+"Calçado apertado, preciso trocar a numeração",Tamanho inadequado
+"A máscara é pequena e deixa frestas",Tamanho inadequado
+"O óculos é largo e escorrega do rosto",Tamanho inadequado
+"A luva não serve, é muito justa",Tamanho inadequado
+"Preciso trocar a botina por um número menor",Tamanho inadequado
+"O avental é comprido demais e atrapalha",Tamanho inadequado
+"Com a luva grande perco a sensibilidade no trabalho",Tamanho inadequado
+"Escorreguei na escada e a botina rasgou no acidente",Acidente
+"Houve um princípio de incêndio e a luva queimou",Acidente
+"Sofri um acidente com a empilhadeira e o capacete quebrou",Acidente
+"Na explosão do compressor o óculos foi destruído",Acidente
+"Caí do andaime e o cinto ficou comprometido",Acidente
+"O EPI foi danificado no acidente registrado na CAT",Acidente
+"Tive um acidente de trabalho e a máscara foi descartada pelo socorro",Acidente
+"O incêndio no galpão queimou meus equipamentos",Acidente
+"Fui atingido por uma carga que caiu da ponte rolante",Acidente
+"No acidente de trânsito a caminho do cliente perdi o capacete",Acidente
+"A luva pegou fogo durante o curto circuito no painel",Acidente
+"Houve vazamento de gás e precisamos evacuar, o respirador ficou no local",Acidente
+"O capacete partiu quando caí da escada",Acidente
+"Depois do choque elétrico a luva isolante precisa ser substituída",Acidente
+"Sofri queda de altura e o cinto travou, precisa trocar",Acidente
+"A botina foi cortada pelos socorristas após o acidente",Acidente
+"No acidente com a prensa a luva foi esmagada",Acidente
+"O óculos quebrou quando fui atropelado pela paleteira",Acidente
+"Acidente com produto inflamável queimou o avental",Acidente
+"A viseira derreteu no incêndio da cabine de pintura",Acidente
+"Caiu um tijolo na minha cabeça e o capacete rachou",Acidente
+"Na batida do caminhão o cinto de segurança arrebentou",Acidente
+"O incidente com o maçarico queimou a luva de couro",Acidente
+"Fui socorrido após acidente e o protetor auricular ficou no hospital",Acidente
+"Acidente durante o içamento danificou meus EPIs",Acidente
+"Mudei de função e agora trabalho com solda, preciso de luva de raspa",Mudança de função
+"Fui transferido para a manutenção e preciso de botina sem metal",Mudança de função
+"Comecei no setor de pintura e preciso de máscara com filtro",Mudança de função
+"Fui promovido a eletricista e preciso de luva isolante",Mudança de função
+"Nova função no laboratório exige óculos de ampla visão",Mudança de função
+"Passei a trabalhar em altura e preciso de cinto paraquedista",Mudança de função
+"Mudei para a área de corte e preciso de luva anticorte",Mudança de função
+"Fui remanejado para a câmara fria e preciso de jaqueta térmica",Mudança de função
+"Agora sou operador de empilhadeira e preciso de outro calçado",Mudança de função
+"Mudança de setor para a fundição exige avental aluminizado",Mudança de função
+"Assumi o cargo de soldador nesta semana",Mudança de função
+"Transferido para a área de ruído alto, preciso de abafador",Mudança de função
+"Nova atividade com produtos químicos exige luva nitrílica",Mudança de função
+"Fui realocado para a linha de vidros",Mudança de função
+"Passei para o turno da caldeira e o EPI é diferente",Mudança de função
+"Comecei a atuar em espaço confinado e preciso de respirador",Mudança de função
+"Promovido a técnico de campo, preciso de capacete com jugular",Mudança de função
+"Fui para a equipe de poda e preciso de perneira",Mudança de função
+"Mudei de cargo e o EPI da nova função é outro",Mudança de função
+"Agora trabalho na expedição com cargas pesadas, preciso de botina com bico",Mudança de função
+"Nova função de esmerilhador exige protetor facial",Mudança de função
+"Mudei para o setor elétrico e a botina atual tem partes metálicas",Mudança de função
+"Fui designado para a limpeza industrial com produtos químicos",Mudança de função
+"Começo amanhã como mecânico de manutenção",Mudança de função
+"Remanejado para o almoxarifado frigorificado",Mudança de função
+"Preciso de uma reserva para a viagem a serviço da semana que vem",Outro
+"Manutenção corretiva na linha 2 consumiu mais discos que o normal neste mês",Outro
+"Vou receber visita de auditoria e quero um EPI novo",Outro
+"Preciso de mais unidades porque a equipe aumentou temporariamente",Outro
+"Solicito para deixar uma reserva no carro da empresa",Outro
+"O cliente exige EPI novo para entrar na planta",Outro
+"Preciso para um treinamento de brigada",Outro
+"Vou cobrir as férias de um colega em outro turno",Outro
+"Gostaria de um par extra para trabalhar no sábado",Outro
+"O serviço extra do mês exigiu mais consumíveis",Outro
+"Pedido para o novo colaborador que ainda não foi cadastrado",Outro
+"Preciso porque vou fazer hora extra no domingo",Outro
+"A demanda de produção dobrou nesta semana",Outro
+"Uso para uma tarefa pontual de inspeção",Outro
+"Vou participar de um evento técnico em outra unidade",Outro
+"Solicitação para teste do novo modelo de luva",Outro
+"O supervisor pediu para eu ter um sobressalente",Outro
+"Preciso de mais discos para terminar a obra no prazo",Outro
+"Pedido de reposição para o kit de emergência",Outro
+"Quero experimentar o modelo novo que chegou",Outro
+"Preciso para mostrar no treinamento de integração",Outro
+"Vou trabalhar em dois turnos nesta semana",Outro
+"Solicito por orientação da CIPA",Outro
+"Necessário para atender uma parada programada",Outro
+"Pedido adicional devido à auditoria do cliente",Outro
