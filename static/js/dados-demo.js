@@ -38,13 +38,13 @@ SF.menu = [
       { rotulo: "Funções", pagina: "funcoes" }, { rotulo: "Cargos", pagina: "cargos" }, { rotulo: "Centros de custo", pagina: "centros-de-custo" }
   ]},
   { grupo: "Materiais", icone: "bi-box-seam", itens: [
-      { rotulo: "Produtos", pagina: "produtos" }, { rotulo: "Fornecedores" }, { rotulo: "Estoque", pagina: "estoque" }
+      { rotulo: "Produtos", pagina: "produtos" }, { rotulo: "Fornecedores", pagina: "fornecedores" }, { rotulo: "Estoque", pagina: "estoque" }
   ]},
   { grupo: "Operações", icone: "bi-clipboard-check", itens: [
       { rotulo: "Solicitações", pagina: "solicitacoes" }, { rotulo: "Entregas", pagina: "entregas" }, { rotulo: "Devoluções", pagina: "devolucoes" }
   ]},
   { grupo: "Gestão", icone: "bi-bar-chart-line", itens: [
-      { rotulo: "Políticas de fornecimento" }, { rotulo: "Histórico" },
+      { rotulo: "Políticas de fornecimento", pagina: "politicas" }, { rotulo: "Histórico" },
       { rotulo: "Relatórios" }, { rotulo: "Avaliação do modelo (IA)", pagina: "avaliacao-ia" }
   ]},
   { grupo: "Governança", icone: "bi-shield-check", itens: [

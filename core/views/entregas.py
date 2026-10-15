@@ -1,115 +1,149 @@
-"""APIs de entregas e devoluções."""
-import hashlib
-import json
-import uuid
-from decimal import Decimal
-from django.db.models import Avg, F, Sum, Count, Q
+"""APIs de entregas e devoluções (RF-31 a RF-35, RF-40 a RF-43)."""
 from django.http import JsonResponse
-from django.shortcuts import render, get_object_or_404
-from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
-from ..models import (
-    Solicitacao,
-    SolicitacaoItem,
-    Produto,
-    CategoriaProduto,
-    Usuario,
-    Setor,
-    Totem,
-    EstoqueTotem,
-    DecisaoSolicitacao,
-    AnaliseIA,
-    AvaliacaoModeloIA,
-)
+
+from ..auditoria import registrar
+from ..models import Devolucao, Entrega, Solicitacao
+from ..permissoes import api_backoffice, pode
+from ..servicos import RegraViolada, estados
+from ..servicos import entregas as servico
+from .util import erro, fmt, ler_json
 
 
-from ..permissoes import api_backoffice
-from .util import fmt, gerar_iniciais, mapear_status_front
-
-
-# ============================================================================
-# ENTREGAS E DEVOLUÇÕES
-# ============================================================================
 @require_GET
 @api_backoffice("ver")
 def api_listar_entregas(request):
-    """Lista entregas confirmadas e entregas pendentes de baixa física."""
-    entregas = (
-        Solicitacao.objects.select_related("solicitante", "solicitante__setor", "totem")
-        .prefetch_related("itens__produto")
-        .filter(status__in=["APROVADA", "RETIRADA"])
-        .order_by("-data_solicitacao")
+    """Pendentes de retirada (aprovadas) e entregas já confirmadas."""
+    pendentes = []
+    aprovadas = (
+        Solicitacao.objects.filter(status__in=estados.ESTADOS_APROVADOS)
+        .select_related("solicitante__setor", "totem", "decisao")
+        .prefetch_related("itens__produto").order_by("data_solicitacao")
     )
-    resultado = []
-    for s in entregas:
-        p_item = s.itens.first()
-        resultado.append({
+    for s in aprovadas:
+        item = s.itens.first()
+        bloqueio = "Aguardando devolução do EPI anterior" if servico.devolucao_pendente(s) else None
+        pendentes.append({
             "id": str(s.id),
             "codigo": s.codigo,
-            "data": fmt(s.data_solicitacao, "%d/%m/%Y às %H:%M"),
-            "data_conclusao": fmt(s.data_conclusao, "%d/%m/%Y às %H:%M") if s.data_conclusao else "Pendente",
+            "data": fmt(s.data_solicitacao, "%d/%m/%Y %H:%M"),
             "colaborador": s.solicitante.nome,
             "matricula": s.solicitante.codigo_matricula,
-            "setor": s.solicitante.setor.nome if s.solicitante.setor else "Operações",
-            "produto": p_item.produto.nome if p_item else "Material",
-            "quantidade": p_item.quantidade_solicitada if p_item else 1,
-            "totem": s.totem.nome if s.totem else "Balcão Central",
-            "status": "Entregue" if s.status == "RETIRADA" or s.data_conclusao else "Aguardando retirada física",
-            "entregue": bool(s.status == "RETIRADA" or s.data_conclusao),
+            "setor": s.solicitante.setor.nome if s.solicitante.setor else "—",
+            "produto": item.produto.nome if item else "—",
+            "quantidade": (item.quantidade_aprovada or item.quantidade_solicitada) if item else 0,
+            "totem": s.totem.nome if s.totem else "—",
+            "status_rotulo": estados.rotulo(s.status),
+            "bloqueio": bloqueio,
         })
-    return JsonResponse({"entregas": resultado})
+
+    confirmadas = [
+        {
+            "id": str(e.id),
+            "codigo": e.solicitacao.codigo,
+            "data": fmt(e.data, "%d/%m/%Y %H:%M"),
+            "colaborador": e.colaborador.nome,
+            "matricula": e.colaborador.codigo_matricula,
+            "setor": e.setor_nome or "—",
+            "centro_custo": e.centro_custo or "—",
+            "produto": e.produto_nome,
+            "quantidade": e.quantidade,
+            "lote": e.lote or "—",
+            "ca": e.ca or "—",
+            "almoxarife": e.almoxarife.nome if e.almoxarife else "—",
+            "totem": e.totem.nome if e.totem else "—",
+        }
+        for e in Entrega.objects.select_related("solicitacao", "colaborador", "almoxarife", "totem")[:200]
+    ]
+    return JsonResponse({"pendentes": pendentes, "entregas": confirmadas,
+                         "pode_entregar": pode(request.usuario, "entregar")})
 
 
 @require_POST
 @api_backoffice("entregar")
 def api_confirmar_entrega(request, solicitacao_id):
-    """Almoxarife confirma a entrega física do produto."""
-    if request.method != "POST":
-        return JsonResponse({"erro": "Método não permitido"}, status=405)
-
-    s = get_object_or_404(Solicitacao, id=solicitacao_id)
-    s.status = "RETIRADA"
-    s.data_conclusao = timezone.now()
-    s.save()
-
-    # RF-40 e RF-41: Baixa definitiva no estoque do totem correspondente
-    totem = s.totem or Totem.objects.filter(status_online=True).first() or Totem.objects.first()
-    for item in s.itens.all():
-        qtd = item.quantidade_aprovada if item.quantidade_aprovada is not None else item.quantidade_solicitada
-        if totem and qtd > 0:
-            estoque_item = EstoqueTotem.objects.filter(totem=totem, produto=item.produto).first()
-            if estoque_item:
-                estoque_item.quantidade_disponivel = max(0, estoque_item.quantidade_disponivel - qtd)
-                estoque_item.save()
-
-    return JsonResponse({"sucesso": True, "mensagem": f"Entrega da solicitação {s.codigo} confirmada com sucesso e estoque atualizado."})
+    """O almoxarife confirma a entrega física: baixa no estoque e registro da entrega (RF-40 a RF-42)."""
+    s = Solicitacao.objects.filter(id=solicitacao_id).first()
+    if s is None:
+        return erro("Solicitação não encontrada.", status=404)
+    try:
+        s, entregas = servico.confirmar_entrega(s, request.usuario)
+    except RegraViolada as e:
+        return erro(str(e), status=e.status)
+    registrar(request, "ENTREGA_CONFIRMADA", s, f"{s.codigo} entregue a {s.solicitante.nome}",
+              itens=[{"produto": e.produto_nome, "quantidade": e.quantidade, "lote": e.lote} for e in entregas])
+    return JsonResponse({"sucesso": True, "mensagem": f"Entrega da solicitação {s.codigo} confirmada."})
 
 
 @require_GET
 @api_backoffice("ver")
 def api_listar_devolucoes(request):
-    """Lista EPIs com devolução obrigatória ou registradas."""
-    devolucoes = (
-        Solicitacao.objects.select_related("solicitante", "solicitante__setor", "decisao")
-        .prefetch_related("itens__produto")
-        .filter(fora_da_cota=True)
-        .order_by("-data_solicitacao")
+    """Devoluções exigidas nas aprovações condicionadas: pendentes e já resolvidas."""
+    exigidas = (
+        Solicitacao.objects.filter(decisao__exige_devolucao=True)
+        .select_related("solicitante__setor", "decisao", "decisao__aprovador")
+        .prefetch_related("itens__produto").order_by("-data_solicitacao")
     )
     resultado = []
-    for s in devolucoes:
-        p_item = s.itens.first()
-        decisao = getattr(s, "decisao", None)
-        tem_condicao = decisao and "devolu" in (decisao.justificativa_decisao or "").lower()
+    for s in exigidas:
+        item = s.itens.first()
+        devolucao = Devolucao.objects.filter(solicitacao=s).select_related(
+            "registrado_por", "entrega_original__solicitacao").first()
+        encerrada = estados.normalizar(s.status) in {estados.REPROVADA, estados.CANCELADA}
+        if devolucao:
+            situacao = "dispensada" if devolucao.dispensada else "registrada"
+        else:
+            situacao = "encerrada" if encerrada else "pendente"
         resultado.append({
             "id": str(s.id),
             "codigo": s.codigo,
             "data_solicitacao": fmt(s.data_solicitacao, "%d/%m/%Y"),
             "colaborador": s.solicitante.nome,
             "matricula": s.solicitante.codigo_matricula,
-            "setor": s.solicitante.setor.nome if s.solicitante.setor else "Operações",
-            "produto": p_item.produto.nome if p_item else "EPI",
-            "condicao_obrigatoria": bool(tem_condicao),
-            "status_devolucao": "Devolução pendente" if tem_condicao and s.status != "RETIRADA" else "Dispensada / Concluída",
-            "observacao": decisao.justificativa_decisao if decisao else "Sem restrição de devolução.",
+            "setor": s.solicitante.setor.nome if s.solicitante.setor else "—",
+            "produto": item.produto.nome if item else "—",
+            "condicao_aprovacao": s.decisao.justificativa_decisao or "Devolução do EPI anterior",
+            "aprovado_por": s.decisao.aprovador.nome if s.decisao.aprovador else "—",
+            "situacao": situacao,
+            "condicao": devolucao.get_condicao_display() if devolucao and devolucao.condicao else None,
+            "destinacao": devolucao.get_destinacao_display() if devolucao and devolucao.destinacao else None,
+            "observacao": devolucao.observacao if devolucao else None,
+            "entrega_original": (devolucao.entrega_original.solicitacao.codigo
+                                 if devolucao and devolucao.entrega_original else None),
+            "registrado_por": devolucao.registrado_por.nome if devolucao and devolucao.registrado_por else None,
+            "data_registro": fmt(devolucao.data, "%d/%m/%Y %H:%M") if devolucao else None,
         })
-    return JsonResponse({"devolucoes": resultado})
+    return JsonResponse({
+        "devolucoes": resultado,
+        "condicoes": [{"valor": v, "rotulo": r} for v, r in Devolucao.CONDICOES],
+        "destinacoes": [{"valor": v, "rotulo": r} for v, r in Devolucao.DESTINACOES],
+        "pode_registrar": pode(request.usuario, "devolucao"),
+        "pode_dispensar": pode(request.usuario, "decidir"),
+    })
+
+
+@require_POST
+@api_backoffice("devolucao")
+def api_registrar_devolucao(request, solicitacao_id):
+    """Registra a devolução (condição e destinação) ou a dispensa formal (RF-31 a RF-35)."""
+    dados, erro_json = ler_json(request)
+    if erro_json:
+        return erro_json
+    s = Solicitacao.objects.filter(id=solicitacao_id).first()
+    if s is None:
+        return erro("Solicitação não encontrada.", status=404)
+    try:
+        devolucao = servico.registrar_devolucao(
+            s, request.usuario,
+            condicao=dados.get("condicao") or "",
+            destinacao=dados.get("destinacao") or "",
+            observacao=dados.get("observacao") or "",
+            dispensar=bool(dados.get("dispensar")),
+        )
+    except RegraViolada as e:
+        return erro(str(e), status=e.status)
+    acao = "DEVOLUCAO_DISPENSADA" if devolucao.dispensada else "DEVOLUCAO_REGISTRADA"
+    registrar(request, acao, s, f"{s.codigo}: {'devolução dispensada' if devolucao.dispensada else 'EPI devolvido'}",
+              condicao=devolucao.condicao, destinacao=devolucao.destinacao)
+    return JsonResponse({"sucesso": True, "mensagem": "Devolução dispensada." if devolucao.dispensada
+                         else "Devolução registrada. A entrega do novo EPI está liberada."})

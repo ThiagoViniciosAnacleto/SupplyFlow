@@ -90,3 +90,13 @@ def pagina_auditoria(request):
 @pagina_backoffice("ver")
 def pagina_em_construcao(request):
     return render(request, "em-construcao.html")
+
+
+@pagina_backoffice("ver")
+def pagina_fornecedores(request):
+    return render(request, "fornecedores.html")
+
+
+@pagina_backoffice("ver")
+def pagina_politicas(request):
+    return render(request, "politicas.html")

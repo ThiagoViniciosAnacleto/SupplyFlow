@@ -24,7 +24,7 @@ from ..models import (
 
 
 from ..permissoes import api_backoffice
-from .util import fmt, gerar_iniciais, mapear_status_front
+from .util import fmt
 
 
 # ============================================================================

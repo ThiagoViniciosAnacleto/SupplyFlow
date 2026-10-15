@@ -8,23 +8,17 @@ matrícula enviada pelo navegador.
 import time
 from functools import wraps
 
-from django.db.models import Sum
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
 from ..auditoria import registrar
-from ..models import (
-    AnaliseIA,
-    EstoqueTotem,
-    Produto,
-    Solicitacao,
-    SolicitacaoItem,
-    Totem,
-    Usuario,
-)
+from ..models import EstoqueTotem, Produto, Solicitacao, Totem, Usuario
 from ..seguranca import bloqueado, limpar_falhas, registrar_falha, verificar_pin
-from .util import fmt, ler_json
+from ..servicos import RegraViolada, estados
+from ..servicos import solicitacoes as servico_solicitacoes
+from ..servicos.elegibilidade import ACIMA_DA_COTA, ANTECIPADA, EXIGE_JUSTIFICATIVA, avaliar
+from .util import EntradaInvalida, erro, fmt, inteiro, ler_json
 
 CHAVE_SESSAO = "totem_colaborador_id"
 CHAVE_EXPIRA = "totem_expira_em"
@@ -149,275 +143,154 @@ def api_totem_sair(request):
     return JsonResponse({"sucesso": True})
 
 
+def _totem(request, codigo=None):
+    codigo = codigo or request.GET.get("totem_codigo") or "TOTEM-01"
+    return Totem.objects.filter(codigo=codigo).first() or Totem.objects.filter(status_online=True).first()
+
+
+# ============================================================================
+# VITRINE, PEDIDO E ACOMPANHAMENTO
+# ============================================================================
 @require_GET
 @api_totem
 def api_totem_produtos(request):
-    """Retorna o catálogo de produtos no totem com cota, elegibilidade e estoque."""
-    totem_codigo = request.GET.get("totem_codigo", "TOTEM-01")
+    """Produtos com a situação de cada um para ESTE colaborador (RF-15 a RF-17, RNF-11).
+    Tudo é calculado no servidor; o totem só exibe."""
     colaborador = request.colaborador
-
-    totem = Totem.objects.filter(codigo=totem_codigo).first() or Totem.objects.filter(status_online=True).first()
-
-    estoques = {
-        e.produto_id: e.quantidade_disponivel
-        for e in EstoqueTotem.objects.filter(totem=totem)
-    } if totem else {}
-
-    solicitacoes_pendentes_prod = set()
-    retiradas_mes_prod = {}
-    ultimas_retiradas = {}
-
-    if colaborador:
-        agora = timezone.now()
-        inicio_mes = agora.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-
-        # Itens com solicitação em análise
-        itens_pendentes = SolicitacaoItem.objects.filter(
-            solicitacao__solicitante=colaborador,
-            solicitacao__status__in=["PENDENTE", "EM_ANALISE_IA", "AGUARDANDO_DECISAO"]
-        ).values_list("produto_id", flat=True)
-        solicitacoes_pendentes_prod = set(itens_pendentes)
-
-        # Consumo no mês atual
-        itens_mes = SolicitacaoItem.objects.filter(
-            solicitacao__solicitante=colaborador,
-            solicitacao__data_solicitacao__gte=inicio_mes,
-            solicitacao__status__in=["APROVADA", "RETIRADA"]
-        ).values("produto_id").annotate(total=Sum("quantidade_solicitada"))
-        for item in itens_mes:
-            retiradas_mes_prod[item["produto_id"]] = item["total"] or 0
-
-        # Última retirada registrada
-        for item in SolicitacaoItem.objects.filter(
-            solicitacao__solicitante=colaborador,
-            solicitacao__status__in=["APROVADA", "RETIRADA"]
-        ).select_related("solicitacao").order_by("-solicitacao__data_solicitacao"):
-            if item.produto_id not in ultimas_retiradas:
-                ultimas_retiradas[item.produto_id] = item.solicitacao.data_solicitacao
-
-    produtos = Produto.objects.select_related("categoria").filter(ativo=True).order_by("categoria__nome", "nome")
+    totem = _totem(request)
+    estoques = {e.produto_id: e for e in EstoqueTotem.objects.filter(totem=totem)} if totem else {}
 
     resultado = []
-    for p in produtos:
-        saldo_totem = estoques.get(p.id, 0)
-        tem_pendente = p.id in solicitacoes_pendentes_prod
-        consumido_mes = retiradas_mes_prod.get(p.id, 0)
-        limite_mensal = p.limite_padrao_mensal or 1
-        saldo_cota = max(0, limite_mensal - consumido_mes)
-
-        ultima_data = ultimas_retiradas.get(p.id)
-        ultima_data_str = fmt(ultima_data, "%d/%m/%Y") if ultima_data else None
-
-        tipo_categoria = "EPI" if p.categoria and "EPI" in p.categoria.nome.upper() else "Consumível"
-
-        # Lógica de elegibilidade (RNF/RF do sistema):
-        if tem_pendente:
-            status_item = "aguardando"
-            elegivel = False
-            tipo_acao = "aguardando"
-            texto_acao = "Aguardando aprovação"
-            mensagem_status = "Você já possui uma solicitação deste item aguardando análise."
-        elif p.requer_justificativa or saldo_cota <= 0:
-            status_item = "fora_da_cota"
-            elegivel = False
-            tipo_acao = "substituicao"
-            texto_acao = "Solicitar substituição antecipada"
-            mensagem_status = "Cota mensal atingida ou requer análise técnica prévia."
-        elif saldo_totem <= 0:
-            status_item = "sem_estoque"
-            elegivel = False
-            tipo_acao = "indisponivel"
-            texto_acao = "Sem estoque no totem"
-            mensagem_status = "Temporariamente sem estoque neste totem."
+    for p in Produto.objects.select_related("categoria").filter(ativo=True).order_by("categoria__nome", "nome"):
+        av = avaliar(colaborador, p, 1, estoques.get(p.id))
+        if av.tem_pendente:
+            situacao, acao = "aguardando", "Você já tem um pedido deste item em andamento."
+        elif av.saldo_livre_totem <= 0:
+            situacao, acao = "sem_estoque", "Sem estoque neste totem no momento. Procure o almoxarifado."
+        elif av.excepcional:
+            situacao = "excecao"
+            acao = {
+                ANTECIPADA: "Antes do prazo de troca"
+                            + (f" (próxima em {fmt(av.proxima_regular, '%d/%m/%Y')})" if av.proxima_regular else "")
+                            + ". Pode pedir com justificativa.",
+                ACIMA_DA_COTA: f"Limite do mês atingido ({av.consumido_mes}/{av.regra.limite_mensal}). "
+                               "Pode pedir com justificativa.",
+                EXIGE_JUSTIFICATIVA: "Este item exige justificativa.",
+            }[av.motivos[0]]
         else:
-            status_item = "disponivel"
-            elegivel = True
-            tipo_acao = "retirada"
-            texto_acao = "Solicitar retirada"
-            mensagem_status = f"Disponível no totem ({saldo_totem} un.)."
+            situacao, acao = "disponivel", "Disponível para retirada."
 
         resultado.append({
             "id": str(p.id),
             "sku": p.sku,
             "nome": p.nome,
             "descricao": p.descricao or "",
-            "categoria": p.categoria.nome if p.categoria else "Geral",
-            "tipo": tipo_categoria,
+            "tipo": "EPI" if p.eh_epi else "Consumível",
             "unidade_medida": p.unidade_medida,
-            "custo_unitario": float(p.custo_unitario),
-            "limite_mensal": limite_mensal,
-            "consumido_mes": consumido_mes,
-            "saldo_cota": saldo_cota,
-            "saldo_totem": saldo_totem,
-            "ultima_retirada": ultima_data_str,
-            "elegivel": elegivel,
-            "tipo_acao": tipo_acao,
-            "texto_acao": texto_acao,
-            "status_item": status_item,
-            "mensagem_status": mensagem_status,
+            "limite_mensal": av.regra.limite_mensal,
+            "consumido_mes": av.consumido_mes,
+            "periodicidade_dias": av.regra.periodicidade_dias,
+            "ultima_retirada": fmt(av.ultima_entrega, "%d/%m/%Y"),
+            "saldo_totem": av.saldo_livre_totem,
+            "situacao": situacao,
+            "motivo_excecao": av.motivo_principal if av.excepcional else None,
+            "mensagem": acao,
+            "pode_solicitar": situacao in ("disponivel", "excecao"),
+            "exige_justificativa": situacao == "excecao",
             "imagem_url": p.imagem_url or "",
         })
 
+    pendentes = Solicitacao.objects.filter(
+        solicitante=colaborador, status__in=list(estados.ESTADOS_AGUARDANDO) + list(estados.ESTADOS_APROVADOS)
+    ).count()
     return JsonResponse({
-        "totem": {
-            "id": str(totem.id) if totem else None,
-            "codigo": totem.codigo if totem else "TOTEM-01",
-            "nome": totem.nome if totem else "Totem Principal",
-            "localizacao": totem.localizacao if totem else "Geral",
-        },
+        "totem": {"codigo": totem.codigo if totem else None, "nome": totem.nome if totem else None,
+                  "localizacao": totem.localizacao if totem else None},
         "produtos": resultado,
-        "total_solicitacoes_pendentes": len(solicitacoes_pendentes_prod),
+        "total_solicitacoes_pendentes": pendentes,
     })
 
 
 @require_POST
 @api_totem
 def api_totem_solicitar(request):
-    """Processa a solicitação de retirada regular ou substituição antecipada via Totem."""
+    """Registra o pedido. O servidor decide se é exceção e exige a justificativa (RF-18 a RF-20)."""
     dados, erro_json = ler_json(request)
     if erro_json:
         return erro_json
-    produto_id = dados.get("produto_id")
-    quantidade = int(dados.get("quantidade") or 1)
-    tipo = (dados.get("tipo") or "retirada").lower()
-    justificativa = (dados.get("justificativa") or "").strip()
-    totem_codigo = dados.get("totem_codigo") or "TOTEM-01"
-
     colaborador = request.colaborador
-
-    produto = Produto.objects.filter(id=produto_id, ativo=True).first()
-    if not produto:
-        return JsonResponse({"sucesso": False, "erro": "Produto não encontrado."}, status=404)
-
-    totem = Totem.objects.filter(codigo=totem_codigo).first() or Totem.objects.filter(status_online=True).first()
-
-    eh_excepcional = (
-        tipo == "substituicao"
-        or produto.requer_justificativa
-        or bool(justificativa)
-    )
-
-    ultimo = Solicitacao.objects.count()
-    codigo_solic = f"SOL-2026-{ultimo + 1:04d}"
-    valor_total = float(produto.custo_unitario) * quantidade
-    # RF-26 a RF-39: Todas as solicitações criadas via Totem iniciam aguardando decisão humana
-    status_inicial = "AGUARDANDO_DECISAO"
-
-    solicitacao = Solicitacao.objects.create(
-        codigo=codigo_solic,
-        solicitante=colaborador,
-        totem=totem,
-        status=status_inicial,
-        justificativa_solicitante=justificativa if eh_excepcional else (justificativa or "Retirada regular de suprimento dentro da cota"),
-        motivo_categoria="Substituição antecipada" if eh_excepcional else "Retirada regular",
-        fora_da_cota=eh_excepcional,
-        valor_total_estimado=valor_total,
-        data_conclusao=None,
-    )
-
-    SolicitacaoItem.objects.create(
-        solicitacao=solicitacao,
-        produto=produto,
-        quantidade_solicitada=quantidade,
-        quantidade_aprovada=None,
-        custo_unitario_momento=produto.custo_unitario,
-    )
-
-    # Se substituição antecipada, classifica via IA supervisionada
-    analise_ia_info = None
-    if eh_excepcional and justificativa:
-        txt = justificativa.lower()
-        if any(w in txt for w in ["rasg", "fur", "quebr", "corte", "danific", "parti"]):
-            cat_ia = "Dano durante atividade"
-            score = 89.0
-            risco = "BAIXO"
-            rec = "APROVAR"
-            fator_princ = "Dano acidental durante execução de atividade operacional"
-        elif any(w in txt for w in ["perd", "sumi", "extravi", "esquec"]):
-            cat_ia = "Perda"
-            score = 82.0
-            risco = "MEDIO"
-            rec = "REVISAO_MANUAL"
-            fator_princ = "Relato de perda/extravio — verificar termos de reposição"
-        elif any(w in txt for w in ["desgast", "velh", "gasto", "usad"]):
-            cat_ia = "Desgaste normal"
-            score = 91.0
-            risco = "BAIXO"
-            rec = "APROVAR"
-            fator_princ = "Fim da vida útil por tempo de uso"
-        elif any(w in txt for w in ["endurec", "rachou", "estrag", "cedo", "defeito"]):
-            cat_ia = "Desgaste prematuro"
-            score = 86.5
-            risco = "BAIXO"
-            rec = "APROVAR"
-            fator_princ = "Deterioração precoce antes da periodicidade padrão"
-        elif any(w in txt for w in ["apert", "larg", "tamanh", "pequen", "grand"]):
-            cat_ia = "Tamanho inadequado"
-            score = 88.0
-            risco = "BAIXO"
-            rec = "APROVAR"
-            fator_princ = "Incompatibilidade ergonômica de tamanho"
-        else:
-            cat_ia = "Outro"
-            score = 72.0
-            risco = "MEDIO"
-            rec = "REVISAO_MANUAL"
-            fator_princ = "Justificativa genérica requer análise pelo gestor responsável"
-
-        AnaliseIA.objects.create(
-            solicitacao=solicitacao,
-            modelo_versao="SupplyAI-v1.4",
-            recomendacao=rec,
-            score_confianca=score,
-            nivel_risco=risco,
-            parecer_resumo=f"Classificado como '{cat_ia}' com {score:.0f}% de confiança. {fator_princ}.",
-            fatores_analisados=[
-                {"fator": "Classificação Textual", "detalhe": cat_ia, "impacto": "POSITIVO" if rec == "APROVAR" else "NEUTRO"},
-                {"fator": "Histórico do Colaborador", "detalhe": f"Setor {colaborador.setor.nome if colaborador.setor else 'Operações'}", "impacto": "POSITIVO"},
-                {"fator": "Periodicidade/Cota", "detalhe": "Solicitação antecipada", "impacto": "ATENCAO"}
-            ],
-            tempo_inferencia_ms=185,
+    produto = Produto.objects.select_related("categoria").filter(id=dados.get("produto_id"), ativo=True).first() \
+        if _uuid_valido(dados.get("produto_id")) else None
+    if produto is None:
+        return erro("Produto não encontrado.", status=404)
+    try:
+        quantidade = inteiro(dados.get("quantidade"), "Quantidade", minimo=1, padrao=1)
+        s, av, motivos, analise = servico_solicitacoes.criar_no_totem(
+            colaborador, produto, quantidade, _totem(request, dados.get("totem_codigo")),
+            tipo=(dados.get("tipo") or "retirada").lower(),
+            justificativa=dados.get("justificativa") or "",
         )
-        analise_ia_info = {
-            "categoria": cat_ia,
-            "confianca": score,
-            "recomendacao": rec,
-        }
+    except EntradaInvalida as e:
+        return erro(str(e))
+    except RegraViolada as e:
+        return erro(str(e), status=e.status)
 
+    registrar(request, "SOLICITACAO_CRIADA", s, f"{s.codigo}: {produto.nome} x{quantidade}",
+              usuario=colaborador, excepcional=s.fora_da_cota, motivos=motivos)
     return JsonResponse({
         "sucesso": True,
-        "codigo": solicitacao.codigo,
-        "status": status_inicial,
-        "eh_excepcional": eh_excepcional,
-        "mensagem": "Solicitação enviada com sucesso! Sua solicitação foi encaminhada para a análise do gestor/almoxarifado.",
-        "analise_ia": analise_ia_info,
+        "codigo": s.codigo,
+        "status": estados.rotulo(s.status),
+        "excepcional": s.fora_da_cota,
+        "mensagem": f"Pedido {s.codigo} enviado para análise. Acompanhe em “Minhas solicitações”.",
     })
 
 
 @require_GET
 @api_totem
 def api_totem_solicitacoes_usuario(request):
-    """Lista as solicitações do colaborador autenticado no autoatendimento (RF-21)."""
-    colaborador = request.colaborador
-
-    sols = Solicitacao.objects.filter(solicitante=colaborador).prefetch_related("itens__produto").order_by("-data_solicitacao")[:15]
+    """As solicitações do próprio colaborador (RF-21)."""
+    sols = (
+        Solicitacao.objects.filter(solicitante=request.colaborador)
+        .prefetch_related("itens__produto").order_by("-data_solicitacao")[:20]
+    )
     resultado = []
     for s in sols:
-        primeiro_item = s.itens.first()
-        prod_nome = primeiro_item.produto.nome if primeiro_item else "Material"
+        item = s.itens.first()
+        status = estados.normalizar(s.status)
         resultado.append({
+            "id": str(s.id),
             "codigo": s.codigo,
             "data": fmt(s.data_solicitacao, "%d/%m/%Y às %H:%M"),
-            "produto": prod_nome,
-            "status": s.status,
-            "status_rotulo": (
-                "Aguardando aprovação" if s.status in ["PENDENTE", "AGUARDANDO_DECISAO", "EM_ANALISE_IA"]
-                else "Aprovada" if s.status == "APROVADA"
-                else "Entregue / Retirada" if s.status == "RETIRADA"
-                else "Reprovada"
-            ),
-            "fora_da_cota": s.fora_da_cota,
-            "motivo": s.motivo_categoria or "Solicitação",
+            "produto": item.produto.nome if item else "—",
+            "status": estados.chave_front(status),
+            "status_rotulo": estados.rotulo(status),
+            "motivo": s.motivo_categoria or "Retirada regular",
+            "pode_cancelar": status in estados.ESTADOS_AGUARDANDO or status in estados.ESTADOS_APROVADOS,
         })
-
     return JsonResponse({"solicitacoes": resultado})
+
+
+@require_POST
+@api_totem
+def api_totem_cancelar(request, solicitacao_id):
+    """O colaborador cancela o próprio pedido antes da entrega (RF-50)."""
+    s = Solicitacao.objects.filter(id=solicitacao_id, solicitante=request.colaborador).first()
+    if s is None:
+        return erro("Solicitação não encontrada.", status=404)
+    try:
+        servico_solicitacoes.cancelar(s, request.colaborador)
+    except RegraViolada as e:
+        return erro(str(e), status=e.status)
+    registrar(request, "SOLICITACAO_CANCELADA", s, f"{s.codigo} cancelada pelo solicitante", usuario=request.colaborador)
+    return JsonResponse({"sucesso": True, "mensagem": f"Pedido {s.codigo} cancelado."})
+
+
+def _uuid_valido(valor):
+    import uuid
+
+    try:
+        uuid.UUID(str(valor))
+        return True
+    except ValueError:
+        return False

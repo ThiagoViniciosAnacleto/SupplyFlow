@@ -33,6 +33,8 @@ urlpatterns = [
     path("backoffice/entregas.html", views.pagina_entregas, name="entregas"),
     path("backoffice/devolucoes.html", views.pagina_devolucoes, name="devolucoes"),
     path("backoffice/usuarios.html", views.pagina_usuarios, name="usuarios"),
+    path("backoffice/fornecedores.html", views.pagina_fornecedores, name="fornecedores"),
+    path("backoffice/politicas.html", views.pagina_politicas, name="politicas"),
     path("backoffice/auditoria.html", views.pagina_auditoria, name="auditoria"),
     path("backoffice/em-construcao.html", views.pagina_em_construcao, name="em_construcao"),
 
@@ -73,6 +75,7 @@ urlpatterns = [
     path("api/totem/produtos/", views.api_totem_produtos, name="api_totem_produtos"),
     path("api/totem/solicitar/", views.api_totem_solicitar, name="api_totem_solicitar"),
     path("api/totem/solicitacoes/", views.api_totem_solicitacoes_usuario, name="api_totem_solicitacoes_usuario"),
+    path("api/totem/solicitacoes/<uuid:solicitacao_id>/cancelar/", views.api_totem_cancelar, name="api_totem_cancelar"),
 
     # =========================================================================
     # AUTENTICAÇÃO DO BACKOFFICE
@@ -89,6 +92,7 @@ urlpatterns = [
     path("api/solicitacoes/", views.api_listar_solicitacoes, name="api_solicitacoes"),
     path("api/solicitacoes/<uuid:solicitacao_id>/", views.api_detalhe_solicitacao, name="api_solicitacao_detalhe"),
     path("api/solicitacoes/<uuid:solicitacao_id>/decidir/", views.api_decidir_solicitacao, name="api_decidir_solicitacao"),
+    path("api/solicitacoes/<uuid:solicitacao_id>/cancelar/", views.api_cancelar_solicitacao, name="api_cancelar_solicitacao"),
     path("api/produtos/", views.api_listar_produtos, name="api_produtos"),
     path("api/produtos/salvar/", views.api_salvar_produto, name="api_salvar_produto"),
     path("api/produtos/<uuid:produto_id>/toggle/", views.api_toggle_produto, name="api_toggle_produto"),
@@ -101,9 +105,18 @@ urlpatterns = [
     path("api/setores/<uuid:setor_id>/toggle/", views.api_toggle_setor, name="api_toggle_setor"),
     path("api/estoque/", views.api_listar_estoque, name="api_estoque"),
     path("api/estoque/repor/", views.api_repor_estoque, name="api_repor_estoque"),
+    path("api/estoque/movimentacoes/", views.api_movimentacoes_estoque, name="api_movimentacoes_estoque"),
+    path("api/fornecedores/", views.api_listar_fornecedores, name="api_fornecedores"),
+    path("api/fornecedores/salvar/", views.api_salvar_fornecedor, name="api_salvar_fornecedor"),
+    path("api/fornecedores/<uuid:fornecedor_id>/toggle/", views.api_toggle_fornecedor, name="api_toggle_fornecedor"),
+    path("api/politicas/", views.api_listar_regras, name="api_politicas"),
+    path("api/politicas/salvar/", views.api_salvar_regra, name="api_salvar_politica"),
+    path("api/politicas/<uuid:regra_id>/toggle/", views.api_toggle_regra, name="api_toggle_politica"),
+    path("api/cargos/", views.api_listar_cargos, name="api_cargos"),
     path("api/avaliacao-ia/", views.api_avaliacao_ia, name="api_avaliacao_ia"),
     path("api/entregas/", views.api_listar_entregas, name="api_entregas"),
     path("api/entregas/<uuid:solicitacao_id>/confirmar/", views.api_confirmar_entrega, name="api_confirmar_entrega"),
     path("api/devolucoes/", views.api_listar_devolucoes, name="api_devolucoes"),
+    path("api/devolucoes/<uuid:solicitacao_id>/registrar/", views.api_registrar_devolucao, name="api_registrar_devolucao"),
     path("api/auditoria/", views.api_listar_auditoria, name="api_auditoria"),
 ]

@@ -81,6 +81,27 @@ class CategoriaProduto(models.Model):
         return self.nome
 
 
+class Fornecedor(models.Model):
+    """Fornecedores de EPIs e consumíveis (RF-05)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    razao_social = models.CharField(max_length=150)
+    nome_fantasia = models.CharField(max_length=150, blank=True)
+    cnpj = models.CharField(max_length=18, unique=True)
+    email = models.CharField(max_length=150, blank=True)
+    telefone = models.CharField(max_length=30, blank=True)
+    contato = models.CharField(max_length=100, blank=True)
+    ativo = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "fornecedores"
+        ordering = ["razao_social"]
+
+    def __str__(self):
+        return self.nome_fantasia or self.razao_social
+
+
 class Produto(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     categoria = models.ForeignKey(
@@ -100,12 +121,24 @@ class Produto(models.Model):
     ativo = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    # Dados específicos de EPI (RF-07) e periodicidade mínima entre entregas (RF-13)
+    ca = models.CharField("Certificado de Aprovação", max_length=30, blank=True, null=True)
+    validade_ca = models.DateField(blank=True, null=True)
+    tamanho = models.CharField(max_length=30, blank=True, null=True)
+    periodicidade_dias = models.PositiveIntegerField(blank=True, null=True)
+    fornecedor = models.ForeignKey(
+        Fornecedor, on_delete=models.SET_NULL, null=True, blank=True, db_column="fornecedor_id"
+    )
 
     class Meta:
         db_table = "produtos"
 
     def __str__(self):
         return f"{self.sku} - {self.nome}"
+
+    @property
+    def eh_epi(self):
+        return bool(self.categoria and "EPI" in self.categoria.nome.upper())
 
 
 class EstoqueTotem(models.Model):
@@ -115,12 +148,20 @@ class EstoqueTotem(models.Model):
         Produto, on_delete=models.CASCADE, db_column="produto_id"
     )
     quantidade_disponivel = models.IntegerField(default=0)
+    # Parte do disponível já prometida a solicitações aprovadas e ainda não entregues (RF-39)
+    quantidade_reservada = models.IntegerField(default=0)
     quantidade_minima = models.IntegerField(default=5)
     slot_posicao = models.CharField(max_length=20, blank=True, null=True)
+    lote = models.CharField(max_length=50, blank=True, null=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = "estoque_totem"
+
+    @property
+    def livre(self):
+        """Quantidade que ainda pode ser prometida a novas solicitações."""
+        return self.quantidade_disponivel - self.quantidade_reservada
 
 
 class Solicitacao(models.Model):
@@ -180,6 +221,9 @@ class AnaliseIA(models.Model):
         db_column="solicitacao_id",
     )
     modelo_versao = models.CharField(max_length=50)
+    # Categoria sugerida pelo classificador. A IA NÃO recomenda aprovar/rejeitar (RF-25);
+    # "recomendacao" é mantida só por compatibilidade e recebe "SUGESTAO_CATEGORIA".
+    categoria = models.CharField(max_length=50, blank=True, null=True)
     recomendacao = models.CharField(max_length=30)
     score_confianca = models.DecimalField(max_digits=5, decimal_places=2)
     nivel_risco = models.CharField(max_length=20, default="BAIXO")
@@ -204,9 +248,15 @@ class DecisaoSolicitacao(models.Model):
         Usuario, on_delete=models.SET_NULL, null=True, db_column="aprovador_id"
     )
     decisao_final = models.CharField(max_length=30)
+    # True quando o responsável manteve a categoria sugerida pela IA.
     seguiu_recomendacao_ia = models.BooleanField()
     justificativa_decisao = models.TextField(blank=True, null=True)
     data_decisao = models.DateTimeField(auto_now_add=True)
+    # Trilha da classificação: sugerida pela IA x confirmada pelo responsável (RF-24)
+    categoria_ia = models.CharField(max_length=50, blank=True, null=True)
+    categoria_confirmada = models.CharField(max_length=50, blank=True, null=True)
+    # Aprovação condicionada à devolução do EPI anterior (RF-29, RF-35)
+    exige_devolucao = models.BooleanField(default=False)
 
     class Meta:
         db_table = "decisoes_solicitacao"
@@ -256,3 +306,118 @@ class RegistroAuditoria(models.Model):
 
     def __str__(self):
         return f"{self.data:%d/%m/%Y %H:%M} {self.acao} {self.usuario_nome}"
+
+class RegraFornecimento(models.Model):
+    """Política de fornecimento (RF-12 a RF-14): sobrepõe o limite e a periodicidade
+    padrão do produto para um setor e/ou cargo. Vale a regra mais específica."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    produto = models.ForeignKey(Produto, on_delete=models.CASCADE, related_name="regras", db_column="produto_id")
+    setor = models.ForeignKey(Setor, on_delete=models.CASCADE, null=True, blank=True, db_column="setor_id")
+    cargo = models.CharField(max_length=100, blank=True)
+    limite_mensal = models.PositiveIntegerField(blank=True, null=True)
+    periodicidade_dias = models.PositiveIntegerField(blank=True, null=True)
+    ativo = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "regras_fornecimento"
+
+    def __str__(self):
+        escopo = " / ".join(filter(None, [self.setor.nome if self.setor else "", self.cargo])) or "Todos"
+        return f"{self.produto.nome} — {escopo}"
+
+
+class MovimentacaoEstoque(models.Model):
+    """Toda alteração de saldo fica registrada (RF-36, RF-37, RF-45, RNF-08)."""
+
+    ENTRADA = "ENTRADA"
+    RESERVA = "RESERVA"
+    LIBERACAO = "LIBERACAO"
+    SAIDA = "SAIDA"
+    AJUSTE = "AJUSTE"
+    TIPOS = [(ENTRADA, "Entrada"), (RESERVA, "Reserva"), (LIBERACAO, "Liberação de reserva"),
+             (SAIDA, "Saída (entrega)"), (AJUSTE, "Ajuste")]
+
+    id = models.BigAutoField(primary_key=True)
+    estoque = models.ForeignKey(EstoqueTotem, on_delete=models.CASCADE, db_column="estoque_id")
+    produto = models.ForeignKey(Produto, on_delete=models.RESTRICT, db_column="produto_id")
+    tipo = models.CharField(max_length=20, choices=TIPOS)
+    quantidade = models.IntegerField()
+    saldo_disponivel_apos = models.IntegerField()
+    saldo_reservado_apos = models.IntegerField()
+    lote = models.CharField(max_length=50, blank=True)
+    solicitacao = models.ForeignKey(Solicitacao, on_delete=models.SET_NULL, null=True, blank=True,
+                                    db_column="solicitacao_id")
+    usuario = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True, db_column="usuario_id")
+    observacao = models.CharField(max_length=255, blank=True)
+    data = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        db_table = "movimentacoes_estoque"
+        ordering = ["-data"]
+
+
+class Entrega(models.Model):
+    """Entrega física confirmada pelo almoxarife (RF-41, RF-42, RF-43).
+    Guarda uma cópia dos dados do momento (RNF-18): mudar o cadastro depois não
+    altera o histórico nem a ficha de EPI do funcionário."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    solicitacao = models.ForeignKey(Solicitacao, on_delete=models.RESTRICT, related_name="entregas",
+                                    db_column="solicitacao_id")
+    item = models.ForeignKey(SolicitacaoItem, on_delete=models.RESTRICT, db_column="item_id")
+    colaborador = models.ForeignKey(Usuario, on_delete=models.RESTRICT, related_name="entregas_recebidas",
+                                    db_column="colaborador_id")
+    produto = models.ForeignKey(Produto, on_delete=models.RESTRICT, db_column="produto_id")
+    almoxarife = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, related_name="entregas_feitas",
+                                   db_column="almoxarife_id")
+    totem = models.ForeignKey(Totem, on_delete=models.SET_NULL, null=True, db_column="totem_id")
+    quantidade = models.PositiveIntegerField()
+    # Cópias do momento da entrega
+    produto_nome = models.CharField(max_length=150)
+    eh_epi = models.BooleanField(default=False)
+    ca = models.CharField(max_length=30, blank=True)
+    lote = models.CharField(max_length=50, blank=True)
+    setor_nome = models.CharField(max_length=100, blank=True)
+    centro_custo = models.CharField(max_length=50, blank=True)
+    custo_unitario = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    data = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        db_table = "entregas"
+        ordering = ["-data"]
+
+
+class Devolucao(models.Model):
+    """Devolução do EPI anterior exigida numa aprovação condicionada (RF-31 a RF-35)."""
+
+    CONDICOES = [
+        ("BOM_ESTADO", "Bom estado"),
+        ("DESGASTE_NORMAL", "Desgaste normal"),
+        ("DANIFICADO", "Danificado"),
+        ("CONTAMINADO", "Contaminado"),
+        ("INUTILIZAVEL", "Inutilizável"),
+    ]
+    DESTINACOES = [
+        ("DESCARTE", "Descarte"),
+        ("AVALIACAO_TECNICA", "Avaliação técnica"),
+        ("QUARENTENA", "Quarentena"),
+        ("DEVOLUCAO_FORNECEDOR", "Devolução ao fornecedor"),
+        ("REUSO", "Reutilização"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    solicitacao = models.OneToOneField(Solicitacao, on_delete=models.CASCADE, related_name="devolucao",
+                                       db_column="solicitacao_id")
+    entrega_original = models.ForeignKey(Entrega, on_delete=models.SET_NULL, null=True, blank=True,
+                                         db_column="entrega_original_id")
+    dispensada = models.BooleanField(default=False)
+    condicao = models.CharField(max_length=30, choices=CONDICOES, blank=True)
+    destinacao = models.CharField(max_length=30, choices=DESTINACOES, blank=True)
+    observacao = models.TextField(blank=True)
+    registrado_por = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, db_column="registrado_por_id")
+    data = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "devolucoes"

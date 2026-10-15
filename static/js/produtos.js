@@ -43,10 +43,20 @@
           });
         }
 
+        var selectForn = document.getElementById("prod-fornecedor");
+        if (selectForn && selectForn.children.length <= 1) {
+          (dados.fornecedores || []).forEach(function (f) {
+            var opt = document.createElement("option");
+            opt.value = f.id;
+            opt.textContent = f.nome;
+            selectForn.appendChild(opt);
+          });
+        }
+
         filtrarERenderizar();
       })
       .catch(function (err) {
-        tabelaCorpo.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-danger">Erro ao carregar catálogo: ' + err.message + '</td></tr>';
+        tabelaCorpo.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-danger">Erro ao carregar catálogo: ' + SF.escapar(err.message) + '</td></tr>';
       });
   }
 
@@ -65,6 +75,7 @@
       return;
     }
 
+    var esc = SF.escapar;
     tabelaCorpo.innerHTML = lista.map(function (p) {
       var ehEpi = p.tipo === "EPI";
       var badgeTipo = ehEpi
@@ -81,12 +92,13 @@
 
       return (
         '<tr>' +
-          '<td><span class="numero">' + p.sku + '</span></td>' +
-          '<td><strong>' + p.nome + '</strong></td>' +
-          '<td>' + p.categoria + '</td>' +
-          '<td><span class="badge bg-light text-dark border">' + p.unidade_medida + '</span></td>' +
+          '<td><span class="numero">' + esc(p.sku) + '</span></td>' +
+          '<td><strong>' + esc(p.nome) + '</strong>' + (p.ca ? '<span class="small text-muted d-block">CA ' + esc(p.ca) + (p.tamanho ? ' · ' + esc(p.tamanho) : '') + '</span>' : '') + '</td>' +
+          '<td>' + esc(p.categoria) + '</td>' +
+          '<td><span class="badge bg-light text-dark border">' + esc(p.unidade_medida) + '</span></td>' +
           '<td>R$ ' + p.custo_unitario.toFixed(2).replace(".", ",") + '</td>' +
-          '<td>' + p.limite_padrao_mensal + ' un./mês</td>' +
+          '<td>' + (p.limite_padrao_mensal != null ? esc(p.limite_padrao_mensal) + ' un./mês' : '—') +
+            (p.periodicidade_dias ? '<span class="small text-muted d-block">troca a cada ' + esc(p.periodicidade_dias) + ' dias</span>' : '') + '</td>' +
           '<td>' + badgeJust + '</td>' +
           '<td>' + badgeStatus + '</td>' +
           '<td class="text-end">' +
@@ -116,7 +128,12 @@
         document.getElementById("prod-categoria").value = p.categoria_id || "";
         document.getElementById("prod-unidade").value = p.unidade_medida;
         document.getElementById("prod-custo").value = p.custo_unitario;
-        document.getElementById("prod-limite").value = p.limite_padrao_mensal;
+        document.getElementById("prod-limite").value = p.limite_padrao_mensal != null ? p.limite_padrao_mensal : "";
+        document.getElementById("prod-ca").value = p.ca || "";
+        document.getElementById("prod-validade-ca").value = p.validade_ca || "";
+        document.getElementById("prod-tamanho").value = p.tamanho || "";
+        document.getElementById("prod-periodicidade").value = p.periodicidade_dias || "";
+        document.getElementById("prod-fornecedor").value = p.fornecedor_id || "";
         document.getElementById("prod-requer-justificativa").checked = p.requer_justificativa;
 
         if (modalBs) modalBs.show();
@@ -156,8 +173,13 @@
         descricao: document.getElementById("prod-descricao").value.trim(),
         categoria_id: document.getElementById("prod-categoria").value || null,
         unidade_medida: document.getElementById("prod-unidade").value,
-        custo_unitario: parseFloat(document.getElementById("prod-custo").value || 0),
-        limite_padrao_mensal: parseInt(document.getElementById("prod-limite").value || 1, 10),
+        custo_unitario: document.getElementById("prod-custo").value,
+        limite_padrao_mensal: document.getElementById("prod-limite").value,
+        periodicidade_dias: document.getElementById("prod-periodicidade").value,
+        ca: document.getElementById("prod-ca").value.trim(),
+        validade_ca: document.getElementById("prod-validade-ca").value,
+        tamanho: document.getElementById("prod-tamanho").value.trim(),
+        fornecedor_id: document.getElementById("prod-fornecedor").value || null,
         requer_justificativa: document.getElementById("prod-requer-justificativa").checked,
       };
 
