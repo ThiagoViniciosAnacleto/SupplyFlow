@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Relatórios · SupplyFlow</title>
+  <link rel="icon" href="../static/img/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../static/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="../static/vendor/bootstrap-icons/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="../static/css/supplyflow.css">
+</head>
+<body data-pagina="relatorios">
+  <div class="app">
+
+    <div class="sidebar-trilho">
+      <aside class="sidebar offcanvas-lg offcanvas-start" tabindex="-1" id="sidebar" aria-label="Menu"></aside>
+    </div>
+
+    <div class="app__principal">
+      <header class="topbar" id="topbar"></header>
+
+      <main class="conteudo">
+        <h1 class="pagina-titulo">Relatórios de gestão</h1>
+        <p class="pagina-descricao" id="descricao-periodo">Consumo, exceções e justificativas do período, calculados a partir das entregas e decisões registradas.</p>
+
+        <form class="cartao filtros filtros--compacto" id="form-periodo" aria-label="Período do relatório">
+          <div>
+            <label for="p-de" class="form-label">De</label>
+            <input type="date" id="p-de" class="form-control">
+          </div>
+          <div>
+            <label for="p-ate" class="form-label">Até</label>
+            <input type="date" id="p-ate" class="form-control">
+          </div>
+          <div class="filtros__acoes">
+            <button type="submit" class="btn btn-primary">Atualizar</button>
+            <span class="form-text">Sem datas: últimos 90 dias.</span>
+          </div>
+        </form>
+
+        <div class="alert alert-danger d-none mt-3" role="alert" id="erro-relatorio"></div>
+
+        <section class="indicadores mt-3" id="kpis-relatorio" aria-label="Resumo do período"></section>
+
+        <div class="avaliacao">
+          <section class="cartao" aria-labelledby="t-centros">
+            <div class="cartao__cabecalho">
+              <h2 class="cartao__titulo" id="t-centros">Consumo por centro de custo</h2>
+              <a class="link-ver-todas" data-secao="centros" href="#"><i class="bi bi-download" aria-hidden="true"></i> CSV</a>
+            </div>
+            <div class="table-responsive" tabindex="0" role="region" aria-labelledby="t-centros">
+              <table class="tabela-solicitacoes">
+                <thead><tr><th scope="col">Centro de custo</th><th scope="col" class="text-end">Itens</th><th scope="col" class="text-end">Valor (R$)</th></tr></thead>
+                <tbody id="corpo-centros"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="cartao" aria-labelledby="t-status">
+            <div class="cartao__cabecalho"><h2 class="cartao__titulo" id="t-status">Solicitações por situação</h2></div>
+            <div class="cartao__corpo"><ul class="lista-solicitacoes" id="lista-status"></ul></div>
+          </section>
+        </div>
+
+        <div class="avaliacao mt-4">
+          <section class="cartao" aria-labelledby="t-produtos">
+            <div class="cartao__cabecalho">
+              <h2 class="cartao__titulo" id="t-produtos">Consumo por produto</h2>
+              <a class="link-ver-todas" data-secao="produtos" href="#"><i class="bi bi-download" aria-hidden="true"></i> CSV</a>
+            </div>
+            <div class="table-responsive" tabindex="0" role="region" aria-labelledby="t-produtos">
+              <table class="tabela-solicitacoes">
+                <thead><tr><th scope="col">Produto</th><th scope="col">Tipo</th><th scope="col" class="text-end">Itens</th><th scope="col" class="text-end">Valor (R$)</th></tr></thead>
+                <tbody id="corpo-produtos"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="cartao" aria-labelledby="t-excecoes">
+            <div class="cartao__cabecalho"><h2 class="cartao__titulo" id="t-excecoes">Exceções por motivo</h2></div>
+            <div class="cartao__corpo"><ul class="lista-solicitacoes" id="lista-excecoes"></ul></div>
+          </section>
+        </div>
+
+        <section class="cartao mt-4" aria-labelledby="t-justificativas">
+          <div class="cartao__cabecalho">
+            <h2 class="cartao__titulo" id="t-justificativas">Justificativas por categoria</h2>
+            <a class="link-ver-todas" data-secao="justificativas" href="#"><i class="bi bi-download" aria-hidden="true"></i> CSV</a>
+          </div>
+          <p class="cartao__subtitulo">Comparação entre a categoria sugerida pela IA e a confirmada pelo responsável nas decisões do período.</p>
+          <div class="table-responsive" tabindex="0" role="region" aria-labelledby="t-justificativas">
+            <table class="tabela-solicitacoes">
+              <thead><tr><th scope="col">Categoria</th><th scope="col" class="text-end">Sugeridas pela IA</th><th scope="col" class="text-end">Confirmadas</th></tr></thead>
+              <tbody id="corpo-justificativas"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+  </div>
+
+  <script src="../static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script src="../static/js/menu.js"></script>
+  <script src="../static/js/api.js"></script>
+  <script src="../static/js/sessao.js"></script>
+  <script src="../static/js/backoffice.js"></script>
+  <script src="../static/js/relatorios.js"></script>
+</body>
+</html>

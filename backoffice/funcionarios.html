@@ -101,14 +101,16 @@
                 <input type="text" id="func-matricula" class="form-control" required placeholder="Ex.: MAT-2004">
               </div>
               <div class="col-6">
-                <label for="func-pin" class="form-label small fw-semibold">PIN (4 dígitos)</label>
-                <input type="password" id="func-pin" class="form-control" maxlength="4" placeholder="Padrão: 1234">
+                <label for="func-pin" class="form-label small fw-semibold">PIN do totem (4 a 6 números)</label>
+                <input type="password" id="func-pin" class="form-control" inputmode="numeric" maxlength="6" autocomplete="new-password" aria-describedby="ajuda-pin">
+                <div class="form-text" id="ajuda-pin">Obrigatório no cadastro. Ao editar, deixe em branco para manter.</div>
               </div>
             </div>
 
             <div class="mb-3">
-              <label for="func-email" class="form-label small fw-semibold">E-mail Corporativo</label>
-              <input type="email" id="func-email" class="form-control" placeholder="lucas.moreira@supplyflow.com">
+              <label for="func-email" class="form-label small fw-semibold">E-mail corporativo</label>
+              <input type="email" id="func-email" class="form-control" autocomplete="off" aria-describedby="ajuda-email">
+              <div class="form-text" id="ajuda-email">Obrigatório para perfis com acesso ao backoffice: a pessoa recebe nele o link para criar a senha.</div>
             </div>
 
             <div class="mb-3">
@@ -129,6 +131,7 @@
                   <option value="COLABORADOR">Colaborador (Totem)</option>
                   <option value="OPERADOR">Almoxarife</option>
                   <option value="TECNICO_SEGURANCA">Técnico de Segurança</option>
+                  <option value="COMPRADOR">Comprador</option>
                   <option value="GESTOR">Gestor / Supervisor</option>
                   <option value="ADMIN">Administrador</option>
                 </select>
@@ -145,7 +148,8 @@
   </div>
 
   <script src="../static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
-  <script src="../static/js/dados-demo.js"></script>
+  <script src="../static/js/menu.js"></script>
+  <script src="../static/js/api.js"></script>
   <script src="../static/js/sessao.js"></script>
   <script src="../static/js/backoffice.js"></script>
   <script src="../static/js/funcionarios.js"></script>

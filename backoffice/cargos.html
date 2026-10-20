@@ -23,7 +23,7 @@
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
           <div>
             <h1 class="pagina-titulo mb-1">Cargos e Funções</h1>
-            <p class="pagina-descricao mb-0">Estrutura de cargos da organização e vinculação a políticas de fornecimento de EPIs.</p>
+            <p class="pagina-descricao mb-0">Cargos em uso no cadastro de funcionários e os produtos que as <a href="politicas.html">políticas de fornecimento</a> vinculam a cada um.</p>
           </div>
         </div>
 
@@ -33,14 +33,13 @@
               <thead>
                 <tr>
                   <th scope="col">Cargo / Função</th>
-                  <th scope="col">Setor Principal</th>
-                  <th scope="col">Colaboradores Ativos</th>
-                  <th scope="col">EPIs Obrigatórios Recomendados</th>
-                  <th scope="col">Status</th>
+                  <th scope="col">Setores</th>
+                  <th scope="col">Funcionários ativos</th>
+                  <th scope="col">Produtos com política para o cargo</th>
                 </tr>
               </thead>
               <tbody id="tabela-cargos-corpo">
-                <tr><td colspan="5" class="text-center py-4 text-muted">Carregando cargos...</td></tr>
+                <tr><td colspan="4" class="text-center py-4 text-muted">Carregando cargos...</td></tr>
               </tbody>
             </table>
           </div>
@@ -51,58 +50,28 @@
   </div>
 
   <script src="../static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
-  <script src="../static/js/dados-demo.js"></script>
+  <script src="../static/js/menu.js"></script>
+  <script src="../static/js/api.js"></script>
   <script src="../static/js/sessao.js"></script>
   <script src="../static/js/backoffice.js"></script>
   <script>
-    (function() {
+    (function () {
       var corpo = document.getElementById("tabela-cargos-corpo");
-      fetch("/api/funcionarios/")
-        .then(function(r) { return r.json(); })
-        .then(function(d) {
-          var funcs = d.funcionarios || [];
-          var cargosMap = {};
-
-          funcs.forEach(function(u) {
-            var c = u.cargo || "Geral";
-            if (!cargosMap[c]) {
-              cargosMap[c] = {
-                cargo: c,
-                setor: u.setor_nome,
-                total: 0,
-                ativo: u.ativo
-              };
-            }
-            cargosMap[c].total++;
-          });
-
-          var lista = Object.values(cargosMap);
-          if (lista.length === 0) {
-            corpo.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">Nenhum cargo encontrado.</td></tr>';
-            return;
-          }
-
-          var episPorCargo = {
-            "Soldador": "Luva anticorte, Máscara de solda, Botina",
-            "Mecânico": "Óculos de proteção, Luva nitrílica, Protetor auricular",
-            "Técnico de Manutenção": "Luva nitrílica, Fita isolante, Multímetro",
-            "Operadora de Produção II": "Óculos antirrisco, Protetor auricular, Touca",
-            "Eletricista Industrial": "Botina sem partes metálicas, Fita antichama, Luva isolante",
-            "Administrador de Sistemas": "Acesso administrativo (sem EPI obrigatório)",
-            "Coordenadora de Suprimentos": "EPI de visita técnica em campo",
-            "Analista de Almoxarifado": "Botina com bico de aço, Luva de vaqueta",
-          };
-
-          corpo.innerHTML = lista.map(function(item) {
-            var epis = episPorCargo[item.cargo] || "Luva de proteção, Óculos de segurança";
-            return '<tr>' +
-              '<td><strong>' + item.cargo + '</strong></td>' +
-              '<td>' + item.setor + '</td>' +
-              '<td><i class="bi bi-person text-muted me-1"></i> ' + item.total + ' funcionário(s)</td>' +
-              '<td class="small text-secondary">' + epis + '</td>' +
-              '<td><span class="badge bg-success-subtle text-success border border-success-subtle">Ativo</span></td>' +
-            '</tr>';
-          }).join("");
+      var esc = SF.escapar;
+      SF.api.get("/api/cargos/")
+        .then(function (d) {
+          corpo.innerHTML = d.cargos.length ? d.cargos.map(function (c) {
+            return "<tr>" +
+              "<td><strong>" + esc(c.cargo) + "</strong></td>" +
+              "<td>" + esc(c.setores.join(", ") || "—") + "</td>" +
+              "<td>" + esc(c.total_funcionarios) + "</td>" +
+              '<td class="small">' + (c.produtos_vinculados.length ? esc(c.produtos_vinculados.join(", "))
+                : '<span class="text-muted">Nenhuma política específica — vale o padrão de cada produto</span>') + "</td>" +
+            "</tr>";
+          }).join("") : '<tr><td colspan="4" class="tabela-solicitacoes__vazio">Nenhum cargo cadastrado.</td></tr>';
+        })
+        .catch(function (erro) {
+          corpo.innerHTML = '<tr><td colspan="4" class="tabela-solicitacoes__vazio">' + esc(erro.message) + "</td></tr>";
         });
     })();
   </script>

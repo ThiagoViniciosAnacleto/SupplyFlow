@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}Acesso{% endblock %} · SupplyFlow</title>
+  <link rel="icon" href="/static/img/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="/static/vendor/bootstrap-icons/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="/static/css/supplyflow.css">
+</head>
+<body>
+  <main class="login">
+    <section class="login__marca">
+      <a class="marca" href="/">
+        <span class="marca__icone" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 10V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5"/><path d="M14 6a6 6 0 0 1 6 6v3"/><path d="M4 15v-3a6 6 0 0 1 6-6"/><rect x="2" y="15" width="20" height="4" rx="1"/></svg>
+        </span>
+        <span><span class="marca__nome">SupplyFlow</span><span class="marca__sub">Gestão de EPIs e consumíveis</span></span>
+      </a>
+      <div class="login__apresentacao">
+        <h1>Acesso ao backoffice</h1>
+        <p>Por segurança, ninguém — nem o administrador — vê ou define a sua senha. Você mesmo a cria pelo link enviado ao seu e-mail.</p>
+      </div>
+      <a class="login__totem" href="/">← Voltar para o login</a>
+    </section>
+
+    <section class="login__area">
+      <div class="login__form">
+        {% block conteudo %}{% endblock %}
+      </div>
+    </section>
+  </main>
+</body>
+</html>

@@ -85,7 +85,8 @@
   </div>
 
   <script src="../static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
-  <script src="../static/js/dados-demo.js"></script>
+  <script src="../static/js/menu.js"></script>
+  <script src="../static/js/api.js"></script>
   <script src="../static/js/sessao.js"></script>
   <script src="../static/js/backoffice.js"></script>
   <script>
@@ -97,8 +98,7 @@
       var setoresCache = [];
 
       function carregarSetores() {
-        fetch("/api/setores/")
-          .then(function(r) { return r.json(); })
+        SF.api.get("/api/setores/")
           .then(function(d) {
             setoresCache = d.setores || [];
             if (setoresCache.length === 0) {
@@ -109,14 +109,16 @@
               var badge = s.ativo
                 ? '<span class="badge bg-success-subtle text-success border border-success-subtle">Ativo</span>'
                 : '<span class="badge bg-danger-subtle text-danger border border-danger-subtle">Inativo</span>';
+              var esc = SF.escapar;
               return '<tr>' +
-                '<td><strong>' + s.nome + '</strong></td>' +
-                '<td><span class="numero">' + s.centro_custo + '</span></td>' +
-                '<td><i class="bi bi-people text-muted me-1"></i> ' + s.total_funcionarios + ' colaboradores</td>' +
+                '<td><strong>' + esc(s.nome) + '</strong></td>' +
+                '<td><span class="numero">' + esc(s.centro_custo) + '</span></td>' +
+                '<td><i class="bi bi-people text-muted me-1" aria-hidden="true"></i> ' + esc(s.total_funcionarios) + ' colaboradores</td>' +
                 '<td>' + badge + '</td>' +
-                '<td class="text-end">' +
-                  '<button type="button" class="btn btn-sm btn-outline-secondary me-1 btn-edit-setor" data-id="' + s.id + '"><i class="bi bi-pencil"></i></button>' +
-                  '<button type="button" class="btn btn-sm btn-outline-' + (s.ativo ? 'danger' : 'success') + ' btn-toggle-setor" data-id="' + s.id + '"><i class="bi bi-' + (s.ativo ? 'slash-circle' : 'check-circle') + '"></i></button>' +
+                '<td class="text-end text-nowrap">' + (SF.sessao.pode("pessoas")
+                  ? '<button type="button" class="btn btn-sm btn-outline-secondary me-1 btn-edit-setor" data-id="' + esc(s.id) + '" aria-label="Editar ' + esc(s.nome) + '"><i class="bi bi-pencil" aria-hidden="true"></i></button>' +
+                    '<button type="button" class="btn btn-sm btn-outline-' + (s.ativo ? 'danger' : 'success') + ' btn-toggle-setor" data-id="' + esc(s.id) + '" aria-label="' + (s.ativo ? 'Inativar ' : 'Ativar ') + esc(s.nome) + '"><i class="bi bi-' + (s.ativo ? 'slash-circle' : 'check-circle') + '" aria-hidden="true"></i></button>'
+                  : '—') +
                 '</td>' +
               '</tr>';
             }).join("");
@@ -135,14 +137,16 @@
 
             document.querySelectorAll(".btn-toggle-setor").forEach(function(b) {
               b.addEventListener("click", function() {
-                fetch("/api/setores/" + encodeURIComponent(b.dataset.id) + "/toggle/", { method: "POST" })
-                  .then(function() { carregarSetores(); });
+                SF.api.post("/api/setores/" + encodeURIComponent(b.dataset.id) + "/toggle/")
+                  .then(function() { carregarSetores(); })
+                  .catch(function(err) { alert(err.message); });
               });
             });
           });
       }
 
       var btnNovo = document.getElementById("btn-novo-setor");
+      if (btnNovo && !SF.sessao.pode("pessoas")) btnNovo.classList.add("d-none");
       if (btnNovo) {
         btnNovo.addEventListener("click", function() {
           form.reset();
@@ -160,12 +164,7 @@
             nome: document.getElementById("setor-nome").value.trim(),
             centro_custo: document.getElementById("setor-cc").value.trim(),
           };
-          fetch("/api/setores/salvar/", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          })
-            .then(function(r) { return r.json(); })
+          SF.api.post("/api/setores/salvar/", payload)
             .then(function(res) {
               if (!res.sucesso) throw new Error(res.erro || "Falha ao salvar");
               if (modalBs) modalBs.hide();

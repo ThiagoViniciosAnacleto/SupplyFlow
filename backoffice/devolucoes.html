@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Devoluções de EPIs · SupplyFlow</title>
+  <title>Devoluções · SupplyFlow</title>
   <link rel="icon" href="../static/img/logo.svg" type="image/svg+xml">
   <link rel="stylesheet" href="../static/vendor/bootstrap/bootstrap.min.css">
   <link rel="stylesheet" href="../static/vendor/bootstrap-icons/bootstrap-icons.min.css">
@@ -20,31 +20,27 @@
       <header class="topbar" id="topbar"></header>
 
       <main class="conteudo">
-        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
-          <div>
-            <h1 class="pagina-titulo mb-1">Devoluções de EPIs</h1>
-            <p class="pagina-descricao mb-0">Gestão de retorno e descarte de equipamentos substituídos antecipadamente (RF-31 a RF-35).</p>
-          </div>
-        </div>
+        <h1 class="pagina-titulo">Devoluções de EPI</h1>
+        <p class="pagina-descricao">Devoluções exigidas nas aprovações com condição. A entrega do novo EPI só é liberada depois que a devolução é registrada ou formalmente dispensada (RF-31 a RF-35).</p>
 
-        <section class="cartao" aria-label="Lista de devoluções">
-          <div class="table-responsive">
+        <div class="alert d-none" role="status" id="aviso-devolucoes" tabindex="-1"></div>
+
+        <section class="cartao" aria-labelledby="t-devolucoes">
+          <div class="cartao__cabecalho"><h2 class="cartao__titulo" id="t-devolucoes">Devoluções exigidas</h2></div>
+          <div class="table-responsive" tabindex="0" role="region" aria-labelledby="t-devolucoes">
             <table class="tabela-solicitacoes">
               <thead>
                 <tr>
-                  <th scope="col">Solicitação de Origem</th>
-                  <th scope="col">Data</th>
+                  <th scope="col">Solicitação</th>
                   <th scope="col">Colaborador</th>
-                  <th scope="col">Setor</th>
-                  <th scope="col">Equipamento</th>
-                  <th scope="col">Condição Obrigatória?</th>
-                  <th scope="col">Status Devolução</th>
-                  <th scope="col">Observações / Parecer</th>
+                  <th scope="col">EPI</th>
+                  <th scope="col">Condição da aprovação</th>
+                  <th scope="col">Situação</th>
+                  <th scope="col">Registro</th>
+                  <th scope="col" class="tabela-solicitacoes__acao">Ação</th>
                 </tr>
               </thead>
-              <tbody id="tabela-devolucoes-corpo">
-                <tr><td colspan="8" class="text-center py-4 text-muted">Carregando devoluções...</td></tr>
-              </tbody>
+              <tbody id="corpo-devolucoes"><tr><td colspan="7" class="tabela-solicitacoes__vazio">Carregando…</td></tr></tbody>
             </table>
           </div>
         </section>
@@ -53,44 +49,50 @@
 
   </div>
 
+  <!-- Modal: registrar ou dispensar a devolução -->
+  <div class="modal fade" id="modal-devolucao" tabindex="-1" aria-labelledby="titulo-modal-devolucao" aria-hidden="true">
+    <div class="modal-dialog">
+      <form class="modal-content" id="form-devolucao" novalidate>
+        <div class="modal-header">
+          <h2 class="modal-title fs-5" id="titulo-modal-devolucao">Registrar devolução</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small" id="modal-resumo"></p>
+          <fieldset class="mb-3">
+            <legend class="form-label fw-semibold fs-6">O que fazer</legend>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="modo" id="modo-registrar" value="registrar" checked>
+              <label class="form-check-label" for="modo-registrar">O colaborador devolveu o EPI antigo</label>
+            </div>
+            <div class="form-check" id="opcao-dispensar">
+              <input class="form-check-input" type="radio" name="modo" id="modo-dispensar" value="dispensar">
+              <label class="form-check-label" for="modo-dispensar">Dispensar a devolução (somente gestor, técnico ou administrador)</label>
+            </div>
+          </fieldset>
+          <div id="campos-devolucao">
+            <label for="dev-condicao" class="form-label fw-semibold">Condição do EPI devolvido</label>
+            <select id="dev-condicao" class="form-select mb-3" required></select>
+            <label for="dev-destinacao" class="form-label fw-semibold">Destinação</label>
+            <select id="dev-destinacao" class="form-select mb-3" required></select>
+          </div>
+          <label for="dev-observacao" class="form-label fw-semibold">Observação <span id="obs-obrigatoria" class="text-danger d-none">(obrigatória para dispensar)</span></label>
+          <textarea id="dev-observacao" class="form-control" rows="3"></textarea>
+          <div class="invalid-feedback d-block" id="erro-devolucao" role="alert"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="btn-salvar-devolucao">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script src="../static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
-  <script src="../static/js/dados-demo.js"></script>
+  <script src="../static/js/menu.js"></script>
+  <script src="../static/js/api.js"></script>
   <script src="../static/js/sessao.js"></script>
   <script src="../static/js/backoffice.js"></script>
-  <script>
-    (function() {
-      var corpo = document.getElementById("tabela-devolucoes-corpo");
-      fetch("/api/devolucoes/")
-        .then(function(r) { return r.json(); })
-        .then(function(d) {
-          var devolucoes = d.devolucoes || [];
-          if (devolucoes.length === 0) {
-            corpo.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">Nenhuma devolução pendente.</td></tr>';
-            return;
-          }
-          corpo.innerHTML = devolucoes.map(function(dev) {
-            var badgeCondicao = dev.condicao_obrigatoria
-              ? '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Sim (Devolução Exigida)</span>'
-              : '<span class="badge bg-light text-muted border">Não exigida</span>';
-
-            var badgeStatus = dev.status_devolucao.indexOf("pendente") !== -1
-              ? '<span class="selo selo--condicional">Devolução pendente</span>'
-              : '<span class="selo selo--entregue">Dispensada / Concluída</span>';
-
-            return '<tr>' +
-              '<td><span class="numero">' + dev.codigo + '</span></td>' +
-              '<td>' + dev.data_solicitacao + '</td>' +
-              '<td><strong>' + dev.colaborador + '</strong> <span class="small text-muted d-block">' + dev.matricula + '</span></td>' +
-              '<td>' + dev.setor + '</td>' +
-              '<td>' + dev.produto + '</td>' +
-              '<td>' + badgeCondicao + '</td>' +
-              '<td>' + badgeStatus + '</td>' +
-              '<td class="small text-secondary">' + dev.observacao + '</td>' +
-            '</tr>';
-          }).join("");
-        });
-    })();
-  </script>
+  <script src="../static/js/devolucoes.js"></script>
 </body>
 </html>
-

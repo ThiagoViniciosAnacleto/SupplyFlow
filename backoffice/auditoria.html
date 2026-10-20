@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Auditoria · SupplyFlow</title>
+  <link rel="icon" href="../static/img/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../static/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="../static/vendor/bootstrap-icons/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="../static/css/supplyflow.css">
+</head>
+<body data-pagina="auditoria">
+  <div class="app">
+
+    <!-- Barra lateral: preenchida pelo backoffice.js -->
+    <div class="sidebar-trilho">
+      <aside class="sidebar offcanvas-lg offcanvas-start" tabindex="-1" id="sidebar" aria-label="Menu"></aside>
+    </div>
+
+    <div class="app__principal">
+      <!-- Topo: preenchido pelo backoffice.js -->
+      <header class="topbar" id="topbar"></header>
+
+      <main class="conteudo">
+        <h1 class="pagina-titulo">Auditoria</h1>
+        <p class="pagina-descricao">Registro das operações críticas: quem fez, o quê, quando e de onde. Os registros não podem ser editados nem apagados pelo sistema.</p>
+
+        <form class="cartao mb-3 p-3 d-flex flex-wrap gap-3 align-items-end" id="form-filtro" aria-label="Filtrar auditoria">
+          <div>
+            <label for="filtro-acao" class="form-label small fw-semibold">Ação</label>
+            <select id="filtro-acao" class="form-select"><option value="">Todas</option></select>
+          </div>
+          <div>
+            <label for="filtro-termo" class="form-label small fw-semibold">Usuário ou descrição</label>
+            <input type="search" id="filtro-termo" class="form-control">
+          </div>
+          <div>
+            <label for="filtro-de" class="form-label small fw-semibold">De</label>
+            <input type="date" id="filtro-de" class="form-control">
+          </div>
+          <div>
+            <label for="filtro-ate" class="form-label small fw-semibold">Até</label>
+            <input type="date" id="filtro-ate" class="form-control">
+          </div>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-funnel" aria-hidden="true"></i> Filtrar</button>
+        </form>
+
+        <section class="cartao" aria-labelledby="titulo-eventos">
+          <div class="cartao__cabecalho">
+            <h2 class="cartao__titulo" id="titulo-eventos">Eventos</h2>
+            <span class="cartao__meta" id="meta-eventos" aria-live="polite"></span>
+          </div>
+          <div class="table-responsive" tabindex="0" role="region" aria-labelledby="titulo-eventos">
+            <table class="tabela-solicitacoes">
+              <thead>
+                <tr>
+                  <th scope="col">Data e hora</th>
+                  <th scope="col">Usuário</th>
+                  <th scope="col">Ação</th>
+                  <th scope="col">Descrição</th>
+                  <th scope="col">IP</th>
+                </tr>
+              </thead>
+              <tbody id="corpo-eventos">
+                <tr><td colspan="5" class="tabela-solicitacoes__vazio">Carregando…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+  </div>
+
+  <script src="../static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script src="../static/js/menu.js"></script>
+  <script src="../static/js/api.js"></script>
+  <script src="../static/js/sessao.js"></script>
+  <script src="../static/js/backoffice.js"></script>
+  <script src="../static/js/auditoria.js"></script>
+</body>
+</html>

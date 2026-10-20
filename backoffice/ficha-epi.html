@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ficha de EPI · SupplyFlow</title>
+  <link rel="icon" href="../static/img/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../static/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="../static/vendor/bootstrap-icons/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="../static/css/supplyflow.css">
+</head>
+<body data-pagina="ficha-epi" data-menu="funcionarios" data-trilha="Ficha de EPI">
+  <div class="app">
+
+    <div class="sidebar-trilho">
+      <aside class="sidebar offcanvas-lg offcanvas-start" tabindex="-1" id="sidebar" aria-label="Menu"></aside>
+    </div>
+
+    <div class="app__principal">
+      <header class="topbar" id="topbar"></header>
+
+      <main class="conteudo">
+        <a class="link-voltar nao-imprimir" href="funcionarios.html"><i class="bi bi-arrow-left" aria-hidden="true"></i> Voltar para funcionários</a>
+
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+          <div>
+            <h1 class="pagina-titulo">Ficha de fornecimento de EPI</h1>
+            <p class="pagina-descricao" id="ficha-emissao">Registro individual das entregas de EPI (RF-43).</p>
+          </div>
+          <div class="d-flex gap-2 nao-imprimir">
+            <button type="button" class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer" aria-hidden="true"></i> Imprimir</button>
+            <a class="btn btn-outline-primary" id="btn-csv" href="#"><i class="bi bi-download" aria-hidden="true"></i> Exportar CSV</a>
+          </div>
+        </div>
+
+        <div class="alert alert-danger d-none" role="alert" id="erro-ficha"></div>
+
+        <section class="cartao mb-3" aria-labelledby="t-func">
+          <div class="cartao__cabecalho"><h2 class="cartao__titulo" id="t-func">Funcionário</h2></div>
+          <dl class="dados dados--linha cartao__corpo" id="dados-funcionario"></dl>
+        </section>
+
+        <section class="cartao" aria-labelledby="t-entregas">
+          <div class="cartao__cabecalho">
+            <h2 class="cartao__titulo" id="t-entregas">Entregas</h2>
+            <div class="form-check ms-auto nao-imprimir">
+              <input class="form-check-input" type="checkbox" id="mostrar-todos">
+              <label class="form-check-label small" for="mostrar-todos">Incluir consumíveis</label>
+            </div>
+          </div>
+          <div class="table-responsive" tabindex="0" role="region" aria-labelledby="t-entregas">
+            <table class="tabela-solicitacoes">
+              <thead>
+                <tr>
+                  <th scope="col">Data</th>
+                  <th scope="col">Item</th>
+                  <th scope="col">CA</th>
+                  <th scope="col">Lote</th>
+                  <th scope="col">Qtd.</th>
+                  <th scope="col">Motivo</th>
+                  <th scope="col">Entregue por</th>
+                  <th scope="col">Devolução</th>
+                </tr>
+              </thead>
+              <tbody id="corpo-ficha"><tr><td colspan="8" class="tabela-solicitacoes__vazio">Carregando…</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+  </div>
+
+  <script src="../static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script src="../static/js/menu.js"></script>
+  <script src="../static/js/api.js"></script>
+  <script src="../static/js/sessao.js"></script>
+  <script src="../static/js/backoffice.js"></script>
+  <script src="../static/js/ficha-epi.js"></script>
+</body>
+</html>

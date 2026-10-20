@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Entregas de Suprimentos · SupplyFlow</title>
+  <title>Entregas · SupplyFlow</title>
   <link rel="icon" href="../static/img/logo.svg" type="image/svg+xml">
   <link rel="stylesheet" href="../static/vendor/bootstrap/bootstrap.min.css">
   <link rel="stylesheet" href="../static/vendor/bootstrap-icons/bootstrap-icons.min.css">
@@ -20,32 +20,55 @@
       <header class="topbar" id="topbar"></header>
 
       <main class="conteudo">
-        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
-          <div>
-            <h1 class="pagina-titulo mb-1">Entregas de Suprimentos</h1>
-            <p class="pagina-descricao mb-0">Rastreabilidade de saídas físicas de EPIs e consumíveis confirmadas pelo almoxarifado ou dispensadas no totem.</p>
-          </div>
-        </div>
+        <h1 class="pagina-titulo">Entregas</h1>
+        <p class="pagina-descricao">Solicitações aprovadas aguardando a retirada física e o registro das entregas confirmadas pelo almoxarifado.</p>
 
-        <section class="cartao" aria-label="Lista de entregas">
-          <div class="table-responsive">
+        <div class="alert d-none" role="status" id="aviso-entregas"></div>
+
+        <section class="cartao mb-4" aria-labelledby="t-pendentes">
+          <div class="cartao__cabecalho">
+            <h2 class="cartao__titulo" id="t-pendentes">Aguardando retirada</h2>
+            <span class="cartao__meta" id="meta-pendentes"></span>
+          </div>
+          <div class="table-responsive" tabindex="0" role="region" aria-labelledby="t-pendentes">
             <table class="tabela-solicitacoes">
               <thead>
                 <tr>
                   <th scope="col">Solicitação</th>
-                  <th scope="col">Data/Hora</th>
+                  <th scope="col">Solicitada em</th>
                   <th scope="col">Colaborador</th>
-                  <th scope="col">Setor</th>
-                  <th scope="col">Produto Entregue</th>
+                  <th scope="col">Produto</th>
                   <th scope="col">Qtd.</th>
-                  <th scope="col">Local / Totem</th>
-                  <th scope="col">Status</th>
-                  <th scope="col" class="text-end">Ação</th>
+                  <th scope="col">Situação</th>
+                  <th scope="col" class="tabela-solicitacoes__acao">Ação</th>
                 </tr>
               </thead>
-              <tbody id="tabela-entregas-corpo">
-                <tr><td colspan="9" class="text-center py-4 text-muted">Carregando registro de entregas...</td></tr>
-              </tbody>
+              <tbody id="corpo-pendentes"><tr><td colspan="7" class="tabela-solicitacoes__vazio">Carregando…</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="cartao" aria-labelledby="t-confirmadas">
+          <div class="cartao__cabecalho">
+            <h2 class="cartao__titulo" id="t-confirmadas">Entregas confirmadas</h2>
+            <span class="cartao__meta">Dados gravados no momento da entrega</span>
+          </div>
+          <div class="table-responsive" tabindex="0" role="region" aria-labelledby="t-confirmadas">
+            <table class="tabela-solicitacoes">
+              <thead>
+                <tr>
+                  <th scope="col">Data</th>
+                  <th scope="col">Solicitação</th>
+                  <th scope="col">Colaborador</th>
+                  <th scope="col">Centro de custo</th>
+                  <th scope="col">Produto</th>
+                  <th scope="col">Qtd.</th>
+                  <th scope="col">CA</th>
+                  <th scope="col">Lote</th>
+                  <th scope="col">Almoxarife</th>
+                </tr>
+              </thead>
+              <tbody id="corpo-confirmadas"><tr><td colspan="9" class="tabela-solicitacoes__vazio">Carregando…</td></tr></tbody>
             </table>
           </div>
         </section>
@@ -55,59 +78,10 @@
   </div>
 
   <script src="../static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
-  <script src="../static/js/dados-demo.js"></script>
+  <script src="../static/js/menu.js"></script>
+  <script src="../static/js/api.js"></script>
   <script src="../static/js/sessao.js"></script>
   <script src="../static/js/backoffice.js"></script>
-  <script>
-    (function() {
-      var corpo = document.getElementById("tabela-entregas-corpo");
-
-      function carregarEntregas() {
-        fetch("/api/entregas/")
-          .then(function(r) { return r.json(); })
-          .then(function(d) {
-            var entregas = d.entregas || [];
-            if (entregas.length === 0) {
-              corpo.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">Nenhuma entrega registrada.</td></tr>';
-              return;
-            }
-
-            corpo.innerHTML = entregas.map(function(e) {
-              var badgeStatus = e.entregue
-                ? '<span class="selo selo--entregue">Entregue</span>'
-                : '<span class="selo selo--aguardando">Aguardando retirada</span>';
-
-              var botaoAcao = !e.entregue
-                ? '<button type="button" class="btn btn-sm btn-outline-success btn-confirmar-entrega" data-id="' + e.id + '"><i class="bi bi-check-lg"></i> Confirmar Baixa</button>'
-                : '<span class="text-muted small"><i class="bi bi-check2-all text-success"></i> Concluído</span>';
-
-              return '<tr>' +
-                '<td><span class="numero">' + e.codigo + '</span></td>' +
-                '<td class="text-nowrap small text-muted">' + e.data + '</td>' +
-                '<td><strong>' + e.colaborador + '</strong> <span class="small text-muted d-block">Matrícula ' + e.matricula + '</span></td>' +
-                '<td>' + e.setor + '</td>' +
-                '<td>' + e.produto + '</td>' +
-                '<td><strong>' + e.quantidade + '</strong></td>' +
-                '<td><span class="badge bg-light text-dark border">' + e.totem + '</span></td>' +
-                '<td>' + badgeStatus + '</td>' +
-                '<td class="text-end">' + botaoAcao + '</td>' +
-              '</tr>';
-            }).join("");
-
-            document.querySelectorAll(".btn-confirmar-entrega").forEach(function(btn) {
-              btn.addEventListener("click", function() {
-                var id = this.dataset.id;
-                fetch("/api/entregas/" + encodeURIComponent(id) + "/confirmar/", { method: "POST" })
-                  .then(function(r) { return r.json(); })
-                  .then(function() { carregarEntregas(); });
-              });
-            });
-          });
-      }
-
-      carregarEntregas();
-    })();
-  </script>
+  <script src="../static/js/entregas.js"></script>
 </body>
 </html>
-

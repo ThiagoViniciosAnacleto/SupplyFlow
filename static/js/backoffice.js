@@ -12,10 +12,12 @@
    podem usar dois atributos opcionais no <body>:
      data-menu="solicitacoes"  -> qual item do menu fica ativo
      data-trilha="Detalhe"     -> texto da trilha no topo e do título da aba
+
+   O menu esconde as telas que o perfil não pode usar. Isso é só
+   conveniência: o servidor bloqueia o acesso de qualquer forma.
    ===================================================================== */
 
 (function () {
-  var usuario = SF.sessao.usuarioAtual();
   var LINK_TOTEM = "/totem/";
 
   var ICONE_CAPACETE =
@@ -24,19 +26,24 @@
   /* ---------- Utilitários ---------- */
   function escapar(texto) {
     var div = document.createElement("div");
-    div.textContent = texto;
+    div.textContent = texto == null ? "" : String(texto);
     return div.innerHTML;
   }
   SF.escapar = escapar; // as páginas também usam ao montar HTML com dados
 
   /* "Centros de custo" -> "centros-de-custo" (para ids de HTML) */
   function paraId(texto) {
-    return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    return texto.normalize("NFD").replace(/[̀-ͯ]/g, "")
       .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
   }
 
   function linkDoItem(item) {
     return item.pagina ? item.pagina + ".html" : "em-construcao.html?p=" + encodeURIComponent(item.rotulo);
+  }
+
+  function permitido(usuario, item) {
+    if (!usuario || !usuario.acoes) return (item.acao || "ver") === "ver";
+    return usuario.acoes.indexOf(item.acao || "ver") !== -1;
   }
 
   /* ---------- Qual página está aberta? ---------- */
@@ -74,72 +81,93 @@
       '<i class="bi ' + icone + '" aria-hidden="true"></i>' + escapar(item.rotulo) + "</a></li>";
   }
 
-  var itensMenu = SF.menu.map(function (entrada) {
-    if (!entrada.itens) return htmlLink(entrada, false);
+  function montarLateral(usuario) {
+    var itensMenu = SF.menu.map(function (entrada) {
+      if (!entrada.itens) return permitido(usuario, entrada) ? htmlLink(entrada, false) : "";
 
-    var id = "grupo-" + paraId(entrada.grupo);
-    return "<li>" +
-      '<button class="menu__grupo" type="button" data-bs-toggle="collapse" data-bs-target="#' + id + '"' +
-      ' aria-expanded="true" aria-controls="' + id + '">' +
-        '<i class="bi ' + entrada.icone + '" aria-hidden="true"></i>' + escapar(entrada.grupo) +
-        '<i class="bi bi-chevron-up menu__seta" aria-hidden="true"></i>' +
-      "</button>" +
-      '<ul class="submenu collapse show" id="' + id + '">' +
-        entrada.itens.map(function (item) { return htmlLink(item, true); }).join("") +
-      "</ul></li>";
-  }).join("");
+      var visiveis = entrada.itens.filter(function (item) { return permitido(usuario, item); });
+      if (!visiveis.length) return "";
 
-  document.getElementById("sidebar").innerHTML =
-    '<div class="sidebar__cabecalho">' +
-      '<a class="marca" href="visao-geral.html">' +
-        '<span class="marca__icone" aria-hidden="true">' + ICONE_CAPACETE + "</span>" +
-        '<span><span class="marca__nome">SupplyFlow</span><span class="marca__sub">Gestão de EPIs</span></span>' +
-      "</a>" +
-      '<button type="button" class="btn-close btn-close-white d-lg-none" data-bs-dismiss="offcanvas"' +
-      ' data-bs-target="#sidebar" aria-label="Fechar menu"></button>' +
-    "</div>" +
-    '<nav class="sidebar__nav" aria-label="Menu principal"><ul class="menu">' + itensMenu + "</ul></nav>" +
-    '<div class="sidebar__rodape">' + escapar(usuario.acesso) + "</div>";
+      var id = "grupo-" + paraId(entrada.grupo);
+      return "<li>" +
+        '<button class="menu__grupo" type="button" data-bs-toggle="collapse" data-bs-target="#' + id + '"' +
+        ' aria-expanded="true" aria-controls="' + id + '">' +
+          '<i class="bi ' + entrada.icone + '" aria-hidden="true"></i>' + escapar(entrada.grupo) +
+          '<i class="bi bi-chevron-up menu__seta" aria-hidden="true"></i>' +
+        "</button>" +
+        '<ul class="submenu collapse show" id="' + id + '">' +
+          visiveis.map(function (item) { return htmlLink(item, true); }).join("") +
+        "</ul></li>";
+    }).join("");
 
-  /* Deixa o item ativo visível dentro da lateral (útil nos itens lá de baixo) */
-  var navLateral = document.querySelector(".sidebar__nav");
-  var linkAtivo = navLateral.querySelector('[aria-current="page"]');
-  if (linkAtivo) {
-    navLateral.scrollTop = linkAtivo.offsetTop - navLateral.clientHeight / 2;
+    document.getElementById("sidebar").innerHTML =
+      '<div class="sidebar__cabecalho">' +
+        '<a class="marca" href="visao-geral.html">' +
+          '<span class="marca__icone" aria-hidden="true">' + ICONE_CAPACETE + "</span>" +
+          '<span><span class="marca__nome">SupplyFlow</span><span class="marca__sub">Gestão de EPIs</span></span>' +
+        "</a>" +
+        '<button type="button" class="btn-close btn-close-white d-lg-none" data-bs-dismiss="offcanvas"' +
+        ' data-bs-target="#sidebar" aria-label="Fechar menu"></button>' +
+      "</div>" +
+      '<nav class="sidebar__nav" aria-label="Menu principal"><ul class="menu">' + itensMenu + "</ul></nav>" +
+      '<div class="sidebar__rodape">' + escapar(usuario ? usuario.acesso : "") + "</div>";
+
+    /* Deixa o item ativo visível dentro da lateral (útil nos itens lá de baixo) */
+    var navLateral = document.querySelector(".sidebar__nav");
+    var linkAtivo = navLateral.querySelector('[aria-current="page"]');
+    if (linkAtivo) {
+      navLateral.scrollTop = linkAtivo.offsetTop - navLateral.clientHeight / 2;
+    }
   }
 
   /* ---------- Topo ---------- */
-  var trilha = trilhaPropria
-    ? escapar(trilhaPropria)
-    : (grupoAtual ? escapar(grupoAtual) + " / " : "") + escapar(rotuloAtual || "");
+  function montarTopo(usuario) {
+    var trilha = trilhaPropria
+      ? escapar(trilhaPropria)
+      : (grupoAtual ? escapar(grupoAtual) + " / " : "") + escapar(rotuloAtual || "");
+    usuario = usuario || { nome: "", iniciais: "", perfil: "" };
 
-  document.getElementById("topbar").innerHTML =
-    '<button class="topbar__menu d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebar"' +
-    ' aria-controls="sidebar" aria-label="Abrir menu"><i class="bi bi-list" aria-hidden="true"></i></button>' +
-    '<nav aria-label="Você está em"><ol class="trilha">' +
-      "<li>Backoffice</li>" +
-      '<li aria-current="page">' + trilha + "</li>" +
-    "</ol></nav>" +
-    '<div class="topbar__acoes">' +
-      '<a class="topbar__totem" href="' + LINK_TOTEM + '" aria-label="Abrir autoatendimento">' +
-        '<span class="topbar__totem-texto">Abrir autoatendimento →</span>' +
-        '<i class="bi bi-tablet d-md-none" aria-hidden="true"></i>' +
-      "</a>" +
-      '<div class="perfil">' +
-        '<span class="perfil__avatar" aria-hidden="true">' + escapar(usuario.iniciais) + "</span>" +
-        '<span class="perfil__texto">' +
-          '<span class="perfil__nome">' + escapar(usuario.nome) + "</span>" +
-          '<span class="perfil__papel">' + escapar(usuario.perfil) + "</span>" +
-        "</span>" +
-      "</div>" +
-      '<button class="btn-sair" type="button" id="btn-sair">' +
-        '<i class="bi bi-box-arrow-right" aria-hidden="true"></i><span class="btn-sair__texto">Sair</span>' +
-      "</button>" +
-    "</div>";
+    document.getElementById("topbar").innerHTML =
+      '<button class="topbar__menu d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebar"' +
+      ' aria-controls="sidebar" aria-label="Abrir menu"><i class="bi bi-list" aria-hidden="true"></i></button>' +
+      '<nav aria-label="Você está em"><ol class="trilha">' +
+        "<li>Backoffice</li>" +
+        '<li aria-current="page">' + trilha + "</li>" +
+      "</ol></nav>" +
+      '<div class="topbar__acoes">' +
+        '<a class="topbar__totem" href="' + LINK_TOTEM + '" aria-label="Abrir autoatendimento">' +
+          '<span class="topbar__totem-texto">Abrir autoatendimento →</span>' +
+          '<i class="bi bi-tablet d-md-none" aria-hidden="true"></i>' +
+        "</a>" +
+        '<div class="perfil">' +
+          '<span class="perfil__avatar" aria-hidden="true">' + escapar(usuario.iniciais) + "</span>" +
+          '<span class="perfil__texto">' +
+            '<span class="perfil__nome">' + escapar(usuario.nome) + "</span>" +
+            '<span class="perfil__papel">' + escapar(usuario.perfil) + "</span>" +
+          "</span>" +
+        "</div>" +
+        '<button class="btn-sair" type="button" id="btn-sair">' +
+          '<i class="bi bi-box-arrow-right" aria-hidden="true"></i><span class="btn-sair__texto">Sair</span>' +
+        "</button>" +
+      "</div>";
 
-  /* ---------- Sair: limpa a sessão fictícia e volta ao login ---------- */
-  document.getElementById("btn-sair").addEventListener("click", function () {
-    SF.sessao.encerrar();
-    window.location.href = "../index.html";
-  });
+    /* Sair: encerra a sessão no servidor e volta ao login */
+    document.getElementById("btn-sair").addEventListener("click", function () {
+      SF.sessao.encerrar().then(function () {
+        window.location.href = "/";
+      });
+    });
+  }
+
+  function montar(usuario) {
+    montarLateral(usuario);
+    montarTopo(usuario);
+  }
+
+  /* Desenha já com a cópia local e confirma no servidor (atualiza se mudou). */
+  var emCache = SF.sessao.usuarioAtual();
+  montar(emCache);
+  SF.sessao.confirmar().then(function (usuario) {
+    if (JSON.stringify(usuario) !== JSON.stringify(emCache)) montar(usuario);
+  }).catch(function () { /* 401: SF.api já voltou para o login */ });
 })();

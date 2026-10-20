@@ -1,0 +1,22 @@
+{% extends "registration/base-acesso.html" %}
+{% block titulo %}Esqueci minha senha{% endblock %}
+{% block conteudo %}
+<h2>Esqueci minha senha</h2>
+<p class="login__instrucao">Informe o e-mail cadastrado. Enviaremos um link para você criar uma nova senha.</p>
+
+<form method="post" novalidate>
+  {% csrf_token %}
+  <label for="id_email" class="form-label">E-mail</label>
+  <input type="email" name="email" id="id_email" class="form-control{% if form.email.errors %} is-invalid{% endif %}"
+         autocomplete="email" required autofocus value="{{ form.email.value|default:'' }}"
+         {% if form.email.errors %}aria-invalid="true" aria-describedby="erro-email"{% endif %}>
+  {% if form.email.errors %}
+    <div class="invalid-feedback" id="erro-email">{{ form.email.errors|first }}</div>
+  {% endif %}
+
+  <button type="submit" class="btn btn-primary w-100 login__entrar">
+    <i class="bi bi-envelope" aria-hidden="true"></i> Enviar link
+  </button>
+</form>
+<p class="login__nota"><a href="/">Voltar para o login</a></p>
+{% endblock %}

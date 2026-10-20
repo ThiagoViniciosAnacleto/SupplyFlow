@@ -1,0 +1,35 @@
+{% extends "registration/base-acesso.html" %}
+{% block titulo %}Criar nova senha{% endblock %}
+{% block conteudo %}
+{% if validlink %}
+  <h2>Criar nova senha</h2>
+  <p class="login__instrucao">Use pelo menos 8 caracteres, sem ser só números e sem repetir seu nome ou e-mail.</p>
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <label for="id_new_password1" class="form-label">Nova senha</label>
+    <input type="password" name="new_password1" id="id_new_password1" autocomplete="new-password" required autofocus
+           class="form-control{% if form.new_password1.errors %} is-invalid{% endif %}"
+           {% if form.new_password1.errors %}aria-invalid="true" aria-describedby="erro-senha1"{% endif %}>
+    {% if form.new_password1.errors %}
+      <div class="invalid-feedback" id="erro-senha1">{% for e in form.new_password1.errors %}{{ e }} {% endfor %}</div>
+    {% endif %}
+
+    <label for="id_new_password2" class="form-label mt-3">Repita a nova senha</label>
+    <input type="password" name="new_password2" id="id_new_password2" autocomplete="new-password" required
+           class="form-control{% if form.new_password2.errors %} is-invalid{% endif %}"
+           {% if form.new_password2.errors %}aria-invalid="true" aria-describedby="erro-senha2"{% endif %}>
+    {% if form.new_password2.errors %}
+      <div class="invalid-feedback" id="erro-senha2">{% for e in form.new_password2.errors %}{{ e }} {% endfor %}</div>
+    {% endif %}
+
+    <button type="submit" class="btn btn-primary w-100 login__entrar">
+      <i class="bi bi-check2-circle" aria-hidden="true"></i> Salvar senha
+    </button>
+  </form>
+{% else %}
+  <h2>Link inválido ou expirado</h2>
+  <p class="login__instrucao" role="alert">Este link já foi usado ou passou do prazo de 1 hora. Peça um novo.</p>
+  <a class="btn btn-primary w-100 login__entrar" href="/senha/esqueci/">Pedir novo link</a>
+{% endif %}
+{% endblock %}

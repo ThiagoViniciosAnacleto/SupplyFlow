@@ -1,128 +1,115 @@
 # SupplyFlow
 
-Sistema web para gestão e rastreabilidade da distribuição de EPIs e materiais consumíveis, com autoatendimento e classificação de justificativas de substituição antecipada.
+Sistema web para gestão e rastreabilidade da distribuição de EPIs e materiais consumíveis, com autoatendimento (totem) e classificação, por IA, das justificativas de substituição antecipada.
 
 TCC de Engenharia de Software — UniCesumar, 2026
 Matheus Vian Stoco e Thiago V. Anacleto de Almeida P.
 
 ---
 
-## Estágio atual
+## O que o sistema faz
 
-**Só front-end, sem backend e sem banco de dados.** Esta primeira etapa traz:
+- **Backoffice** com login por e-mail e senha, perfis (Administrador, Gestor, Técnico de Segurança, Almoxarife, Comprador) e permissões conferidas no servidor.
+- **Totem de autoatendimento**: o colaborador se identifica pela matrícula e PIN, vê o que pode retirar e faz o pedido. O servidor calcula a cota mensal, a periodicidade de troca, o estoque e se o pedido é uma exceção (que exige justificativa).
+- **Decisão humana**: toda solicitação passa por aprovação. O responsável aprova, aprova com condição (ex.: devolver o EPI antigo) ou rejeita.
+- **IA de apoio**: um classificador TF-IDF (scikit-learn) sugere a categoria da justificativa. **A IA não aprova, não rejeita e não bloqueia nada** — o técnico confirma ou reclassifica, e as duas categorias ficam registradas.
+- **Estoque** com reserva na aprovação e baixa só na entrega física; toda movimentação fica registrada.
+- **Entregas, devoluções e ficha de EPI** por funcionário, com CA e lote do momento.
+- **Gestão**: histórico com filtros, relatórios de consumo e justificativas, exportação CSV e trilha de auditoria.
 
-- **Tela de login** com os cinco usuários de demonstração do protótipo. O login é fictício: nenhuma senha é pedida nem verificada — escolha um usuário e clique em **Entrar**.
-- **Estrutura do backoffice**: barra lateral com o menu completo do protótipo, topo com o usuário logado e botão **Sair**.
-- **Visão Geral**: indicadores, solicitações aguardando análise e os gráficos de entregas por mês e consumo por centro de custo.
-- **Página provisória** para os demais itens do menu, que ainda não foram construídos.
+## Rodar na sua máquina (Windows, Prompt de Comando)
 
-Todos os dados exibidos são fictícios e ficam em `static/js/dados-demo.js`.
-
----
-
-## Como abrir
-
-### Opção 1 — Live Server no VS Code (recomendada)
-
-1. No VS Code, abra a pasta `supplyflow`.
-2. Instale a extensão **Live Server** (autor: Ritwick Dey).
-3. Clique com o botão direito em `index.html` → **Open with Live Server**.
-
-A página recarrega sozinha sempre que você salvar um arquivo.
-
-### Opção 2 — Servidor do Python, pelo Prompt de Comando
+Pré-requisito: Python 3.12 ou mais novo.
 
 ```
-cd caminho\para\supplyflow
-python -m http.server 8000
+cd caminho\para\SupplyFlow
+python -m venv venv
+venv\Scripts\python.exe -m pip install -r requirements.txt
+copy .env.example .env
 ```
 
-Depois abra `http://localhost:8000` no navegador. Para parar o servidor: `Ctrl + C`.
+Abra o `.env` e deixe `DEBUG=True`. Sem `DATABASE_URL`, o projeto usa um SQLite local (`db.sqlite3`, fora do git).
 
-### Opção 3 — Duplo clique
+```
+venv\Scripts\python.exe manage.py migrate
+venv\Scripts\python.exe manage.py carregar_demo
+venv\Scripts\python.exe manage.py runserver
+```
 
-Abrir o `index.html` direto também funciona. Mas prefira as opções 1 ou 2: é assim que o sistema vai rodar quando o Django entrar, e alguns navegadores restringem recursos em arquivos abertos direto do disco.
+Abra `http://localhost:8000`. O `carregar_demo` cria dados **fictícios** (os do protótipo) e mostra no terminal a senha e o PIN de demonstração — eles são sorteados a cada execução; para fixá-los, defina `DEMO_SENHA` e `DEMO_PIN` antes do comando. Ele só roda com `DEBUG=True`.
 
----
+O "Esqueci minha senha" e o convite de primeiro acesso mandam e-mail. Sem `EMAIL_HOST` no `.env`, o e-mail aparece no terminal do `runserver` (é só copiar o link).
+
+### Testes automáticos
+
+```
+venv\Scripts\python.exe manage.py test core
+```
+
+São 56 testes: login e permissões, regras do totem, estados da solicitação, estoque, decisão, entrega, devolução, IA e relatórios.
+
+### IA: treinar e avaliar
+
+```
+venv\Scripts\python.exe manage.py treinar_classificador
+```
+
+Separa 75% para treino e 25% para teste (estratificado, semente fixa), compara Regressão Logística, Naive Bayes e SVM linear por validação cruzada só no treino, mede no teste acurácia, precisão, revocação, F1 e matriz de confusão, e compara com uma linha de base por palavras-chave. O modelo e as métricas ficam em `core/ia/modelo/` e aparecem na tela **Avaliação do modelo (IA)**.
+
+> ⚠️ O conjunto atual (`core/ia/dados/justificativas_sinteticas.csv`) é **sintético**. Antes de usar os números no TCC, revise os rótulos com profissionais e acrescente justificativas reais **anonimizadas** — veja `core/ia/dados/LEIA-ME.md`.
+
+## Deploy no Render
+
+Variáveis de ambiente obrigatórias: `SECRET_KEY` (gere com `python -c "import secrets; print(secrets.token_urlsafe(50))"`) e `DATABASE_URL`. Com `DEBUG` ausente, o sistema roda em modo de produção (HTTPS, cookies seguros) e se recusa a subir sem `SECRET_KEY`. O endereço do Render entra sozinho em `ALLOWED_HOSTS`.
+
+- **Build:** `pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate`
+- **Start:** `gunicorn config.wsgi`
+- **Banco que já existia antes das migrações** (criado à mão): rode **uma vez** `python manage.py migrate --fake-initial`. A migração `0004` converte os registros antigos (status, categorias da IA, entregas e reservas).
+- Senhas e PINs antigos em MD5 continuam funcionando e são convertidos para hash forte no primeiro uso correto.
+- Para o e-mail de senha: `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL`.
 
 ## Estrutura
 
 ```
-supplyflow/
-├── index.html                  Tela de login (ponto de entrada)
-├── backoffice/
-│   ├── visao-geral.html        Painel inicial após o login
-│   └── em-construcao.html      Página provisória das telas ainda não feitas
-└── static/
-    ├── css/supplyflow.css      Cores, fonte e layout do protótipo
-    ├── js/
-    │   ├── dados-demo.js       Dados FICTÍCIOS (sai quando o backend entrar)
-    │   ├── sessao.js           Sessão fictícia: lembra o usuário escolhido
-    │   ├── login.js            Comportamento da tela de login
-    │   ├── backoffice.js       Monta lateral e topo em todas as páginas
-    │   └── visao-geral.js      Indicadores, lista e gráficos
-    ├── img/logo.svg
-    └── vendor/                 Bibliotecas baixadas (funcionam sem internet)
-        ├── bootstrap/          Bootstrap 5.3.3
-        ├── bootstrap-icons/    Bootstrap Icons 1.11.3
-        ├── chartjs/            Chart.js 4.4.4
-        └── inter/              Fonte Inter
+SupplyFlow/
+├── config/                 Configuração do Django (settings lê tudo do .env)
+├── core/
+│   ├── models.py           Tabelas do sistema
+│   ├── migrations/         Esquema do banco versionado
+│   ├── permissoes.py       Perfis e ações permitidas (RF-09)
+│   ├── seguranca.py        PIN, senhas antigas e limite de tentativas
+│   ├── contas.py           Contas do backoffice e link de senha
+│   ├── auditoria.py        Registro das operações críticas
+│   ├── servicos/           Regras de negócio (estados, elegibilidade, estoque, decisão, entrega)
+│   ├── ia/                 Classificador, linha de base, treino e dados
+│   ├── views/              APIs e páginas, divididas por assunto
+│   ├── management/         Comandos carregar_demo e treinar_classificador
+│   └── tests/              Testes automáticos
+├── templates/              Telas de senha e de acesso negado
+├── index.html              Login do backoffice
+├── backoffice/             Telas do backoffice
+├── totem/                  Tela do autoatendimento
+└── static/                 CSS, JavaScript e bibliotecas (funcionam sem internet)
 ```
 
-As bibliotecas estão dentro do projeto, e não carregadas da internet, para que o sistema funcione numa apresentação sem Wi-Fi.
+## Perfis e permissões
 
----
+| Perfil | Pode |
+|---|---|
+| Administrador | tudo, inclusive funcionários, usuários e auditoria |
+| Gestor / Técnico de Segurança | consultar, decidir solicitações, dispensar/registrar devoluções |
+| Almoxarife | consultar, confirmar entregas, registrar devoluções, movimentar estoque |
+| Comprador | consultar, produtos, fornecedores, políticas e estoque |
+| Colaborador | só o totem |
+
+A tela **Usuários e permissões** mostra a matriz completa, lida do servidor.
 
 ## Stack
 
-| Camada          | Tecnologia                         | Situação         |
-|-----------------|------------------------------------|------------------|
-| Interface       | HTML + Bootstrap + JavaScript puro | ✅ em andamento  |
-| Backend         | Python + Django                    | próxima etapa    |
-| Banco de dados  | PostgreSQL                         | próxima etapa    |
-| Classificador   | scikit-learn + TF-IDF              | próxima etapa    |
-| Versionamento   | GitHub                             | ✅               |
-| Hospedagem      | Render                             | próxima etapa    |
-
----
-
-## Subir no GitHub (Prompt de Comando)
-
-**Antes:** crie um repositório **vazio** no GitHub chamado `supplyflow`. Não marque "Add a README" nem ".gitignore" — se o repositório nascer com arquivos, o primeiro `push` é recusado.
-
-```
-cd caminho\para\supplyflow
-git init
-git add .
-git commit -m "Tela de login e painel inicial do backoffice (front-end estatico)"
-git branch -M main
-git remote add origin https://github.com/SEU-USUARIO/supplyflow.git
-git push -u origin main
-```
-
-Troque `SEU-USUARIO` pelo seu usuário do GitHub. Se o Git pedir nome e e-mail na hora do commit, rode antes:
-
-```
-git config --global user.name "Seu Nome"
-git config --global user.email "seu@email.com"
-```
-
----
-
-## Como isto vira Django depois
-
-A estrutura já foi pensada para a migração:
-
-- `static/` vira a pasta de arquivos estáticos do Django, sem mudanças.
-- Os `.html` vão para `templates/`, trocando os caminhos por `{% static '...' %}`.
-- O `backoffice.js` (lateral + topo) vira o template base `base.html`, e cada página estende ele com `{% block conteudo %}`.
-- `dados-demo.js` e `sessao.js` são **apagados**: os dados passam a vir do banco e o login passa a ser o `django.contrib.auth`, com perfis de verdade.
-
----
-
-## Próximas telas (seguindo o protótipo)
-
-1. Solicitações — lista com a coluna de classificação da IA
-2. Detalhe da solicitação — dados, análise da IA e painel de decisão
-3. Totem — boas-vindas, matrícula, senha, produtos disponíveis e justificativa
-4. Avaliação do modelo (IA) — matriz de confusão por categoria
+| Camada | Tecnologia |
+|---|---|
+| Interface | HTML + Bootstrap 5 + JavaScript puro |
+| Backend | Python + Django 6 |
+| Banco | PostgreSQL (SQLite no desenvolvimento) |
+| IA | scikit-learn (TF-IDF + SVM linear calibrado) |
+| Hospedagem | Render |
