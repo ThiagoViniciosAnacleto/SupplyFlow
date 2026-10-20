@@ -589,3 +589,21 @@ body.totem-body {
   color: var(--totem-texto);
 }
 
+
+
+/* Topo no celular: só ícones (o nome continua disponível para leitores de tela) */
+.totem-header { gap: 12px; }
+.totem-header__acoes { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.totem-marca { min-width: 0; }
+.totem-marca__sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 575.98px) {
+  .totem-header { padding: 10px 14px; }
+  .totem-header__texto { display: none; }
+  .totem-marca__icone { width: 38px; height: 38px; }
+  .totem-marca__titulo { font-size: 15px; }
+}
+/* Foco visível em todos os controles do totem */
+.totem-card-opcao:focus-visible, .btn-tecla:focus-visible, .btn-reiniciar:focus-visible {
+  outline: 3px solid #0d9488;
+  outline-offset: 2px;
+}

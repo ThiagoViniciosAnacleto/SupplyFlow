@@ -8,6 +8,7 @@
   var filtroCategoria = document.getElementById("filtro-categoria-prod");
   var btnFiltrar = document.getElementById("btn-filtrar-prod");
   var btnNovoProd = document.getElementById("btn-novo-produto");
+  if (btnNovoProd && !SF.sessao.pode("produtos")) btnNovoProd.classList.add("d-none");
   var modalEl = document.getElementById("modal-produto");
   var formProd = document.getElementById("form-produto");
   var modalBs = modalEl ? new bootstrap.Modal(modalEl) : null;
@@ -101,13 +102,13 @@
             (p.periodicidade_dias ? '<span class="small text-muted d-block">troca a cada ' + esc(p.periodicidade_dias) + ' dias</span>' : '') + '</td>' +
           '<td>' + badgeJust + '</td>' +
           '<td>' + badgeStatus + '</td>' +
-          '<td class="text-end">' +
-            '<button type="button" class="btn btn-sm btn-outline-secondary me-1 btn-editar-prod" data-id="' + p.id + '" title="Editar">' +
-              '<i class="bi bi-pencil"></i>' +
-            '</button>' +
-            '<button type="button" class="btn btn-sm btn-outline-' + (p.ativo ? 'danger' : 'success') + ' btn-toggle-prod" data-id="' + p.id + '" title="' + (p.ativo ? 'Inativar' : 'Ativar') + '">' +
-              '<i class="bi bi-' + (p.ativo ? 'slash-circle' : 'check-circle') + '"></i>' +
-            '</button>' +
+          '<td class="text-end text-nowrap">' + (SF.sessao.pode("produtos")
+            ? '<button type="button" class="btn btn-sm btn-outline-secondary me-1 btn-editar-prod" data-id="' + esc(p.id) + '"' +
+                ' aria-label="Editar ' + esc(p.nome) + '" title="Editar"><i class="bi bi-pencil" aria-hidden="true"></i></button>' +
+              '<button type="button" class="btn btn-sm btn-outline-' + (p.ativo ? 'danger' : 'success') + ' btn-toggle-prod" data-id="' + esc(p.id) + '"' +
+                ' aria-label="' + (p.ativo ? 'Inativar ' : 'Ativar ') + esc(p.nome) + '" title="' + (p.ativo ? 'Inativar' : 'Ativar') + '">' +
+                '<i class="bi bi-' + (p.ativo ? 'slash-circle' : 'check-circle') + '" aria-hidden="true"></i></button>'
+            : '—') +
           '</td>' +
         '</tr>'
       );
@@ -147,7 +148,8 @@
         SF.api.post("/api/produtos/" + encodeURIComponent(id) + "/toggle/")
           .then(function () {
             carregarProdutos();
-          });
+          })
+          .catch(function (err) { alert(err.message); });
       });
     });
   }

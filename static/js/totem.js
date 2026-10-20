@@ -68,6 +68,14 @@
       if (inputMatricula) inputMatricula.value = "";
       mostrarPasso("passo-matricula");
     });
+    // É um "botão" feito com div (role="button"): Enter e Espaço precisam funcionar como clique
+    opcaoMatricula.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        e.stopPropagation();
+        opcaoMatricula.click();
+      }
+    });
   }
 
   /* ---------- Passo 2: Teclado de Matrícula ---------- */

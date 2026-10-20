@@ -27,7 +27,7 @@
 
     if (!m) {
       document.getElementById("aviso-sem-modelo").classList.remove("d-none");
-      kpis([["Concordância humana", pct(uso.concordancia), "tom-verde", uso.decisoes_com_ia + " decisões com sugestão"]]);
+      kpis([["Concordância humana", pct(uso.concordancia), "tom-verde", uso.decisoes_com_ia + (uso.decisoes_com_ia === 1 ? " decisão" : " decisões") + " com sugestão"]]);
     } else {
       document.getElementById("aviso-sintetico").classList.toggle("d-none", !m.dados.sintetico);
       document.getElementById("descricao-modelo").textContent =
@@ -37,7 +37,7 @@
         ["Acurácia no teste", pct(m.modelo.acuracia), "tom-azul", "Linha de base: " + pct(m.linha_base.acuracia)],
         ["F1 macro no teste", pct(m.modelo.f1_macro), "tom-indigo", "Linha de base: " + pct(m.linha_base.f1_macro)],
         ["Exemplos avaliados", m.dados.teste, "tom-cinza", m.dados.total + " no total (" + m.dados.treino + " de treino)"],
-        ["Concordância humana", pct(uso.concordancia), "tom-verde", uso.decisoes_com_ia + " decisões com sugestão"]
+        ["Concordância humana", pct(uso.concordancia), "tom-verde", uso.decisoes_com_ia + (uso.decisoes_com_ia === 1 ? " decisão" : " decisões") + " com sugestão"]
       ]);
 
       var matriz = m.modelo.matriz_confusao;
@@ -99,7 +99,7 @@
     }
 
     document.getElementById("resumo-uso").textContent = uso.decisoes_com_ia
-      ? "Em " + uso.decisoes_com_ia + " decisões com sugestão da IA, o responsável manteve a categoria em " +
+      ? "Em " + uso.decisoes_com_ia + (uso.decisoes_com_ia === 1 ? " decisão" : " decisões") + " com sugestão da IA, o responsável manteve a categoria em " +
         pct(uso.concordancia) + " e reclassificou " + uso.reclassificadas + "."
       : "Ainda não há decisões sobre solicitações classificadas pela IA.";
     document.getElementById("lista-reclassificacoes").innerHTML = uso.ultimas_reclassificacoes.map(function (r) {
