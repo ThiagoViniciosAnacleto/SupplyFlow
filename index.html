@@ -37,31 +37,34 @@
       <a class="login__totem" href="/totem/">Ir para o autoatendimento (totem) →</a>
     </section>
 
-    <!-- Formulário: escolha do usuário de demonstração -->
+    <!-- Formulário de login: e-mail + senha, conferidos no servidor -->
     <section class="login__area">
       <form class="login__form" id="form-login" novalidate>
         <h2>Entrar no backoffice</h2>
-        <p class="login__instrucao">Selecione o usuário de demonstração e clique em Entrar.</p>
+        <p class="login__instrucao">Use o e-mail cadastrado e a sua senha.</p>
 
-        <fieldset class="usuarios" id="lista-usuarios">
-          <legend class="visually-hidden">Usuário de demonstração</legend>
-          <!-- Os cartões de usuário são criados pelo login.js a partir de dados-demo.js -->
-        </fieldset>
+        <div class="alert alert-danger d-none" role="alert" id="login-erro"></div>
 
-        <label for="senha" class="form-label">Senha</label>
-        <input type="password" id="senha" class="form-control" placeholder="Não é necessária nesta versão" autocomplete="off">
+        <label for="email" class="form-label">E-mail</label>
+        <input type="email" id="email" name="email" class="form-control" autocomplete="username" required autofocus>
 
-        <button type="submit" class="btn btn-primary w-100 login__entrar">
+        <label for="senha" class="form-label mt-3">Senha</label>
+        <input type="password" id="senha" name="senha" class="form-control" autocomplete="current-password" required>
+
+        <button type="submit" class="btn btn-primary w-100 login__entrar" id="btn-entrar">
           <i class="bi bi-box-arrow-in-right" aria-hidden="true"></i> Entrar
         </button>
 
-        <p class="login__nota">Autenticação simulada — nenhuma senha é verificada.</p>
+        <p class="login__nota d-flex justify-content-between flex-wrap gap-2">
+          <a href="/senha/esqueci/">Esqueci minha senha</a>
+          <span>Primeiro acesso? Use o link enviado ao seu e-mail.</span>
+        </p>
       </form>
     </section>
 
   </main>
 
-  <script src="static/js/dados-demo.js"></script>
+  <script src="static/js/api.js"></script>
   <script src="static/js/sessao.js"></script>
   <script src="static/js/login.js"></script>
 </body>

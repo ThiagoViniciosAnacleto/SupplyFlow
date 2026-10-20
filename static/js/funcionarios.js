@@ -15,8 +15,7 @@
   var funcionariosCache = [];
 
   function carregarSetores() {
-    fetch("/api/setores/")
-      .then(function (r) { return r.json(); })
+    SF.api.get("/api/setores/")
       .then(function (d) {
         var setores = d.setores || [];
         var selectFiltro = document.getElementById("filtro-setor");
@@ -44,8 +43,7 @@
     var url = "/api/funcionarios/?q=" + encodeURIComponent(termo) + "&setor=" + encodeURIComponent(setor);
     tabelaCorpo.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Carregando colaboradores...</td></tr>';
 
-    fetch(url)
-      .then(function (r) { return r.json(); })
+    SF.api.get(url)
       .then(function (dados) {
         funcionariosCache = dados.funcionarios || [];
         renderizarTabela(funcionariosCache);
@@ -61,35 +59,38 @@
       return;
     }
 
+    var esc = SF.escapar;
     tabelaCorpo.innerHTML = lista.map(function (u) {
       var badgeStatus = u.ativo
         ? '<span class="badge bg-success-subtle text-success border border-success-subtle">Ativo</span>'
         : '<span class="badge bg-danger-subtle text-danger border border-danger-subtle">Inativo</span>';
 
-      var badgePerfil = '<span class="badge bg-light text-dark border">' + u.perfil + '</span>';
+      var badgePerfil = '<span class="badge bg-light text-dark border">' + esc(u.perfil) + '</span>';
 
       return (
         '<tr>' +
           '<td>' +
             '<div class="d-flex align-items-center gap-2">' +
-              '<span class="usuario__avatar" style="width:34px;height:34px;font-size:12px;">' + u.iniciais + '</span>' +
+              '<span class="usuario__avatar" style="width:34px;height:34px;font-size:12px;" aria-hidden="true">' + esc(u.iniciais) + '</span>' +
               '<div>' +
-                '<div class="fw-semibold">' + u.nome + '</div>' +
-                '<small class="text-muted">' + u.email + '</small>' +
+                '<div class="fw-semibold">' + esc(u.nome) + '</div>' +
+                '<small class="text-muted">' + esc(u.email) + '</small>' +
               '</div>' +
             '</div>' +
           '</td>' +
-          '<td><span class="numero">' + u.matricula + '</span></td>' +
-          '<td>' + u.cargo + '</td>' +
-          '<td>' + u.setor_nome + '</td>' +
+          '<td><span class="numero">' + esc(u.matricula) + '</span></td>' +
+          '<td>' + esc(u.cargo) + '</td>' +
+          '<td>' + esc(u.setor_nome) + '</td>' +
           '<td>' + badgePerfil + '</td>' +
           '<td>' + badgeStatus + '</td>' +
-          '<td class="text-end">' +
-            '<button type="button" class="btn btn-sm btn-outline-secondary me-1 btn-editar" data-id="' + u.id + '" title="Editar">' +
-              '<i class="bi bi-pencil"></i>' +
-            '</button>' +
-            '<button type="button" class="btn btn-sm btn-outline-' + (u.ativo ? 'danger' : 'success') + ' btn-toggle" data-id="' + u.id + '" title="' + (u.ativo ? 'Inativar' : 'Ativar') + '">' +
-              '<i class="bi bi-' + (u.ativo ? 'slash-circle' : 'check-circle') + '"></i>' +
+          '<td class="text-end text-nowrap">' +
+            '<a class="btn btn-sm btn-outline-primary me-1" href="ficha-epi.html?id=' + encodeURIComponent(u.id) + '"' +
+              ' aria-label="Ficha de EPI de ' + esc(u.nome) + '" title="Ficha de EPI"><i class="bi bi-card-checklist" aria-hidden="true"></i></a>' +
+            '<button type="button" class="btn btn-sm btn-outline-secondary me-1 btn-editar" data-id="' + esc(u.id) + '"' +
+              ' aria-label="Editar ' + esc(u.nome) + '" title="Editar"><i class="bi bi-pencil" aria-hidden="true"></i></button>' +
+            '<button type="button" class="btn btn-sm btn-outline-' + (u.ativo ? 'danger' : 'success') + ' btn-toggle" data-id="' + esc(u.id) + '"' +
+              ' aria-label="' + (u.ativo ? 'Inativar ' : 'Ativar ') + esc(u.nome) + '" title="' + (u.ativo ? 'Inativar' : 'Ativar') + '">' +
+              '<i class="bi bi-' + (u.ativo ? 'slash-circle' : 'check-circle') + '" aria-hidden="true"></i>' +
             '</button>' +
           '</td>' +
         '</tr>'
@@ -121,8 +122,7 @@
     document.querySelectorAll(".btn-toggle").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var id = this.dataset.id;
-        fetch("/api/funcionarios/" + encodeURIComponent(id) + "/toggle/", { method: "POST" })
-          .then(function (r) { return r.json(); })
+        SF.api.post("/api/funcionarios/" + encodeURIComponent(id) + "/toggle/")
           .then(function (res) {
             carregarFuncionarios();
           });
@@ -155,16 +155,12 @@
         perfil: document.getElementById("func-perfil").value,
       };
 
-      fetch("/api/funcionarios/salvar/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      })
-        .then(function (r) { return r.json(); })
+      SF.api.post("/api/funcionarios/salvar/", payload)
         .then(function (res) {
           if (!res.sucesso) throw new Error(res.erro || "Falha ao salvar funcionário.");
           if (modalBs) modalBs.hide();
           carregarFuncionarios();
+          if (res.convite_enviado) alert(res.mensagem);
         })
         .catch(function (err) {
           alert(err.message);

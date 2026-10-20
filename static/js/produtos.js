@@ -8,6 +8,7 @@
   var filtroCategoria = document.getElementById("filtro-categoria-prod");
   var btnFiltrar = document.getElementById("btn-filtrar-prod");
   var btnNovoProd = document.getElementById("btn-novo-produto");
+  if (btnNovoProd && !SF.sessao.pode("produtos")) btnNovoProd.classList.add("d-none");
   var modalEl = document.getElementById("modal-produto");
   var formProd = document.getElementById("form-produto");
   var modalBs = modalEl ? new bootstrap.Modal(modalEl) : null;
@@ -18,8 +19,7 @@
   function carregarProdutos() {
     tabelaCorpo.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm me-2"></div>Carregando catálogo de produtos...</td></tr>';
 
-    fetch("/api/produtos/?todos=true")
-      .then(function (r) { return r.json(); })
+    SF.api.get("/api/produtos/?todos=true")
       .then(function (dados) {
         produtosCache = dados.produtos || [];
         categoriasCache = dados.categorias || [];
@@ -44,10 +44,20 @@
           });
         }
 
+        var selectForn = document.getElementById("prod-fornecedor");
+        if (selectForn && selectForn.children.length <= 1) {
+          (dados.fornecedores || []).forEach(function (f) {
+            var opt = document.createElement("option");
+            opt.value = f.id;
+            opt.textContent = f.nome;
+            selectForn.appendChild(opt);
+          });
+        }
+
         filtrarERenderizar();
       })
       .catch(function (err) {
-        tabelaCorpo.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-danger">Erro ao carregar catálogo: ' + err.message + '</td></tr>';
+        tabelaCorpo.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-danger">Erro ao carregar catálogo: ' + SF.escapar(err.message) + '</td></tr>';
       });
   }
 
@@ -66,6 +76,7 @@
       return;
     }
 
+    var esc = SF.escapar;
     tabelaCorpo.innerHTML = lista.map(function (p) {
       var ehEpi = p.tipo === "EPI";
       var badgeTipo = ehEpi
@@ -82,21 +93,22 @@
 
       return (
         '<tr>' +
-          '<td><span class="numero">' + p.sku + '</span></td>' +
-          '<td><strong>' + p.nome + '</strong></td>' +
-          '<td>' + p.categoria + '</td>' +
-          '<td><span class="badge bg-light text-dark border">' + p.unidade_medida + '</span></td>' +
+          '<td><span class="numero">' + esc(p.sku) + '</span></td>' +
+          '<td><strong>' + esc(p.nome) + '</strong>' + (p.ca ? '<span class="small text-muted d-block">CA ' + esc(p.ca) + (p.tamanho ? ' · ' + esc(p.tamanho) : '') + '</span>' : '') + '</td>' +
+          '<td>' + esc(p.categoria) + '</td>' +
+          '<td><span class="badge bg-light text-dark border">' + esc(p.unidade_medida) + '</span></td>' +
           '<td>R$ ' + p.custo_unitario.toFixed(2).replace(".", ",") + '</td>' +
-          '<td>' + p.limite_padrao_mensal + ' un./mês</td>' +
+          '<td>' + (p.limite_padrao_mensal != null ? esc(p.limite_padrao_mensal) + ' un./mês' : '—') +
+            (p.periodicidade_dias ? '<span class="small text-muted d-block">troca a cada ' + esc(p.periodicidade_dias) + ' dias</span>' : '') + '</td>' +
           '<td>' + badgeJust + '</td>' +
           '<td>' + badgeStatus + '</td>' +
-          '<td class="text-end">' +
-            '<button type="button" class="btn btn-sm btn-outline-secondary me-1 btn-editar-prod" data-id="' + p.id + '" title="Editar">' +
-              '<i class="bi bi-pencil"></i>' +
-            '</button>' +
-            '<button type="button" class="btn btn-sm btn-outline-' + (p.ativo ? 'danger' : 'success') + ' btn-toggle-prod" data-id="' + p.id + '" title="' + (p.ativo ? 'Inativar' : 'Ativar') + '">' +
-              '<i class="bi bi-' + (p.ativo ? 'slash-circle' : 'check-circle') + '"></i>' +
-            '</button>' +
+          '<td class="text-end text-nowrap">' + (SF.sessao.pode("produtos")
+            ? '<button type="button" class="btn btn-sm btn-outline-secondary me-1 btn-editar-prod" data-id="' + esc(p.id) + '"' +
+                ' aria-label="Editar ' + esc(p.nome) + '" title="Editar"><i class="bi bi-pencil" aria-hidden="true"></i></button>' +
+              '<button type="button" class="btn btn-sm btn-outline-' + (p.ativo ? 'danger' : 'success') + ' btn-toggle-prod" data-id="' + esc(p.id) + '"' +
+                ' aria-label="' + (p.ativo ? 'Inativar ' : 'Ativar ') + esc(p.nome) + '" title="' + (p.ativo ? 'Inativar' : 'Ativar') + '">' +
+                '<i class="bi bi-' + (p.ativo ? 'slash-circle' : 'check-circle') + '" aria-hidden="true"></i></button>'
+            : '—') +
           '</td>' +
         '</tr>'
       );
@@ -117,7 +129,12 @@
         document.getElementById("prod-categoria").value = p.categoria_id || "";
         document.getElementById("prod-unidade").value = p.unidade_medida;
         document.getElementById("prod-custo").value = p.custo_unitario;
-        document.getElementById("prod-limite").value = p.limite_padrao_mensal;
+        document.getElementById("prod-limite").value = p.limite_padrao_mensal != null ? p.limite_padrao_mensal : "";
+        document.getElementById("prod-ca").value = p.ca || "";
+        document.getElementById("prod-validade-ca").value = p.validade_ca || "";
+        document.getElementById("prod-tamanho").value = p.tamanho || "";
+        document.getElementById("prod-periodicidade").value = p.periodicidade_dias || "";
+        document.getElementById("prod-fornecedor").value = p.fornecedor_id || "";
         document.getElementById("prod-requer-justificativa").checked = p.requer_justificativa;
 
         if (modalBs) modalBs.show();
@@ -128,11 +145,11 @@
     document.querySelectorAll(".btn-toggle-prod").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var id = this.dataset.id;
-        fetch("/api/produtos/" + encodeURIComponent(id) + "/toggle/", { method: "POST" })
-          .then(function (r) { return r.json(); })
+        SF.api.post("/api/produtos/" + encodeURIComponent(id) + "/toggle/")
           .then(function () {
             carregarProdutos();
-          });
+          })
+          .catch(function (err) { alert(err.message); });
       });
     });
   }
@@ -158,17 +175,17 @@
         descricao: document.getElementById("prod-descricao").value.trim(),
         categoria_id: document.getElementById("prod-categoria").value || null,
         unidade_medida: document.getElementById("prod-unidade").value,
-        custo_unitario: parseFloat(document.getElementById("prod-custo").value || 0),
-        limite_padrao_mensal: parseInt(document.getElementById("prod-limite").value || 1, 10),
+        custo_unitario: document.getElementById("prod-custo").value,
+        limite_padrao_mensal: document.getElementById("prod-limite").value,
+        periodicidade_dias: document.getElementById("prod-periodicidade").value,
+        ca: document.getElementById("prod-ca").value.trim(),
+        validade_ca: document.getElementById("prod-validade-ca").value,
+        tamanho: document.getElementById("prod-tamanho").value.trim(),
+        fornecedor_id: document.getElementById("prod-fornecedor").value || null,
         requer_justificativa: document.getElementById("prod-requer-justificativa").checked,
       };
 
-      fetch("/api/produtos/salvar/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      })
-        .then(function (r) { return r.json(); })
+      SF.api.post("/api/produtos/salvar/", payload)
         .then(function (res) {
           if (!res.sucesso) throw new Error(res.erro || "Falha ao salvar produto.");
           if (modalBs) modalBs.hide();

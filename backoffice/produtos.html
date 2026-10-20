@@ -112,7 +112,7 @@
 
             <div class="mb-3">
               <label for="prod-descricao" class="form-label small fw-semibold">Descrição Detalhada</label>
-              <textarea id="prod-descricao" class="form-control" rows="2" placeholder="Especificações técnicas, CA, tamanho..."></textarea>
+              <textarea id="prod-descricao" class="form-control" rows="2"></textarea>
             </div>
 
             <div class="row g-2 mb-3">
@@ -132,8 +132,34 @@
               </div>
               <div class="col-4">
                 <label for="prod-limite" class="form-label small fw-semibold">Cota Mensal</label>
-                <input type="number" id="prod-limite" class="form-control" required value="1" min="1">
+                <input type="number" id="prod-limite" class="form-control" min="0" aria-describedby="ajuda-limite">
               </div>
+            </div>
+
+            <fieldset class="row g-2 mb-3">
+              <legend class="form-label small fw-semibold mb-1">Dados de EPI e regra de troca</legend>
+              <div class="col-6 col-md-3">
+                <label for="prod-ca" class="form-label small">CA</label>
+                <input type="text" id="prod-ca" class="form-control" maxlength="30" aria-describedby="ajuda-ca">
+              </div>
+              <div class="col-6 col-md-3">
+                <label for="prod-validade-ca" class="form-label small">Validade do CA</label>
+                <input type="date" id="prod-validade-ca" class="form-control">
+              </div>
+              <div class="col-6 col-md-3">
+                <label for="prod-tamanho" class="form-label small">Tamanho</label>
+                <input type="text" id="prod-tamanho" class="form-control" maxlength="30">
+              </div>
+              <div class="col-6 col-md-3">
+                <label for="prod-periodicidade" class="form-label small">Troca a cada (dias)</label>
+                <input type="number" id="prod-periodicidade" class="form-control" min="1">
+              </div>
+              <div class="form-text" id="ajuda-ca">Para EPI, o número do CA é obrigatório. Pedidos antes da periodicidade viram substituição antecipada.</div>
+            </fieldset>
+
+            <div class="mb-3">
+              <label for="prod-fornecedor" class="form-label small fw-semibold">Fornecedor</label>
+              <select id="prod-fornecedor" class="form-select"><option value="">Não informado</option></select>
             </div>
 
             <div class="form-check form-switch pt-2 border-top">
@@ -153,7 +179,8 @@
   </div>
 
   <script src="../static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
-  <script src="../static/js/dados-demo.js"></script>
+  <script src="../static/js/menu.js"></script>
+  <script src="../static/js/api.js"></script>
   <script src="../static/js/sessao.js"></script>
   <script src="../static/js/backoffice.js"></script>
   <script src="../static/js/produtos.js"></script>

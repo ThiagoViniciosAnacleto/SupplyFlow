@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Políticas de fornecimento · SupplyFlow</title>
+  <link rel="icon" href="../static/img/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../static/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="../static/vendor/bootstrap-icons/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="../static/css/supplyflow.css">
+</head>
+<body data-pagina="politicas">
+  <div class="app">
+
+    <div class="sidebar-trilho">
+      <aside class="sidebar offcanvas-lg offcanvas-start" tabindex="-1" id="sidebar" aria-label="Menu"></aside>
+    </div>
+
+    <div class="app__principal">
+      <header class="topbar" id="topbar"></header>
+
+      <main class="conteudo">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+          <div>
+            <h1 class="pagina-titulo">Políticas de fornecimento</h1>
+            <p class="pagina-descricao">Limites mensais e periodicidade de troca por setor e/ou cargo. Sem política específica, vale o padrão do produto. Quando mais de uma se aplica, vale a mais específica (setor + cargo &gt; cargo &gt; setor).</p>
+          </div>
+          <button type="button" class="btn btn-primary d-none" id="btn-nova-regra"><i class="bi bi-plus-lg" aria-hidden="true"></i> Nova política</button>
+        </div>
+
+        <div class="alert d-none" role="status" id="aviso-regras" tabindex="-1"></div>
+
+        <section class="cartao" aria-labelledby="t-regras">
+          <div class="cartao__cabecalho"><h2 class="cartao__titulo" id="t-regras">Políticas cadastradas</h2></div>
+          <div class="table-responsive" tabindex="0" role="region" aria-labelledby="t-regras">
+            <table class="tabela-solicitacoes">
+              <thead>
+                <tr>
+                  <th scope="col">Produto</th>
+                  <th scope="col">Escopo</th>
+                  <th scope="col">Limite mensal</th>
+                  <th scope="col">Periodicidade</th>
+                  <th scope="col">Situação</th>
+                  <th scope="col" class="tabela-solicitacoes__acao">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="corpo-regras"><tr><td colspan="6" class="tabela-solicitacoes__vazio">Carregando…</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+  </div>
+
+  <div class="modal fade" id="modal-regra" tabindex="-1" aria-labelledby="titulo-modal-regra" aria-hidden="true">
+    <div class="modal-dialog">
+      <form class="modal-content" id="form-regra" novalidate>
+        <div class="modal-header">
+          <h2 class="modal-title fs-5" id="titulo-modal-regra">Política de fornecimento</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="regra-id">
+          <label for="regra-produto" class="form-label fw-semibold">Produto *</label>
+          <select id="regra-produto" class="form-select mb-3" required></select>
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label for="regra-setor" class="form-label fw-semibold">Setor</label>
+              <select id="regra-setor" class="form-select"></select>
+            </div>
+            <div class="col-6">
+              <label for="regra-cargo" class="form-label fw-semibold">Cargo</label>
+              <input id="regra-cargo" class="form-control" list="lista-cargos" maxlength="100">
+              <datalist id="lista-cargos"></datalist>
+            </div>
+          </div>
+          <div class="row g-2">
+            <div class="col-6">
+              <label for="regra-limite" class="form-label fw-semibold">Limite mensal (un.)</label>
+              <input type="number" id="regra-limite" class="form-control" min="0">
+            </div>
+            <div class="col-6">
+              <label for="regra-periodicidade" class="form-label fw-semibold">Troca a cada (dias)</label>
+              <input type="number" id="regra-periodicidade" class="form-control" min="1">
+            </div>
+          </div>
+          <div class="form-text">Informe pelo menos um escopo (setor ou cargo) e pelo menos um valor.</div>
+          <div class="invalid-feedback d-block" id="erro-regra" role="alert"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="../static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script src="../static/js/menu.js"></script>
+  <script src="../static/js/api.js"></script>
+  <script src="../static/js/sessao.js"></script>
+  <script src="../static/js/backoffice.js"></script>
+  <script src="../static/js/politicas.js"></script>
+</body>
+</html>

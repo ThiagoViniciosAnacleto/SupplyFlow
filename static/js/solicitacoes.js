@@ -1,7 +1,7 @@
 /* =====================================================================
    SupplyFlow — Solicitações (lista integrada à API Django /api/solicitacoes/)
    Monta a tabela a partir de dados reais do PostgreSQL e filtra pelas abas.
-   O status mostrado considera o estado persistido no banco e na sessão.
+   O status, a categoria da IA e a decisão vêm sempre do servidor.
    ===================================================================== */
 
 (function () {
@@ -17,7 +17,7 @@
     "aprovada-condicao": { rotulo: "Aprovada com condição", selo: "selo--condicional" },
     "rejeitada":         { rotulo: "Rejeitada",             selo: "selo--rejeitado" },
     "entregue":          { rotulo: "Entregue",              selo: "selo--entregue" },
-    "cancelada":         { rotulo: "Cancelada",             selo: "selo--rejeitado" }
+    "cancelada":         { rotulo: "Cancelada",             selo: "selo--cancelado" }
   };
 
   /* Cada aba é uma regra que diz se a solicitação aparece ou não */
@@ -28,7 +28,7 @@
     },
     aguardando: {
       legenda: "Solicitações aguardando análise",
-      mostra: function (s) { return SF.sessao.statusDe(s) === "aguardando"; }
+      mostra: function (s) { return s.status === "aguardando"; }
     },
     todas: {
       legenda: "Todas as solicitações",
@@ -42,6 +42,7 @@
   var legenda = document.getElementById("legenda-tabela");
   var resumo = document.getElementById("resumo-filtro");
   var abaAtiva = abas[0];
+  var solicitacoes = [];
 
   /* ---------- Uma linha da tabela ---------- */
   function htmlClassificacao(s) {
@@ -49,26 +50,28 @@
       return '<span class="classificacao-ia classificacao-ia--vazia">' +
         '<span aria-hidden="true">—</span><span class="visually-hidden">Não se aplica</span></span>';
     }
-    var conf = s.ia.confianca ? ' <span class="classificacao-ia__confianca">· ' + s.ia.confianca + "%</span>" : "";
+    var conf = s.ia.confianca != null
+      ? ' <span class="classificacao-ia__confianca">· ' + Math.round(s.ia.confianca) + "%</span>"
+      : ' <span class="classificacao-ia__confianca">· sem confiança</span>';
     return '<span class="classificacao-ia">' +
       escapar(s.ia.categoria) + conf +
     "</span>";
   }
 
   function htmlLinha(s) {
-    var statusChave = SF.sessao.statusDe(s) || "aguardando";
-    var status = STATUS_MAP[statusChave] || { rotulo: statusChave, selo: "selo--aguardando" };
+    var statusChave = s.status || "aguardando";
+    var status = STATUS_MAP[statusChave] || { rotulo: s.status_rotulo || statusChave, selo: "selo--aguardando" };
     var numeroTexto = s.numero || s.codigo || s.id;
     var dataHora = s.data && s.hora ? s.data + ", " + s.hora : (s.data || "");
 
     return "<tr>" +
       '<td><span class="numero">' + escapar(numeroTexto) + "</span></td>" +
       "<td>" + escapar(s.funcionario || (s.solicitante && s.solicitante.nome)) + "</td>" +
-      "<td>" + escapar(s.funcao || (s.solicitante && s.solicitante.cargo) || "Colaborador") + "</td>" +
-      "<td>" + escapar(s.centroCusto || (s.solicitante && s.solicitante.setor) || "Geral") + "</td>" +
-      "<td>" + escapar(s.produto || "Material solicitado") + "</td>" +
+      "<td>" + escapar(s.funcao || "—") + "</td>" +
+      "<td>" + escapar(s.centroCusto || "—") + "</td>" +
+      "<td>" + escapar(s.produto || "—") + "</td>" +
       '<td class="text-nowrap">' + escapar(dataHora) + "</td>" +
-      "<td>" + escapar(s.motivo || "Solicitação de item") + "</td>" +
+      "<td>" + escapar(s.motivo || "—") + "</td>" +
       "<td>" + htmlClassificacao(s) + "</td>" +
       '<td class="tabela-solicitacoes__status"><span class="selo ' + status.selo + '">' + escapar(status.rotulo) + "</span></td>" +
       '<td class="tabela-solicitacoes__acao">' +
@@ -84,7 +87,7 @@
     if (!aba || !corpo) return;
     abaAtiva = aba;
     var filtro = FILTROS[aba.dataset.filtro] || FILTROS.todas;
-    var listaBase = (window.SF && SF.solicitacoes) || [];
+    var listaBase = solicitacoes;
     var lista = listaBase.filter(filtro.mostra);
 
     abas.forEach(function (outra) {
@@ -130,19 +133,14 @@
     corpo.innerHTML = '<tr><td colspan="10" class="tabela-solicitacoes__vazio">Carregando solicitações do sistema...</td></tr>';
   }
 
-  // 1. Busca solicitações reais da API Django
-  fetch("/api/solicitacoes/")
-    .then(function (resposta) {
-      if (!resposta.ok) throw new Error("Erro HTTP " + resposta.status);
-      return resposta.json();
-    })
+  // Busca as solicitações no servidor. Em caso de erro, mostra o erro (nunca dados de exemplo).
+  SF.api.get("/api/solicitacoes/")
     .then(function (dados) {
-      window.SF = window.SF || {};
-      SF.solicitacoes = dados.solicitacoes || [];
+      solicitacoes = dados.solicitacoes || [];
       mostrar(abaAtiva || abas[0]);
     })
     .catch(function (erro) {
-      console.warn("Aviso: carregando solicitações de contingência:", erro);
-      mostrar(abaAtiva || abas[0]);
+      corpo.innerHTML = '<tr><td colspan="10" class="tabela-solicitacoes__vazio" role="alert">' +
+        escapar("Não foi possível carregar as solicitações: " + erro.message) + "</td></tr>";
     });
 })();

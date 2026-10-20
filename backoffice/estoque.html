@@ -72,15 +72,17 @@
                   <th scope="col">Totem</th>
                   <th scope="col">Produto</th>
                   <th scope="col">Categoria</th>
-                  <th scope="col">Qtd. Disponível</th>
-                  <th scope="col">Qtd. Mínima</th>
-                  <th scope="col">Slot</th>
+                  <th scope="col">Disponível</th>
+                  <th scope="col">Reservado</th>
+                  <th scope="col">Livre</th>
+                  <th scope="col">Mínimo</th>
+                  <th scope="col">Lote</th>
                   <th scope="col">Status</th>
                   <th scope="col" class="text-end">Ação</th>
                 </tr>
               </thead>
               <tbody id="tabela-estoque-corpo">
-                <tr><td colspan="8" class="text-center py-4 text-muted">Carregando saldos de estoque...</td></tr>
+                <tr><td colspan="10" class="text-center py-4 text-muted">Carregando saldos de estoque...</td></tr>
               </tbody>
             </table>
           </div>
@@ -96,7 +98,7 @@
       <div class="modal-content rounded-4 border-0 shadow">
         <form id="form-repor">
           <div class="modal-header border-bottom">
-            <h5 class="modal-title fw-bold" id="modalReporTitulo">Repor Estoque no Totem</h5>
+            <h5 class="modal-title fw-bold" id="modalReporTitulo">Registrar entrada no estoque</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
           </div>
           <div class="modal-body p-4">
@@ -108,8 +110,12 @@
             </div>
 
             <div class="mb-3">
-              <label for="repor-qtd" class="form-label small fw-semibold">Quantidade a Adicionar *</label>
+              <label for="repor-qtd" class="form-label small fw-semibold">Quantidade recebida *</label>
               <input type="number" id="repor-qtd" class="form-control" required min="1" value="10">
+              <label for="repor-lote" class="form-label small fw-semibold mt-3">Lote</label>
+              <input type="text" id="repor-lote" class="form-control" maxlength="50" placeholder="Ex.: L-2026-10">
+              <label for="repor-obs" class="form-label small fw-semibold mt-3">Observação (nota fiscal, fornecedor…)</label>
+              <input type="text" id="repor-obs" class="form-control" maxlength="255">
               <div class="form-text">As unidades serão adicionadas imediatamente ao saldo disponível no totem.</div>
             </div>
           </div>
@@ -123,7 +129,8 @@
   </div>
 
   <script src="../static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
-  <script src="../static/js/dados-demo.js"></script>
+  <script src="../static/js/menu.js"></script>
+  <script src="../static/js/api.js"></script>
   <script src="../static/js/sessao.js"></script>
   <script src="../static/js/backoffice.js"></script>
   <script>
@@ -135,8 +142,7 @@
       var estoqueCache = [];
 
       function carregarEstoque() {
-        fetch("/api/estoque/")
-          .then(function(r) { return r.json(); })
+        SF.api.get("/api/estoque/")
           .then(function(d) {
             estoqueCache = d.estoque || [];
             document.getElementById("res-total-estoque").textContent = d.resumo.total_registros || 0;
@@ -144,7 +150,7 @@
             document.getElementById("res-zerado-estoque").textContent = d.resumo.itens_zerados || 0;
 
             if (estoqueCache.length === 0) {
-              corpo.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">Nenhum estoque cadastrado.</td></tr>';
+              corpo.innerHTML = '<tr><td colspan="10" class="text-center py-4 text-muted">Nenhum estoque cadastrado.</td></tr>';
               return;
             }
 
@@ -156,18 +162,21 @@
                 badgeStatus = '<span class="badge bg-danger-subtle text-danger border border-danger-subtle">Esgotado</span>';
               }
 
+              var esc = SF.escapar;
               return '<tr>' +
-                '<td><span class="badge bg-light text-dark border">' + e.totem_codigo + '</span> <span class="small text-muted d-block">' + e.totem_nome + '</span></td>' +
-                '<td><strong>' + e.produto_nome + '</strong> <span class="small text-muted d-block">SKU: ' + e.produto_sku + '</span></td>' +
-                '<td>' + e.categoria + '</td>' +
-                '<td><strong class="fs-6">' + e.quantidade_disponivel + '</strong> un.</td>' +
-                '<td>' + e.quantidade_minima + ' un.</td>' +
-                '<td><span class="numero">' + e.slot_posicao + '</span></td>' +
+                '<td><span class="badge bg-light text-dark border">' + esc(e.totem_codigo) + '</span> <span class="small text-muted d-block">' + esc(e.totem_nome) + '</span></td>' +
+                '<td><strong>' + esc(e.produto_nome) + '</strong> <span class="small text-muted d-block">SKU: ' + esc(e.produto_sku) + '</span></td>' +
+                '<td>' + esc(e.categoria) + '</td>' +
+                '<td><strong class="fs-6">' + esc(e.quantidade_disponivel) + '</strong> un.</td>' +
+                '<td>' + esc(e.quantidade_reservada) + ' un.</td>' +
+                '<td>' + esc(e.quantidade_livre) + ' un.</td>' +
+                '<td>' + esc(e.quantidade_minima) + ' un.</td>' +
+                '<td><span class="numero">' + esc(e.lote) + '</span></td>' +
                 '<td>' + badgeStatus + '</td>' +
-                '<td class="text-end">' +
-                  '<button type="button" class="btn btn-sm btn-outline-primary btn-abrir-repor" data-id="' + e.id + '">' +
-                    '<i class="bi bi-box-arrow-in-down"></i> Repor' +
-                  '</button>' +
+                '<td class="text-end">' + (d.pode_repor
+                  ? '<button type="button" class="btn btn-sm btn-outline-primary btn-abrir-repor" data-id="' + esc(e.id) + '"' +
+                    ' aria-label="Registrar entrada de ' + esc(e.produto_nome) + '"><i class="bi bi-box-arrow-in-down" aria-hidden="true"></i> Entrada</button>'
+                  : '—') +
                 '</td>' +
               '</tr>';
             }).join("");
@@ -178,8 +187,10 @@
                 if (!item) return;
                 document.getElementById("repor-id").value = item.id;
                 document.getElementById("repor-prod-nome").textContent = item.produto_nome + " (SKU: " + item.produto_sku + ")";
-                document.getElementById("repor-totem-nome").textContent = item.totem_nome + " (" + item.totem_codigo + ") · Slot: " + item.slot_posicao;
+                document.getElementById("repor-totem-nome").textContent = item.totem_nome + " (" + item.totem_codigo + ") · Lote atual: " + item.lote;
                 document.getElementById("repor-qtd").value = "10";
+                document.getElementById("repor-lote").value = "";
+                document.getElementById("repor-obs").value = "";
                 if (modalBs) modalBs.show();
               });
             });
@@ -194,17 +205,13 @@
           e.preventDefault();
           var payload = {
             estoque_id: document.getElementById("repor-id").value,
-            quantidade: parseInt(document.getElementById("repor-qtd").value, 10),
+            quantidade: document.getElementById("repor-qtd").value,
+            lote: document.getElementById("repor-lote").value.trim(),
+            observacao: document.getElementById("repor-obs").value.trim(),
           };
 
-          fetch("/api/estoque/repor/", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          })
-            .then(function(r) { return r.json(); })
+          SF.api.post("/api/estoque/repor/", payload)
             .then(function(res) {
-              if (!res.sucesso) throw new Error(res.erro || "Falha na reposição");
               if (modalBs) modalBs.hide();
               carregarEstoque();
             })

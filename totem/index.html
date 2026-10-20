@@ -28,12 +28,12 @@
       </div>
     </div>
 
-    <div class="d-flex align-items-center gap-2">
-      <a href="/index.html" class="btn btn-outline-secondary btn-sm" title="Ir para o Backoffice">
-        <i class="bi bi-box-arrow-left"></i> Backoffice
+    <div class="totem-header__acoes">
+      <a href="/index.html" class="btn btn-outline-secondary btn-sm" aria-label="Ir para o backoffice">
+        <i class="bi bi-box-arrow-left" aria-hidden="true"></i><span class="totem-header__texto"> Backoffice</span>
       </a>
-      <button type="button" class="btn-reiniciar" id="btn-reiniciar-sessao">
-        <i class="bi bi-house-door"></i> Reiniciar sessão
+      <button type="button" class="btn-reiniciar" id="btn-reiniciar-sessao" aria-label="Reiniciar sessão">
+        <i class="bi bi-house-door" aria-hidden="true"></i><span class="totem-header__texto">Reiniciar sessão</span>
       </button>
     </div>
   </header>
@@ -91,7 +91,7 @@
       <p class="totem-subtitulo">Utilize o teclado na tela ou o leitor para informar seu código.</p>
 
       <div class="totem-teclado-container">
-        <input type="text" id="input-matricula" class="totem-display-input w-100" placeholder="MAT-2001" readonly>
+        <input type="text" id="input-matricula" class="totem-display-input w-100" placeholder="Sua matrícula" aria-label="Matrícula digitada" readonly>
 
         <div class="totem-teclado">
           <button type="button" class="btn-tecla tecla-num" data-val="1">1</button>
@@ -110,15 +110,6 @@
           <button type="button" class="btn-tecla btn-tecla--acao btn-tecla--verde" id="btn-matricula-confirmar">
             OK <i class="bi bi-arrow-right"></i>
           </button>
-        </div>
-
-        <div class="totem-dica">
-          <strong>Acesso rápido de teste:</strong>
-          <div class="totem-chips">
-            <span class="totem-chip chip-demo" data-mat="MAT-2001">MAT-2001 (João · Soldador)</span>
-            <span class="totem-chip chip-demo" data-mat="MAT-2002">MAT-2002 (Fernanda · Operadora)</span>
-            <span class="totem-chip chip-demo" data-mat="MAT-2003">MAT-2003 (Ricardo · Eletricista)</span>
-          </div>
         </div>
       </div>
     </section>
@@ -161,10 +152,6 @@
           <button type="button" class="btn-tecla btn-tecla--acao btn-tecla--apagar" id="btn-pin-apagar">
             <i class="bi bi-backspace"></i>
           </button>
-        </div>
-
-        <div class="totem-dica mt-4" id="pin-dica-conteudo">
-          PIN de teste da matrícula <span id="dica-mat-atual">MAT-2001</span>: <strong id="dica-pin-num">1122</strong>
         </div>
       </div>
     </section>
@@ -285,6 +272,7 @@
                   <th>Produto</th>
                   <th>Tipo</th>
                   <th>Status</th>
+                  <th>Ação</th>
                 </tr>
               </thead>
               <tbody id="lista-minhas-sols-body">
@@ -330,6 +318,7 @@
 
   <!-- Scripts -->
   <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script src="/static/js/api.js"></script>
   <script src="/static/js/totem.js"></script>
 </body>
 </html>

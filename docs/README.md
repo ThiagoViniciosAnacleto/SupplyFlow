@@ -14,14 +14,14 @@ Material de apoio ao desenvolvimento. Nada aqui é código do sistema.
 |---|---|---|
 | 01-login-backoffice.jpg | Login do backoffice | feita (`index.html`) |
 | 02-visao-geral.jpg | Visão Geral | feita (`backoffice/visao-geral.html`) |
-| 03-solicitacoes-lista.jpg | Lista de solicitações | a fazer |
-| 04-solicitacao-detalhe-analise-ia.jpg | Detalhe da solicitação — dados e análise da IA | a fazer |
-| 05-solicitacao-detalhe-decisao.jpg | Detalhe da solicitação — regra, histórico e decisão | a fazer |
-| 06-avaliacao-modelo-ia.jpg | Avaliação do modelo (IA) | a fazer |
-| 07-totem-boas-vindas.jpg | Totem — boas-vindas e identificação | a fazer |
-| 08-totem-senha-pin.jpg | Totem — senha (PIN) | a fazer |
-| 09-totem-produtos-disponiveis.jpg | Totem — produtos disponíveis | a fazer |
-| 10-totem-justificativa.jpg | Totem — justificativa de substituição antecipada | a fazer |
+| 03-solicitacoes-lista.jpg | Lista de solicitações | feita (`backoffice/solicitacoes.html`) |
+| 04-solicitacao-detalhe-analise-ia.jpg | Detalhe da solicitação — dados e análise da IA | feita (`backoffice/solicitacao.html`) |
+| 05-solicitacao-detalhe-decisao.jpg | Detalhe da solicitação — regra, histórico e decisão | feita (`backoffice/solicitacao.html`) |
+| 06-avaliacao-modelo-ia.jpg | Avaliação do modelo (IA) | feita (`backoffice/avaliacao-ia.html`), com métricas reais |
+| 07-totem-boas-vindas.jpg | Totem — boas-vindas e identificação | feita (`totem/index.html`) |
+| 08-totem-senha-pin.jpg | Totem — senha (PIN) | feita (`totem/index.html`) |
+| 09-totem-produtos-disponiveis.jpg | Totem — produtos disponíveis | feita (`totem/index.html`) |
+| 10-totem-justificativa.jpg | Totem — justificativa de substituição antecipada | feita (`totem/index.html`) |
 
 ## Ao ler os prints
 

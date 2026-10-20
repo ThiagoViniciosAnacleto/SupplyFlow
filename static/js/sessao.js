@@ -1,127 +1,56 @@
 /* =====================================================================
-   SupplyFlow — sessão integrada com API Django e sessionStorage
+   SupplyFlow — dados de exibição da sessão
    ---------------------------------------------------------------------
-   Armazena no sessionStorage os dados do usuário autenticado e sincroniza
-   as decisões tomadas com o backend via /api/solicitacoes/<id>/decidir/.
+   A sessão de verdade fica no SERVIDOR (cookie do Django). Aqui guardamos
+   só uma cópia do nome/perfil para desenhar o topo da página sem esperar
+   a rede. Quem decide o que cada um pode fazer é sempre o servidor.
    ===================================================================== */
 
 window.SF = window.SF || {};
 
 SF.sessao = (function () {
   var CHAVE = "supplyflow.usuario";
-  var CHAVE_DECISOES = "supplyflow.decisoes";
 
-  var USUARIO_PADRAO = {
-    id: "admin-default",
-    nome: "Carlos Mendes",
-    iniciais: "CM",
-    perfil: "Administrador",
-    perfil_codigo: "ADMIN",
-    cargo: "Administrador de Sistemas",
-    matricula: "MAT-1001",
-    email: "admin@supplyflow.com",
-    acesso: "Acesso geral ao sistema."
-  };
-
-  function lerArmazenamento(chave) {
+  function ler() {
     try {
-      return window.sessionStorage.getItem(chave);
+      return JSON.parse(window.sessionStorage.getItem(CHAVE)) || null;
     } catch (erro) {
       return null;
     }
   }
 
-  function lerDecisoes() {
+  function gravar(usuario) {
     try {
-      return JSON.parse(lerArmazenamento(CHAVE_DECISOES)) || {};
-    } catch (erro) {
-      return {};
-    }
+      window.sessionStorage.setItem(CHAVE, JSON.stringify(usuario));
+    } catch (erro) { /* sem armazenamento: o topo é atualizado pela API */ }
   }
 
   return {
-    /* Salva o usuário escolhido (objeto ou id) */
-    iniciar: function (usuarioOuId) {
-      try {
-        if (typeof usuarioOuId === "object" && usuarioOuId !== null) {
-          window.sessionStorage.setItem(CHAVE, JSON.stringify(usuarioOuId));
-        } else {
-          window.sessionStorage.setItem(CHAVE, usuarioOuId);
-        }
-      } catch (erro) {
-        /* sem armazenamento, continua em memória */
-      }
+    /* Chamado após o login com os dados devolvidos pelo servidor */
+    iniciar: gravar,
+
+    /* Cópia local de quem está logado (ou null). */
+    usuarioAtual: ler,
+
+    /* Confere no servidor quem está logado e atualiza a cópia local.
+       Se a sessão expirou, SF.api volta para o login. */
+    confirmar: function () {
+      return SF.api.get("/api/sessao/").then(function (resposta) {
+        gravar(resposta.usuario);
+        return resposta.usuario;
+      });
     },
 
-    /* Devolve o usuário atual com fallback seguro */
-    usuarioAtual: function () {
-      var salvo = lerArmazenamento(CHAVE);
-      if (salvo) {
-        try {
-          var obj = JSON.parse(salvo);
-          if (obj && typeof obj === "object" && obj.nome) {
-            return obj;
-          }
-        } catch (e) {
-          /* não era json, continua */
-        }
-        if (window.SF && Array.isArray(SF.usuarios)) {
-          var achado = SF.usuarios.find(function (u) { return u.id === salvo; });
-          if (achado) return achado;
-        }
-      }
-      return (window.SF && SF.usuarios && SF.usuarios[0]) || USUARIO_PADRAO;
+    /* O perfil logado pode executar esta ação? (só para mostrar/esconder botões) */
+    pode: function (acao) {
+      var usuario = ler();
+      return !!(usuario && usuario.acoes && usuario.acoes.indexOf(acao) !== -1);
     },
 
-    /* Registra a decisão tomada numa solicitação e sincroniza com a API */
-    salvarDecisao: function (idSolicitacao, decisao) {
-      var decisoes = lerDecisoes();
-      decisoes[idSolicitacao] = decisao;
-      try {
-        window.sessionStorage.setItem(CHAVE_DECISOES, JSON.stringify(decisoes));
-      } catch (erro) {}
-
-      // Tenta persistir no backend remoto
-      if (idSolicitacao && decisao) {
-        var statusStr = (decisao.status || "").toLowerCase();
-        var decisaoFinal = statusStr === "rejeitada" ? "REPROVADA" : "APROVADA";
-        var usuario = this.usuarioAtual();
-
-        fetch("/api/solicitacoes/" + encodeURIComponent(idSolicitacao) + "/decidir/", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            decisao: decisaoFinal,
-            justificativa: decisao.observacao || decisao.justificativa_decisao || "",
-            seguiu_recomendacao_ia: decisao.seguiu_recomendacao_ia !== false,
-            aprovador_id: usuario ? usuario.id : null
-          })
-        }).catch(function (err) {
-          console.warn("Aviso ao persistir decisão na API:", err);
-        });
-      }
-
-      return true;
-    },
-
-    /* Decisão da solicitação: a tomada nesta sessão ou a gravada no banco */
-    decisaoDe: function (solicitacao) {
-      return lerDecisoes()[solicitacao.id] || solicitacao.decisao || null;
-    },
-
-    /* Status exibido na tela, priorizando atualizações em tempo real */
-    statusDe: function (solicitacao) {
-      var daSessao = lerDecisoes()[solicitacao.id];
-      if (daSessao && solicitacao.status === "aguardando") return daSessao.status;
-      return solicitacao.status;
-    },
-
-    /* Encerra a sessão e limpa os dados */
+    /* Sair: encerra a sessão no servidor e limpa a cópia local */
     encerrar: function () {
-      try {
-        window.sessionStorage.removeItem(CHAVE);
-        window.sessionStorage.removeItem(CHAVE_DECISOES);
-      } catch (erro) {}
+      try { window.sessionStorage.removeItem(CHAVE); } catch (erro) {}
+      return SF.api.post("/api/logout/", {}, { semRedirecionar: true }).catch(function () {});
     }
   };
 })();

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Usuários e permissões · SupplyFlow</title>
+  <link rel="icon" href="../static/img/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../static/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="../static/vendor/bootstrap-icons/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="../static/css/supplyflow.css">
+</head>
+<body data-pagina="usuarios">
+  <div class="app">
+
+    <!-- Barra lateral: preenchida pelo backoffice.js -->
+    <div class="sidebar-trilho">
+      <aside class="sidebar offcanvas-lg offcanvas-start" tabindex="-1" id="sidebar" aria-label="Menu"></aside>
+    </div>
+
+    <div class="app__principal">
+      <!-- Topo: preenchido pelo backoffice.js -->
+      <header class="topbar" id="topbar"></header>
+
+      <main class="conteudo">
+        <h1 class="pagina-titulo">Usuários e permissões</h1>
+        <p class="pagina-descricao">
+          Quem acessa o backoffice e o que cada perfil pode fazer. Para criar um usuário, cadastre-o em
+          <a href="funcionarios.html">Funcionários</a> com um perfil administrativo e e-mail: o sistema envia o link
+          para a própria pessoa criar a senha.
+        </p>
+
+        <div class="alert d-none" role="status" id="aviso-usuarios"></div>
+
+        <section class="cartao mb-4" aria-labelledby="titulo-acessos">
+          <div class="cartao__cabecalho">
+            <h2 class="cartao__titulo" id="titulo-acessos">Acessos ao backoffice</h2>
+          </div>
+          <div class="table-responsive" tabindex="0" role="region" aria-labelledby="titulo-acessos">
+            <table class="tabela-solicitacoes">
+              <thead>
+                <tr>
+                  <th scope="col">Usuário</th>
+                  <th scope="col">E-mail</th>
+                  <th scope="col">Perfil</th>
+                  <th scope="col">Situação do acesso</th>
+                  <th scope="col">Último acesso</th>
+                  <th scope="col" class="tabela-solicitacoes__acao">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="corpo-usuarios">
+                <tr><td colspan="6" class="tabela-solicitacoes__vazio">Carregando…</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="tabela-nota">
+            <i class="bi bi-shield-lock" aria-hidden="true"></i>
+            Ninguém vê nem define a senha de outra pessoa. "Enviar link" manda ao usuário um link de 1 hora para criar ou redefinir a própria senha.
+          </p>
+        </section>
+
+        <section class="cartao" aria-labelledby="titulo-permissoes">
+          <div class="cartao__cabecalho">
+            <h2 class="cartao__titulo" id="titulo-permissoes">Permissões por perfil</h2>
+            <span class="cartao__meta">Conferidas no servidor em toda operação</span>
+          </div>
+          <div class="table-responsive" tabindex="0" role="region" aria-labelledby="titulo-permissoes">
+            <table class="tabela-solicitacoes">
+              <thead id="cabecalho-permissoes"></thead>
+              <tbody id="corpo-permissoes"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+  </div>
+
+  <script src="../static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script src="../static/js/menu.js"></script>
+  <script src="../static/js/api.js"></script>
+  <script src="../static/js/sessao.js"></script>
+  <script src="../static/js/backoffice.js"></script>
+  <script src="../static/js/usuarios.js"></script>
+</body>
+</html>

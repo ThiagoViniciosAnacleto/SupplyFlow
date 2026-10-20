@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Avaliação do Modelo (IA) · SupplyFlow</title>
+  <title>Avaliação do modelo (IA) · SupplyFlow</title>
   <link rel="icon" href="../static/img/logo.svg" type="image/svg+xml">
   <link rel="stylesheet" href="../static/vendor/bootstrap/bootstrap.min.css">
   <link rel="stylesheet" href="../static/vendor/bootstrap-icons/bootstrap-icons.min.css">
@@ -20,113 +20,86 @@
       <header class="topbar" id="topbar"></header>
 
       <main class="conteudo">
-        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
-          <div>
-            <h1 class="pagina-titulo mb-1">Avaliação do Modelo (IA)</h1>
-            <p class="pagina-descricao mb-0">Métricas de precisão, matriz de confusão e conformidade ética do classificador textual de justificativas.</p>
-          </div>
-          <div>
-            <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 fs-6">
-              <i class="bi bi-cpu"></i> Modelo: SupplyAI-v1.4 (TF-IDF + LinearSVC)
-            </span>
-          </div>
+        <h1 class="pagina-titulo">Avaliação do modelo (IA)</h1>
+        <p class="pagina-descricao" id="descricao-modelo">Métricas do classificador de justificativas medidas em um conjunto de teste separado do treino.</p>
+
+        <div class="alert alert-warning d-none" role="alert" id="aviso-sintetico">
+          <strong>Conjunto de dados sintético.</strong> As justificativas usadas no treino e no teste foram escritas para o
+          desenvolvimento, não coletadas de pessoas reais. Os números abaixo tendem a ser otimistas e precisam ser
+          refeitos com justificativas reais anonimizadas e revisadas por profissionais antes de valerem como resultado.
+        </div>
+        <div class="alert alert-danger d-none" role="alert" id="aviso-sem-modelo">
+          Nenhum modelo treinado foi encontrado. O sistema está usando a linha de base por palavras-chave.
+          Rode <code>python manage.py treinar_classificador</code> para treinar e avaliar.
         </div>
 
-        <!-- KPIs de IA -->
-        <div class="row g-3 mb-4">
-          <div class="col-md-3">
-            <div class="cartao indicador">
-              <div>
-                <p class="indicador__rotulo">Acurácia Global</p>
-                <p class="indicador__valor text-primary" id="kpi-acuracia">84,1%</p>
-              </div>
-              <span class="indicador__icone tom-azul"><i class="bi bi-bullseye"></i></span>
+        <section class="indicadores" id="kpis" aria-label="Indicadores do modelo"></section>
+
+        <div class="avaliacao">
+          <section class="cartao" aria-labelledby="t-categorias">
+            <div class="cartao__cabecalho">
+              <h2 class="cartao__titulo" id="t-categorias">Desempenho por categoria</h2>
             </div>
-          </div>
-          <div class="col-md-3">
-            <div class="cartao indicador">
-              <div>
-                <p class="indicador__rotulo">Exemplos Avaliados</p>
-                <p class="indicador__valor" id="kpi-exemplos">277</p>
-              </div>
-              <span class="indicador__icone tom-cinza"><i class="bi bi-journal-text"></i></span>
+            <p class="cartao__subtitulo" id="sub-categorias"></p>
+            <div class="table-responsive" tabindex="0" role="region" aria-labelledby="t-categorias">
+              <table class="tabela-solicitacoes">
+                <thead>
+                  <tr>
+                    <th scope="col">Categoria</th>
+                    <th scope="col" class="text-end">Acertos</th>
+                    <th scope="col" class="text-end">Erros</th>
+                    <th scope="col" class="text-end">Precisão</th>
+                    <th scope="col" class="text-end">Revocação</th>
+                    <th scope="col" class="text-end">F1</th>
+                  </tr>
+                </thead>
+                <tbody id="corpo-categorias"></tbody>
+                <tfoot id="rodape-categorias"></tfoot>
+              </table>
             </div>
-          </div>
-          <div class="col-md-3">
-            <div class="cartao indicador">
-              <div>
-                <p class="indicador__rotulo">Média Confiança IA</p>
-                <p class="indicador__valor text-success" id="kpi-confianca">89,8%</p>
-              </div>
-              <span class="indicador__icone tom-verde"><i class="bi bi-stars"></i></span>
+          </section>
+
+          <section class="cartao" aria-labelledby="t-sobre">
+            <div class="cartao__cabecalho"><h2 class="cartao__titulo" id="t-sobre">Sobre o classificador</h2></div>
+            <div class="cartao__corpo">
+              <ul class="lista-sobre">
+                <li>Recebe <strong>apenas o texto da justificativa</strong> — sem nome, CPF ou matrícula (minimização de dados, RNF-06).</li>
+                <li>A classificação é apenas uma <strong>sugestão de apoio</strong>; a decisão final é sempre humana (RNF-14/15).</li>
+                <li>O modelo não aprova, rejeita, bloqueia ou acusa fraude (RF-25).</li>
+                <li>O técnico de segurança pode confirmar ou alterar a categoria sugerida; as duas ficam registradas (RF-24).</li>
+              </ul>
+              <dl class="dados mt-3" id="ficha-modelo"></dl>
             </div>
-          </div>
-          <div class="col-md-3">
-            <div class="cartao indicador">
-              <div>
-                <p class="indicador__rotulo">Aderência Decisão Humana</p>
-                <p class="indicador__valor text-indigo" id="kpi-aderencia">66,7%</p>
-              </div>
-              <span class="indicador__icone tom-indigo"><i class="bi bi-person-check"></i></span>
-            </div>
-          </div>
+          </section>
         </div>
 
-        <div class="row g-4">
-          <!-- Coluna 1: Matriz de Confusão -->
-          <div class="col-lg-7">
-            <section class="cartao">
-              <div class="cartao__cabecalho">
-                <h2 class="cartao__titulo">Matriz de confusão (resumo por categoria)</h2>
-                <span class="text-muted small">Classificações corretas e incorretas do conjunto de validação</span>
-              </div>
-              <div class="table-responsive">
-                <table class="tabela-solicitacoes">
-                  <thead>
-                    <tr>
-                      <th scope="col">CATEGORIA</th>
-                      <th scope="col" class="text-end">ACERTOS</th>
-                      <th scope="col" class="text-end">ERROS</th>
-                      <th scope="col" class="text-end">PRECISÃO</th>
-                    </tr>
-                  </thead>
-                  <tbody id="tabela-matriz-corpo">
-                    <tr><td colspan="4" class="text-center py-4 text-muted">Carregando métricas...</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </section>
+        <section class="cartao mt-4" aria-labelledby="t-matriz">
+          <div class="cartao__cabecalho"><h2 class="cartao__titulo" id="t-matriz">Matriz de confusão</h2></div>
+          <p class="cartao__subtitulo">Linhas: categoria correta. Colunas: categoria sugerida pelo modelo. A diagonal são os acertos.</p>
+          <div class="table-responsive" tabindex="0" role="region" aria-labelledby="t-matriz">
+            <table class="matriz" id="matriz"></table>
           </div>
+        </section>
 
-          <!-- Coluna 2: Regras Éticas e Feedbacks -->
-          <div class="col-lg-5">
-            <section class="cartao mb-4">
-              <div class="cartao__cabecalho">
-                <h2 class="cartao__titulo">Sobre o classificador</h2>
-              </div>
-              <div class="cartao__corpo p-3 small text-secondary">
-                <ul class="list-unstyled d-flex flex-column gap-2 mb-3">
-                  <li><i class="bi bi-shield-check text-primary me-2"></i> <strong>Minimização de dados (RNF-06):</strong> O modelo recebe estritamente o texto da justificativa, sem CPF, matrícula ou nome.</li>
-                  <li><i class="bi bi-person-gear text-primary me-2"></i> <strong>Apoio à decisão humana (RF-25):</strong> A sugestão da IA nunca aprova, rejeita ou bloqueia o fornecimento de forma autônoma.</li>
-                  <li><i class="bi bi-hand-thumbs-up text-primary me-2"></i> <strong>Correção pelo técnico (RF-24):</strong> O técnico de segurança pode confirmar ou reclassificar qualquer parecer da IA.</li>
-                </ul>
-                <div class="p-2 bg-light rounded text-muted">
-                  <small>Métricas calculadas sobre conjunto de justificativas rotuladas para validação do TCC.</small>
-                </div>
-              </div>
-            </section>
+        <div class="avaliacao mt-4">
+          <section class="cartao" aria-labelledby="t-comparacao">
+            <div class="cartao__cabecalho"><h2 class="cartao__titulo" id="t-comparacao">Comparações</h2></div>
+            <div class="table-responsive" tabindex="0" role="region" aria-labelledby="t-comparacao">
+              <table class="tabela-solicitacoes">
+                <thead><tr><th scope="col">Abordagem</th><th scope="col" class="text-end">Acurácia</th><th scope="col" class="text-end">F1 macro</th></tr></thead>
+                <tbody id="corpo-comparacao"></tbody>
+              </table>
+            </div>
+            <p class="tabela-nota" id="nota-comparacao"></p>
+          </section>
 
-            <section class="cartao">
-              <div class="cartao__cabecalho">
-                <h2 class="cartao__titulo">Auditoria de supervisão humana</h2>
-              </div>
-              <div class="cartao__corpo p-0">
-                <ul class="list-group list-group-flush small" id="lista-feedbacks-ia">
-                  <!-- Gerado dinamicamente -->
-                </ul>
-              </div>
-            </section>
-          </div>
+          <section class="cartao" aria-labelledby="t-uso">
+            <div class="cartao__cabecalho"><h2 class="cartao__titulo" id="t-uso">Supervisão humana em uso</h2></div>
+            <div class="cartao__corpo">
+              <p id="resumo-uso" class="mb-3"></p>
+              <ul class="lista-solicitacoes" id="lista-reclassificacoes"></ul>
+            </div>
+          </section>
         </div>
       </main>
     </div>
@@ -134,60 +107,10 @@
   </div>
 
   <script src="../static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
-  <script src="../static/js/dados-demo.js"></script>
+  <script src="../static/js/menu.js"></script>
+  <script src="../static/js/api.js"></script>
   <script src="../static/js/sessao.js"></script>
   <script src="../static/js/backoffice.js"></script>
-  <script>
-    (function() {
-      fetch("/api/avaliacao-ia/")
-        .then(function(r) { return r.json(); })
-        .then(function(dados) {
-          document.getElementById("kpi-acuracia").textContent = dados.acuracia_global + "%";
-          document.getElementById("kpi-exemplos").textContent = dados.total_exemplos;
-          document.getElementById("kpi-confianca").textContent = dados.media_confianca.toFixed(1) + "%";
-          document.getElementById("kpi-aderencia").textContent = dados.aderencia_humana.toFixed(1) + "%";
-
-          var corpo = document.getElementById("tabela-matriz-corpo");
-          var matriz = dados.matriz_confusao || [];
-          var linhasHtml = matriz.map(function(m) {
-            return '<tr>' +
-              '<td><strong>' + m.categoria + '</strong></td>' +
-              '<td class="text-end text-success fw-semibold">' + m.acertos + '</td>' +
-              '<td class="text-end text-danger">' + m.erros + '</td>' +
-              '<td class="text-end fw-bold">' + m.precisao.toFixed(0) + '%</td>' +
-            '</tr>';
-          }).join("");
-
-          linhasHtml += '<tr class="table-light fw-bold">' +
-            '<td>Total</td>' +
-            '<td class="text-end text-success">' + dados.total_acertos + '</td>' +
-            '<td class="text-end text-danger">' + dados.total_erros + '</td>' +
-            '<td class="text-end text-primary">' + dados.acuracia_global + '%</td>' +
-          '</tr>';
-
-          corpo.innerHTML = linhasHtml;
-
-          // Feedbacks
-          var feedbacks = dados.feedbacks_recentes || [];
-          var listaFb = document.getElementById("lista-feedbacks-ia");
-          if (feedbacks.length === 0) {
-            listaFb.innerHTML = '<li class="list-group-item text-muted">Nenhum feedback registrado.</li>';
-          } else {
-            listaFb.innerHTML = feedbacks.map(function(fb) {
-              var badgeClass = fb.classificacao.indexOf("CONCORDANCIA") !== -1 ? "bg-success-subtle text-success" : "bg-warning-subtle text-warning-emphasis";
-              return '<li class="list-group-item p-3">' +
-                '<div class="d-flex justify-content-between align-items-center mb-1">' +
-                  '<strong class="numero">' + fb.codigo_solicitacao + '</strong>' +
-                  '<span class="badge ' + badgeClass + '">' + fb.classificacao + ' (Nota ' + fb.nota + '/5)</span>' +
-                '</div>' +
-                '<p class="mb-1 text-secondary">“' + fb.feedback + '”</p>' +
-                '<small class="text-muted">' + fb.avaliador + ' · ' + fb.data + '</small>' +
-              '</li>';
-            }).join("");
-          }
-        });
-    })();
-  </script>
+  <script src="../static/js/avaliacao-ia.js"></script>
 </body>
 </html>
-

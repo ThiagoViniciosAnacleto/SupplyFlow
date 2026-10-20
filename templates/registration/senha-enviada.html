@@ -1,0 +1,11 @@
+{% extends "registration/base-acesso.html" %}
+{% block titulo %}Verifique seu e-mail{% endblock %}
+{% block conteudo %}
+<h2>Verifique seu e-mail</h2>
+<p class="login__instrucao" role="status">
+  Se o e-mail informado estiver cadastrado, você receberá em instantes um link para criar a nova senha.
+  O link vale por 1 hora.
+</p>
+<p class="login__nota">Não chegou? Confira a caixa de spam ou peça ao administrador para reenviar.</p>
+<a class="btn btn-primary w-100 login__entrar" href="/">Voltar para o login</a>
+{% endblock %}

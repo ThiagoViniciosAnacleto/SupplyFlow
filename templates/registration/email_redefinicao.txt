@@ -1,0 +1,11 @@
+{% autoescape off %}Olá, {{ user.first_name|default:user.email }}.
+
+Recebemos um pedido para criar ou redefinir a sua senha do backoffice do SupplyFlow.
+Para escolher a senha, abra o link abaixo (ele vale por 1 hora e só pode ser usado uma vez):
+
+{{ protocol }}://{{ domain }}{% url 'password_reset_confirm' uidb64=uid token=token %}
+
+Se você não fez este pedido, ignore este e-mail: sua senha continua a mesma.
+
+— SupplyFlow
+{% endautoescape %}

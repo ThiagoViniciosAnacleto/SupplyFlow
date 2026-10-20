@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Histórico · SupplyFlow</title>
+  <link rel="icon" href="../static/img/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../static/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="../static/vendor/bootstrap-icons/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="../static/css/supplyflow.css">
+</head>
+<body data-pagina="historico">
+  <div class="app">
+
+    <div class="sidebar-trilho">
+      <aside class="sidebar offcanvas-lg offcanvas-start" tabindex="-1" id="sidebar" aria-label="Menu"></aside>
+    </div>
+
+    <div class="app__principal">
+      <header class="topbar" id="topbar"></header>
+
+      <main class="conteudo">
+        <h1 class="pagina-titulo">Histórico</h1>
+        <p class="pagina-descricao">Entregas, devoluções, entradas de estoque e solicitações, com filtros e exportação (RF-44, RF-45, RF-47, RF-49).</p>
+
+        <form class="cartao filtros" id="form-filtros" aria-label="Filtros do histórico">
+          <div>
+            <label for="f-tipo" class="form-label">Tipo</label>
+            <select id="f-tipo" class="form-select"><option value="">Movimentações (entrega, devolução, entrada)</option></select>
+          </div>
+          <div>
+            <label for="f-de" class="form-label">De</label>
+            <input type="date" id="f-de" class="form-control">
+          </div>
+          <div>
+            <label for="f-ate" class="form-label">Até</label>
+            <input type="date" id="f-ate" class="form-control">
+          </div>
+          <div>
+            <label for="f-funcionario" class="form-label">Funcionário ou matrícula</label>
+            <input type="search" id="f-funcionario" class="form-control">
+          </div>
+          <div>
+            <label for="f-setor" class="form-label">Setor / centro de custo</label>
+            <select id="f-setor" class="form-select"><option value="">Todos</option></select>
+          </div>
+          <div>
+            <label for="f-produto" class="form-label">Produto</label>
+            <select id="f-produto" class="form-select"><option value="">Todos</option></select>
+          </div>
+          <div>
+            <label for="f-status" class="form-label">Status da solicitação</label>
+            <select id="f-status" class="form-select"><option value="">Todos</option></select>
+          </div>
+          <div>
+            <label for="f-responsavel" class="form-label">Responsável</label>
+            <input type="search" id="f-responsavel" class="form-control">
+          </div>
+          <div class="filtros__acoes">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-funnel" aria-hidden="true"></i> Filtrar</button>
+            <a class="btn btn-outline-secondary" id="btn-csv" href="#"><i class="bi bi-download" aria-hidden="true"></i> Exportar CSV</a>
+          </div>
+        </form>
+
+        <section class="cartao mt-3" aria-labelledby="t-historico">
+          <div class="cartao__cabecalho">
+            <h2 class="cartao__titulo" id="t-historico">Registros</h2>
+            <span class="cartao__meta" id="meta-historico" aria-live="polite"></span>
+          </div>
+          <div class="table-responsive" tabindex="0" role="region" aria-labelledby="t-historico">
+            <table class="tabela-solicitacoes">
+              <thead>
+                <tr>
+                  <th scope="col">Data</th>
+                  <th scope="col">Tipo</th>
+                  <th scope="col">Funcionário</th>
+                  <th scope="col">Centro de custo</th>
+                  <th scope="col">Produto</th>
+                  <th scope="col">Qtd.</th>
+                  <th scope="col">CA / Lote</th>
+                  <th scope="col">Responsável</th>
+                  <th scope="col">Detalhe</th>
+                </tr>
+              </thead>
+              <tbody id="corpo-historico"><tr><td colspan="9" class="tabela-solicitacoes__vazio">Carregando…</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+  </div>
+
+  <script src="../static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+  <script src="../static/js/menu.js"></script>
+  <script src="../static/js/api.js"></script>
+  <script src="../static/js/sessao.js"></script>
+  <script src="../static/js/backoffice.js"></script>
+  <script src="../static/js/historico.js"></script>
+</body>
+</html>

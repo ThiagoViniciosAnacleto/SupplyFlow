@@ -1,89 +1,53 @@
 /* =====================================================================
-   SupplyFlow — tela de login integrada com API Django (/api/usuarios/)
-   Carrega os usuários cadastrados no banco PostgreSQL e autentica na sessão.
+   SupplyFlow — tela de login
+   Envia e-mail + senha para /api/login/. O servidor confere a senha,
+   abre a sessão e devolve os dados de exibição do usuário.
    ===================================================================== */
 
 (function () {
-  var lista = document.getElementById("lista-usuarios");
   var formulario = document.getElementById("form-login");
-  var usuariosCarregados = [];
+  var campoEmail = document.getElementById("email");
+  var campoSenha = document.getElementById("senha");
+  var caixaErro = document.getElementById("login-erro");
+  var botao = document.getElementById("btn-entrar");
 
-  function renderizarUsuarios(usuarios) {
-    if (!lista) return;
-    lista.innerHTML = "";
-
-    usuarios.forEach(function (usuario, index) {
-      var rotulo = document.createElement("label");
-      rotulo.className = "usuario";
-
-      var iniciais = usuario.iniciais || "SF";
-      rotulo.innerHTML =
-        '<span class="usuario__avatar" aria-hidden="true">' + iniciais + "</span>" +
-        '<span class="usuario__texto">' +
-          '<span class="usuario__nome">' + usuario.nome + "</span>" +
-          '<span class="usuario__detalhe">' + usuario.perfil + " · Matrícula " + usuario.matricula + "</span>" +
-        "</span>";
-
-      var radio = document.createElement("input");
-      radio.type = "radio";
-      radio.name = "usuario";
-      radio.value = usuario.id;
-      radio.className = "form-check-input";
-      // Seleciona o administrador como padrão se houver, ou o primeiro
-      radio.checked = (usuario.perfil_codigo === "ADMIN" || usuario.perfil === "Administrador") || index === 0;
-      radio.setAttribute("aria-label", usuario.nome + ", " + usuario.perfil);
-
-      rotulo.appendChild(radio);
-      lista.appendChild(rotulo);
-    });
+  function mostrarErro(mensagem) {
+    caixaErro.textContent = mensagem;
+    caixaErro.classList.remove("d-none");
+    campoSenha.setAttribute("aria-invalid", "true");
+    campoSenha.value = "";
+    campoSenha.focus();
   }
 
-  // 1. Busca os usuários reais do PostgreSQL
-  fetch("/api/usuarios/")
-    .then(function (resposta) {
-      if (!resposta.ok) throw new Error("Erro HTTP " + resposta.status);
-      return resposta.json();
-    })
-    .then(function (dados) {
-      usuariosCarregados = dados.usuarios || [];
-      if (usuariosCarregados.length > 0) {
-        window.SF = window.SF || {};
-        SF.usuarios = usuariosCarregados;
-        renderizarUsuarios(usuariosCarregados);
-      } else if (window.SF && SF.usuarios) {
-        renderizarUsuarios(SF.usuarios);
-      }
-    })
-    .catch(function (erro) {
-      console.warn("Aviso: carregando usuários de contingência:", erro);
-      if (window.SF && SF.usuarios) {
-        renderizarUsuarios(SF.usuarios);
-      }
-    });
-
-  // 2. Entrar: armazena na sessão o usuário escolhido e navega para o backoffice
-  if (formulario) {
-    formulario.addEventListener("submit", function (evento) {
-      evento.preventDefault();
-
-      var selecionado = formulario.querySelector('input[name="usuario"]:checked');
-      var usuarioFinal = null;
-
-      if (selecionado && usuariosCarregados.length > 0) {
-        usuarioFinal = usuariosCarregados.find(function (u) {
-          return String(u.id) === String(selecionado.value);
-        });
-      }
-
-      if (!usuarioFinal && window.SF && SF.usuarios) {
-        usuarioFinal = SF.usuarios[0];
-      }
-
-      if (usuarioFinal) {
-        SF.sessao.iniciar(usuarioFinal);
-      }
-
-      window.location.href = "backoffice/visao-geral.html";
-    });
+  /* Só aceita voltar para páginas do próprio sistema (evita redirecionar para outro site) */
+  function destinoSeguro() {
+    var proximo = new URLSearchParams(window.location.search).get("proximo") || "";
+    return /^\/backoffice\/[a-z0-9-]+\.html(\?[^#]*)?$/i.test(proximo) ? proximo : "/backoffice/visao-geral.html";
   }
+
+  formulario.addEventListener("submit", function (evento) {
+    evento.preventDefault();
+    caixaErro.classList.add("d-none");
+    campoSenha.removeAttribute("aria-invalid");
+
+    var email = campoEmail.value.trim();
+    var senha = campoSenha.value;
+    if (!email || !senha) {
+      mostrarErro("Informe e-mail e senha.");
+      return;
+    }
+
+    botao.disabled = true;
+    SF.api.post("/api/login/", { email: email, senha: senha }, { semRedirecionar: true })
+      .then(function (resposta) {
+        SF.sessao.iniciar(resposta.usuario);
+        window.location.href = destinoSeguro();
+      })
+      .catch(function (erro) {
+        mostrarErro(erro.message);
+      })
+      .finally(function () {
+        botao.disabled = false;
+      });
+  });
 })();
