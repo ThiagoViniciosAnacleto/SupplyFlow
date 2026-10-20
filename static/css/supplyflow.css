@@ -772,3 +772,27 @@
 .matriz__acerto { background: rgba(4, 120, 87, var(--intensidade)); }
 .matriz__erro { background: rgba(220, 38, 38, var(--intensidade)); }
 .matriz__forte { color: #fff; }
+
+/* =====================================================================
+   FILTROS, HISTÓRICO, RELATÓRIOS E FICHA
+   ===================================================================== */
+.filtros {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  align-items: end;
+  padding: 16px;
+}
+.filtros .form-label { margin-bottom: 4px; font-size: 13px; font-weight: 600; }
+.filtros__acoes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.filtros--compacto { grid-template-columns: repeat(auto-fit, minmax(160px, 220px)); }
+.dados--linha { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.dados--linha > div { flex-direction: column; gap: 2px; }
+.dados--linha dd { text-align: left; }
+
+@media print {
+  .sidebar-trilho, .topbar, .nao-imprimir { display: none !important; }
+  .conteudo { padding: 0; }
+  .cartao { border-color: #999; break-inside: avoid; }
+  body { background: #fff; }
+}

@@ -119,6 +119,7 @@ def detalhe(s):
         "justificativa": s.justificativa_solicitante,
         "valor_total_estimado": float(s.valor_total_estimado),
         "solicitante": {
+            "id": str(colaborador.id),
             "nome": colaborador.nome,
             "matricula": colaborador.codigo_matricula,
             "cargo": colaborador.cargo or None,

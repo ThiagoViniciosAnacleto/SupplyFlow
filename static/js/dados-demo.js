@@ -44,8 +44,8 @@ SF.menu = [
       { rotulo: "Solicitações", pagina: "solicitacoes" }, { rotulo: "Entregas", pagina: "entregas" }, { rotulo: "Devoluções", pagina: "devolucoes" }
   ]},
   { grupo: "Gestão", icone: "bi-bar-chart-line", itens: [
-      { rotulo: "Políticas de fornecimento", pagina: "politicas" }, { rotulo: "Histórico" },
-      { rotulo: "Relatórios" }, { rotulo: "Avaliação do modelo (IA)", pagina: "avaliacao-ia" }
+      { rotulo: "Políticas de fornecimento", pagina: "politicas" }, { rotulo: "Histórico", pagina: "historico" },
+      { rotulo: "Relatórios", pagina: "relatorios" }, { rotulo: "Avaliação do modelo (IA)", pagina: "avaliacao-ia" }
   ]},
   { grupo: "Governança", icone: "bi-shield-check", itens: [
       { rotulo: "Auditoria", pagina: "auditoria", acao: "auditoria" },

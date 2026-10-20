@@ -8,3 +8,4 @@ from .ia import *  # noqa: F401,F403
 from .entregas import *  # noqa: F401,F403
 from .autenticacao import *  # noqa: F401,F403
 from .auditoria import *  # noqa: F401,F403
+from .relatorios import *  # noqa: F401,F403

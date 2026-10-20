@@ -35,6 +35,9 @@ urlpatterns = [
     path("backoffice/usuarios.html", views.pagina_usuarios, name="usuarios"),
     path("backoffice/fornecedores.html", views.pagina_fornecedores, name="fornecedores"),
     path("backoffice/politicas.html", views.pagina_politicas, name="politicas"),
+    path("backoffice/historico.html", views.pagina_historico, name="historico"),
+    path("backoffice/relatorios.html", views.pagina_relatorios, name="relatorios"),
+    path("backoffice/ficha-epi.html", views.pagina_ficha_epi, name="ficha_epi"),
     path("backoffice/auditoria.html", views.pagina_auditoria, name="auditoria"),
     path("backoffice/em-construcao.html", views.pagina_em_construcao, name="em_construcao"),
 
@@ -119,4 +122,7 @@ urlpatterns = [
     path("api/devolucoes/", views.api_listar_devolucoes, name="api_devolucoes"),
     path("api/devolucoes/<uuid:solicitacao_id>/registrar/", views.api_registrar_devolucao, name="api_registrar_devolucao"),
     path("api/auditoria/", views.api_listar_auditoria, name="api_auditoria"),
+    path("api/historico/", views.api_historico, name="api_historico"),
+    path("api/relatorios/", views.api_relatorios, name="api_relatorios"),
+    path("api/funcionarios/<uuid:funcionario_id>/ficha/", views.api_ficha_epi, name="api_ficha_epi"),
 ]

@@ -54,6 +54,8 @@
       ["Centro de custo", f.setor ? f.setor + (f.centro_custo ? " (" + f.centro_custo + ")" : "") : null]
     ]);
 
+    el("link-ficha").href = "ficha-epi.html?id=" + encodeURIComponent(f.id);
+
     var p = s.produto;
     el("det-prod-nome").textContent = p.nome || "—";
     el("det-prod-tipo").textContent = p.tipo || "";

@@ -59,35 +59,38 @@
       return;
     }
 
+    var esc = SF.escapar;
     tabelaCorpo.innerHTML = lista.map(function (u) {
       var badgeStatus = u.ativo
         ? '<span class="badge bg-success-subtle text-success border border-success-subtle">Ativo</span>'
         : '<span class="badge bg-danger-subtle text-danger border border-danger-subtle">Inativo</span>';
 
-      var badgePerfil = '<span class="badge bg-light text-dark border">' + u.perfil + '</span>';
+      var badgePerfil = '<span class="badge bg-light text-dark border">' + esc(u.perfil) + '</span>';
 
       return (
         '<tr>' +
           '<td>' +
             '<div class="d-flex align-items-center gap-2">' +
-              '<span class="usuario__avatar" style="width:34px;height:34px;font-size:12px;">' + u.iniciais + '</span>' +
+              '<span class="usuario__avatar" style="width:34px;height:34px;font-size:12px;" aria-hidden="true">' + esc(u.iniciais) + '</span>' +
               '<div>' +
-                '<div class="fw-semibold">' + u.nome + '</div>' +
-                '<small class="text-muted">' + u.email + '</small>' +
+                '<div class="fw-semibold">' + esc(u.nome) + '</div>' +
+                '<small class="text-muted">' + esc(u.email) + '</small>' +
               '</div>' +
             '</div>' +
           '</td>' +
-          '<td><span class="numero">' + u.matricula + '</span></td>' +
-          '<td>' + u.cargo + '</td>' +
-          '<td>' + u.setor_nome + '</td>' +
+          '<td><span class="numero">' + esc(u.matricula) + '</span></td>' +
+          '<td>' + esc(u.cargo) + '</td>' +
+          '<td>' + esc(u.setor_nome) + '</td>' +
           '<td>' + badgePerfil + '</td>' +
           '<td>' + badgeStatus + '</td>' +
-          '<td class="text-end">' +
-            '<button type="button" class="btn btn-sm btn-outline-secondary me-1 btn-editar" data-id="' + u.id + '" title="Editar">' +
-              '<i class="bi bi-pencil"></i>' +
-            '</button>' +
-            '<button type="button" class="btn btn-sm btn-outline-' + (u.ativo ? 'danger' : 'success') + ' btn-toggle" data-id="' + u.id + '" title="' + (u.ativo ? 'Inativar' : 'Ativar') + '">' +
-              '<i class="bi bi-' + (u.ativo ? 'slash-circle' : 'check-circle') + '"></i>' +
+          '<td class="text-end text-nowrap">' +
+            '<a class="btn btn-sm btn-outline-primary me-1" href="ficha-epi.html?id=' + encodeURIComponent(u.id) + '"' +
+              ' aria-label="Ficha de EPI de ' + esc(u.nome) + '" title="Ficha de EPI"><i class="bi bi-card-checklist" aria-hidden="true"></i></a>' +
+            '<button type="button" class="btn btn-sm btn-outline-secondary me-1 btn-editar" data-id="' + esc(u.id) + '"' +
+              ' aria-label="Editar ' + esc(u.nome) + '" title="Editar"><i class="bi bi-pencil" aria-hidden="true"></i></button>' +
+            '<button type="button" class="btn btn-sm btn-outline-' + (u.ativo ? 'danger' : 'success') + ' btn-toggle" data-id="' + esc(u.id) + '"' +
+              ' aria-label="' + (u.ativo ? 'Inativar ' : 'Ativar ') + esc(u.nome) + '" title="' + (u.ativo ? 'Inativar' : 'Ativar') + '">' +
+              '<i class="bi bi-' + (u.ativo ? 'slash-circle' : 'check-circle') + '" aria-hidden="true"></i>' +
             '</button>' +
           '</td>' +
         '</tr>'

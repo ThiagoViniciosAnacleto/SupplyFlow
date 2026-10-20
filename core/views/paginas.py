@@ -100,3 +100,18 @@ def pagina_fornecedores(request):
 @pagina_backoffice("ver")
 def pagina_politicas(request):
     return render(request, "politicas.html")
+
+
+@pagina_backoffice("ver")
+def pagina_historico(request):
+    return render(request, "historico.html")
+
+
+@pagina_backoffice("ver")
+def pagina_relatorios(request):
+    return render(request, "relatorios.html")
+
+
+@pagina_backoffice("ver")
+def pagina_ficha_epi(request):
+    return render(request, "ficha-epi.html")
