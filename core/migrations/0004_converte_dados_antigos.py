@@ -81,6 +81,26 @@ def _atualizar_enums_postgres(schema_editor):
             for valor in valores:
                 cursor.execute(f"ALTER TYPE {tipo_enum} ADD VALUE IF NOT EXISTS '{valor}'")
 
+        # Remove restrições CHECK legadas (ex.: decisoes_solicitacao_decisao_final_check)
+        # criadas pelo script SQL original antes das migrações do Django.
+        tabelas = [t for t, _, _ in ENUMS_LEGADOS] + ["avaliacoes_modelo_ia"]
+        cursor.execute(
+            """
+            SELECT c.relname, con.conname
+            FROM pg_constraint con
+            JOIN pg_class c ON c.oid = con.conrelid
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = current_schema()
+              AND con.contype = 'c'
+              AND c.relname = ANY(%s)
+            """,
+            [tabelas],
+        )
+        for tabela, restricao in cursor.fetchall():
+            tabela_q = schema_editor.quote_name(tabela)
+            restricao_q = schema_editor.quote_name(restricao)
+            cursor.execute(f"ALTER TABLE {tabela_q} DROP CONSTRAINT IF EXISTS {restricao_q}")
+
 
 def converter(apps, schema_editor):
     _atualizar_enums_postgres(schema_editor)
