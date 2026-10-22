@@ -5,17 +5,15 @@ Ordem de tentativa:
 2. RESEND_API_KEY -> envia via HTTPS (porta 443) na API do Resend (funciona no Render Free).
 3. EMAIL_HOST     -> tenta SMTP com timeout curto (5 s); se a rede bloquear a porta 587/465,
                      imprime o e-mail (e o link de senha) nos logs do servidor sem derrubar a requisição.
-4. Sem configuração -> imprime o e-mail nos logs/terminal (ConsoleEmailBackend).
+4. Sem configuração -> imprime o e-mail nos logs/terminal.
 """
 import json
-import sys
 import urllib.error
 import urllib.request
 from email.utils import parseaddr
 
 from django.conf import settings
 from django.core.mail.backends.base import BaseEmailBackend
-from django.core.mail.backends.console import EmailBackend as ConsoleEmailBackend
 from django.core.mail.backends.smtp import EmailBackend as SmtpEmailBackend
 
 
@@ -41,6 +39,7 @@ def _enviar_brevo(mensagem, chave_api):
             "accept": "application/json",
             "content-type": "application/json",
             "api-key": chave_api,
+            "User-Agent": "SupplyFlow/1.0",
         },
         method="POST",
     )
@@ -69,6 +68,15 @@ def _enviar_resend(mensagem, chave_api):
         return 200 <= resp.status < 300
 
 
+def _imprimir_no_log(mensagem, motivo=""):
+    cabecalho = f"[SupplyFlow E-mail] {motivo}" if motivo else "[SupplyFlow E-mail]"
+    print(cabecalho, flush=True)
+    print(f"Para: {', '.join(mensagem.to)}", flush=True)
+    print(f"Assunto: {mensagem.subject}", flush=True)
+    print(mensagem.body, flush=True)
+    print("-" * 79, flush=True)
+
+
 class BackendEmailResiliente(BaseEmailBackend):
     def send_messages(self, email_messages):
         if not email_messages:
@@ -82,10 +90,14 @@ class BackendEmailResiliente(BaseEmailBackend):
             for msg in email_messages:
                 try:
                     if _enviar_brevo(msg, brevo_key):
+                        print(f"[SupplyFlow E-mail] E-mail enviado com sucesso via Brevo para {msg.to}", flush=True)
                         enviados += 1
+                except urllib.error.HTTPError as exc:
+                    detalhe = exc.read().decode("utf-8", errors="ignore")
+                    _imprimir_no_log(msg, f"Falha na API Brevo (HTTP {exc.code}: {detalhe}). Exibindo link limpo no log:")
+                    enviados += 1
                 except Exception as exc:
-                    print(f"[SupplyFlow E-mail] Falha na API Brevo ({exc}); exibindo no log:", file=sys.stderr)
-                    ConsoleEmailBackend(stream=sys.stdout).send_messages([msg])
+                    _imprimir_no_log(msg, f"Falha na API Brevo ({exc}). Exibindo link limpo no log:")
                     enviados += 1
             return enviados
 
@@ -94,10 +106,14 @@ class BackendEmailResiliente(BaseEmailBackend):
             for msg in email_messages:
                 try:
                     if _enviar_resend(msg, resend_key):
+                        print(f"[SupplyFlow E-mail] E-mail enviado com sucesso via Resend para {msg.to}", flush=True)
                         enviados += 1
+                except urllib.error.HTTPError as exc:
+                    detalhe = exc.read().decode("utf-8", errors="ignore")
+                    _imprimir_no_log(msg, f"Falha na API Resend (HTTP {exc.code}: {detalhe}). Exibindo link limpo no log:")
+                    enviados += 1
                 except Exception as exc:
-                    print(f"[SupplyFlow E-mail] Falha na API Resend ({exc}); exibindo no log:", file=sys.stderr)
-                    ConsoleEmailBackend(stream=sys.stdout).send_messages([msg])
+                    _imprimir_no_log(msg, f"Falha na API Resend ({exc}). Exibindo link limpo no log:")
                     enviados += 1
             return enviados
 
@@ -114,13 +130,13 @@ class BackendEmailResiliente(BaseEmailBackend):
                 )
                 return smtp.send_messages(email_messages)
             except Exception as exc:
-                print(
-                    f"[SupplyFlow E-mail] Porta SMTP bloqueada ou inacessível ({exc}). "
-                    "Exibindo o e-mail e o link de redefinição diretamente no log:",
-                    file=sys.stderr,
-                )
-                ConsoleEmailBackend(stream=sys.stdout).send_messages(email_messages)
+                for msg in email_messages:
+                    _imprimir_no_log(
+                        msg,
+                        f"Porta SMTP bloqueada ou inacessível ({exc}). Exibindo link limpo diretamente no log:",
+                    )
                 return len(email_messages)
 
-        return ConsoleEmailBackend(stream=sys.stdout).send_messages(email_messages)
-
+        for msg in email_messages:
+            _imprimir_no_log(msg, "Sem servidor de e-mail configurado. Exibindo link limpo no log:")
+        return len(email_messages)
