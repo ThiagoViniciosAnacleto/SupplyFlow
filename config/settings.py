@@ -149,15 +149,16 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # ---------------------------------------------------------------------------
 # E-mail (usado pelo "Esqueci minha senha")
 # ---------------------------------------------------------------------------
-# Sem EMAIL_HOST configurado, o e-mail é apenas impresso no terminal do servidor.
-EMAIL_HOST = os.getenv("EMAIL_HOST", "")
-if EMAIL_HOST:
-    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-    EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
-    EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
-    EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
-    EMAIL_USE_TLS = _bool("EMAIL_USE_TLS", True)
-else:
-    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+# Suporta envio via HTTPS (BREVO_API_KEY ou RESEND_API_KEY, que funcionam no Render Free),
+# via SMTP (EMAIL_HOST, com timeout curto) e fallback automático para o log do servidor.
+EMAIL_BACKEND = "core.correio.BackendEmailResiliente"
+BREVO_API_KEY = os.getenv("BREVO_API_KEY", "").strip()
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "").strip()
+EMAIL_HOST = os.getenv("EMAIL_HOST", "").strip()
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "").strip()
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "").replace(" ", "")
+EMAIL_USE_TLS = _bool("EMAIL_USE_TLS", True)
+EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "5"))
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "SupplyFlow <nao-responda@supplyflow.local>")
 PASSWORD_RESET_TIMEOUT = 60 * 60  # link de redefinição vale 1 hora
