@@ -97,6 +97,7 @@ Por requisito de segurança e privacidade (**RF-08**), **o Administrador nunca d
    - O Django gera um token criptográfico assinado com validade de **1 hora** (`PASSWORD_RESET_TIMEOUT = 3600`) que **se invalida automaticamente assim que a senha é alterada**.
 3. **Ao Salvar a Nova Senha (`RedefinirSenhaView`):**
    - O Django aplica os 4 validadores de força de senha (`MinimumLengthValidator` mín. 8 caracteres, `UserAttributeSimilarityValidator`, `CommonPasswordValidator`, `NumericPasswordValidator`).
+   - E o validador próprio `core.validadores.SenhaDiferenteDaAtual`: a nova senha não pode ser igual à atual (inclusive a senha antiga em MD5 ainda não migrada). Não há histórico de senhas — a comparação é só com o hash atual. No convite de primeiro acesso (conta sem senha) a regra não se aplica.
    - Limpa qualquer `senha_hash` legado e grava o evento `SENHA_DEFINIDA` na trilha de auditoria.
 
 ---

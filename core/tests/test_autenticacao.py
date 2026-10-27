@@ -150,6 +150,36 @@ class EsqueciSenhaTeste(BaseTeste):
         self.assertEqual(self.post("/api/login/", {"email": self.gestor.email, "senha": nova}, Client()).status_code, 200)
         self.assertTrue(RegistroAuditoria.objects.filter(acao="SENHA_DEFINIDA", usuario=self.gestor).exists())
 
+    def _formulario_do_link(self, email):
+        """Pede o link de redefinição e devolve a URL do formulário de nova senha."""
+        mail.outbox.clear()
+        self.client.post("/senha/esqueci/", {"email": email})
+        link = re.search(r"https?://[^/]+(/senha/nova/\S+/)", mail.outbox[-1].body).group(1)
+        return self.client.get(link, follow=True).redirect_chain[-1][0]
+
+    def test_nao_aceita_redefinir_para_a_mesma_senha(self):
+        url = self._formulario_do_link(self.gestor.email)
+        mesma = self.client.post(url, {"new_password1": SENHA, "new_password2": SENHA})
+        self.assertEqual(mesma.status_code, 200)  # volta ao formulário, sem trocar
+        self.assertContains(mesma, "precisa ser diferente da senha atual")
+        nova = "Outra-senha-forte-77"
+        self.assertRedirects(self.client.post(url, {"new_password1": nova, "new_password2": nova}), "/senha/concluida/")
+
+    def test_nao_aceita_repetir_senha_antiga_em_md5(self):
+        legado = Usuario.objects.create(codigo_matricula="L-002", nome="Legado Dois", perfil="GESTOR",
+                                        email="legado2@teste.local",
+                                        senha_hash=hashlib.md5(b"Antiga-forte-2024").hexdigest())
+        url = self._formulario_do_link(legado.email)
+        resposta = self.client.post(url, {"new_password1": "Antiga-forte-2024", "new_password2": "Antiga-forte-2024"})
+        self.assertContains(resposta, "precisa ser diferente da senha atual")
+
+    def test_convite_de_primeiro_acesso_nao_e_bloqueado(self):
+        novo = self.criar_usuario("G-555", "Nova Pessoa", "GESTOR", "nova.pessoa@teste.local", com_senha=False)
+        url = self._formulario_do_link(novo.email)
+        senha = "Primeira-senha-forte-1"
+        self.assertRedirects(self.client.post(url, {"new_password1": senha, "new_password2": senha}),
+                             "/senha/concluida/")
+
     def test_email_desconhecido_nao_revela_nada(self):
         resposta = self.client.post("/senha/esqueci/", {"email": "ninguem@teste.local"})
         self.assertRedirects(resposta, "/senha/enviada/")
