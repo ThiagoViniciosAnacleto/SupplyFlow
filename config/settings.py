@@ -131,6 +131,7 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+    {"NAME": "core.validadores.SenhaDiferenteDaAtual"},  # nova senha não pode repetir a atual
 ]
 
 # Idioma e fuso horário
