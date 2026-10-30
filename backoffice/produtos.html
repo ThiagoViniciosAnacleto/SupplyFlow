@@ -56,7 +56,7 @@
 
         <!-- Tabela de Produtos -->
         <section class="cartao" aria-label="Lista de produtos">
-          <div class="table-responsive">
+          <div class="table-responsive" tabindex="0" role="region" aria-label="Tabela de produtos">
             <table class="tabela-solicitacoes">
               <thead>
                 <tr>
@@ -95,11 +95,11 @@
             <input type="hidden" id="prod-id">
 
             <div class="row g-2 mb-3">
-              <div class="col-5">
+              <div class="col-12 col-sm-5">
                 <label for="prod-sku" class="form-label small fw-semibold">SKU / Código *</label>
                 <input type="text" id="prod-sku" class="form-control text-uppercase" required placeholder="EPI-004">
               </div>
-              <div class="col-7">
+              <div class="col-12 col-sm-7">
                 <label for="prod-categoria" class="form-label small fw-semibold">Categoria *</label>
                 <select id="prod-categoria" class="form-select" required>
                   <option value="">Selecione...</option>
@@ -118,7 +118,7 @@
             </div>
 
             <div class="row g-2 mb-3">
-              <div class="col-4">
+              <div class="col-12 col-sm-4">
                 <label for="prod-unidade" class="form-label small fw-semibold">Unidade</label>
                 <select id="prod-unidade" class="form-select">
                   <option value="UN">UN</option>
@@ -128,11 +128,11 @@
                   <option value="CJ">CJ</option>
                 </select>
               </div>
-              <div class="col-4">
+              <div class="col-6 col-sm-4">
                 <label for="prod-custo" class="form-label small fw-semibold">Custo (R$)</label>
                 <input type="number" step="0.01" id="prod-custo" class="form-control" required placeholder="0.00">
               </div>
-              <div class="col-4">
+              <div class="col-6 col-sm-4">
                 <label for="prod-limite" class="form-label small fw-semibold">Cota Mensal</label>
                 <input type="number" id="prod-limite" class="form-control" min="0" aria-describedby="ajuda-limite">
                 <div class="form-text" id="ajuda-limite">Vazio = sem limite.</div>

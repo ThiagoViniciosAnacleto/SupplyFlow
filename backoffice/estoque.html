@@ -33,39 +33,33 @@
         </div>
 
         <!-- Indicadores Resumo -->
-        <div class="row g-3 mb-4">
-          <div class="col-md-4">
-            <div class="cartao indicador">
-              <div>
-                <p class="indicador__rotulo">Itens Monitorados</p>
-                <p class="indicador__valor" id="res-total-estoque">0</p>
-              </div>
-              <span class="indicador__icone tom-azul" aria-hidden="true"><i class="bi bi-box-seam"></i></span>
+        <section class="indicadores" aria-label="Resumo do estoque">
+          <article class="cartao indicador">
+            <div>
+              <p class="indicador__rotulo">Itens Monitorados</p>
+              <p class="indicador__valor" id="res-total-estoque">0</p>
             </div>
-          </div>
-          <div class="col-md-4">
-            <div class="cartao indicador">
-              <div>
-                <p class="indicador__rotulo">Estoque Baixo (Ponto de Pedido)</p>
-                <p class="indicador__valor" id="res-critico-estoque">0</p>
-              </div>
-              <span class="indicador__icone tom-ambar" aria-hidden="true"><i class="bi bi-exclamation-triangle"></i></span>
+            <span class="indicador__icone tom-azul" aria-hidden="true"><i class="bi bi-box-seam"></i></span>
+          </article>
+          <article class="cartao indicador">
+            <div>
+              <p class="indicador__rotulo">Estoque Baixo (Ponto de Pedido)</p>
+              <p class="indicador__valor" id="res-critico-estoque">0</p>
             </div>
-          </div>
-          <div class="col-md-4">
-            <div class="cartao indicador">
-              <div>
-                <p class="indicador__rotulo">Itens Zerados</p>
-                <p class="indicador__valor" id="res-zerado-estoque">0</p>
-              </div>
-              <span class="indicador__icone tom-vermelho" aria-hidden="true"><i class="bi bi-x-circle"></i></span>
+            <span class="indicador__icone tom-ambar" aria-hidden="true"><i class="bi bi-exclamation-triangle"></i></span>
+          </article>
+          <article class="cartao indicador">
+            <div>
+              <p class="indicador__rotulo">Itens Zerados</p>
+              <p class="indicador__valor" id="res-zerado-estoque">0</p>
             </div>
-          </div>
-        </div>
+            <span class="indicador__icone tom-vermelho" aria-hidden="true"><i class="bi bi-x-circle"></i></span>
+          </article>
+        </section>
 
         <!-- Tabela de Estoque -->
         <section class="cartao" aria-label="Lista de estoque por totem">
-          <div class="table-responsive">
+          <div class="table-responsive" tabindex="0" role="region" aria-label="Tabela de estoque por totem">
             <table class="tabela-solicitacoes">
               <thead>
                 <tr>
