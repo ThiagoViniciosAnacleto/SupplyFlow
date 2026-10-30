@@ -23,12 +23,14 @@ DESCRICAO_MOTIVO = {
     EXIGE_JUSTIFICATIVA: "Produto exige justificativa",
 }
 
+PREFIXO_FUNCIONARIO = "MAT:"
+
 
 @dataclass
 class Regra:
     limite_mensal: int | None
     periodicidade_dias: int | None
-    origem: str  # texto para a tela: "Função: Soldador", "Setor: Manutenção", "Padrão do produto"
+    origem: str  # texto para a tela: "Funcionário: ...", "Função: Soldador", "Setor: Manutenção", "Padrão do produto"
 
 
 @dataclass
@@ -53,22 +55,36 @@ class Avaliacao:
 
 
 def regra_para(colaborador, produto):
-    """Regra mais específica: setor+cargo > cargo > setor > padrão do produto."""
+    """Regra mais específica: funcionário > setor+cargo > cargo > setor > padrão do produto."""
     cargo = (colaborador.cargo or "").strip()
+    marcador_matricula = f"{PREFIXO_FUNCIONARIO}{(colaborador.codigo_matricula or '').strip()}"
+
+    filtro_cargo_ou_func = Q(cargo="") | Q(cargo__iexact=marcador_matricula)
+    if cargo:
+        filtro_cargo_ou_func |= Q(cargo__iexact=cargo)
+
     candidatas = RegraFornecimento.objects.filter(produto=produto, ativo=True).filter(
         Q(setor__isnull=True) | Q(setor_id=colaborador.setor_id)
-    ).filter(Q(cargo="") | Q(cargo__iexact=cargo))
+    ).filter(filtro_cargo_ou_func)
+
     melhor = None
     for r in candidatas:
-        peso = (2 if r.cargo else 0) + (1 if r.setor_id else 0)
+        eh_regra_funcionario = r.cargo.upper() == marcador_matricula.upper()
+        if eh_regra_funcionario:
+            peso = 4 + (1 if r.setor_id else 0)
+        else:
+            peso = (2 if r.cargo else 0) + (1 if r.setor_id else 0)
         if melhor is None or peso > melhor[0]:
-            melhor = (peso, r)
+            melhor = (peso, r, eh_regra_funcionario)
+
     if melhor:
-        r = melhor[1]
+        _, r, eh_regra_funcionario = melhor
         partes = []
         if r.setor_id:
             partes.append(f"Setor: {r.setor.nome}")
-        if r.cargo:
+        if eh_regra_funcionario:
+            partes.append(f"Funcionário: {colaborador.nome} ({colaborador.codigo_matricula})")
+        elif r.cargo:
             partes.append(f"Função: {r.cargo}")
         return Regra(
             limite_mensal=r.limite_mensal if r.limite_mensal is not None else produto.limite_padrao_mensal,
@@ -126,4 +142,3 @@ def avaliar(colaborador, produto, quantidade=1, estoque=None, agora=None):
     if produto.requer_justificativa:
         av.motivos.append(EXIGE_JUSTIFICATIVA)
     return av
-

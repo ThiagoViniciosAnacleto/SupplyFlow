@@ -20,6 +20,7 @@ from ..models import (DecisaoSolicitacao, Devolucao, Entrega, MovimentacaoEstoqu
                       Usuario)
 from ..permissoes import api_backoffice
 from ..servicos import estados
+from .cadastros import _catalogo_cargos
 from .util import erro, fmt
 
 LIMITE = 1000
@@ -63,7 +64,7 @@ def _csv(request, nome, cabecalho, linhas, descricao):
     """Arquivo CSV que abre direto no Excel em português (separador ; e acentos certos)."""
     resposta = HttpResponse(content_type="text/csv; charset=utf-8")
     resposta["Content-Disposition"] = f'attachment; filename="{nome}-{timezone.localtime():%Y%m%d-%H%M}.csv"'
-    resposta.write("﻿")  # BOM: faz o Excel reconhecer UTF-8
+    resposta.write("\ufeff")  # BOM: faz o Excel reconhecer UTF-8
     escritor = csv.writer(resposta, delimiter=";")
     escritor.writerow(cabecalho)
     for linha in linhas:
@@ -80,7 +81,7 @@ def _csv(request, nome, cabecalho, linhas, descricao):
 @api_backoffice("ver")
 def api_historico(request):
     """Histórico unificado. Filtros: de, ate, tipo, funcionario (nome ou matrícula), setor,
-    produto, status (da solicitação) e responsavel."""
+    cargo (função), produto, status (da solicitação) e responsavel."""
     try:
         inicio, fim = _periodo(request)
     except ValueError as e:
@@ -88,6 +89,7 @@ def api_historico(request):
     tipo = (request.GET.get("tipo") or "").upper()
     termo = (request.GET.get("funcionario") or "").strip()
     setor_id = request.GET.get("setor") or ""
+    cargo = (request.GET.get("cargo") or "").strip()
     produto_id = request.GET.get("produto") or ""
     status = (request.GET.get("status") or "").upper()
     responsavel = (request.GET.get("responsavel") or "").strip()
@@ -100,6 +102,8 @@ def api_historico(request):
                            Q(**{f"{prefixo}__codigo_matricula__icontains": termo}))
         if setor_id:
             qs = qs.filter(**{f"{prefixo}__setor_id": setor_id})
+        if cargo:
+            qs = qs.filter(**{f"{prefixo}__cargo__iexact": cargo})
         return qs
 
     if tipo in ("", "ENTREGA"):
@@ -142,8 +146,8 @@ def api_historico(request):
                            "detalhe": "Dispensada: " + d.observacao if d.dispensada
                            else f"{d.get_condicao_display()} → {d.get_destinacao_display()}"})
 
-    # Entradas de estoque não têm funcionário/status: só entram sem esses filtros
-    if tipo in ("", "ENTRADA") and not (termo or setor_id or status):
+    # Entradas de estoque não têm funcionário/setor/cargo/status: só entram sem esses filtros
+    if tipo in ("", "ENTRADA") and not (termo or setor_id or cargo or status):
         qs = _no_periodo(MovimentacaoEstoque.objects.filter(tipo=MovimentacaoEstoque.ENTRADA)
                          .select_related("produto", "usuario", "estoque__totem"), "data", inicio, fim)
         if produto_id:
@@ -201,7 +205,11 @@ def api_historico(request):
         "limite": LIMITE,
         "filtros": {
             "tipos": [{"valor": k, "rotulo": v} for k, v in TIPOS.items()],
-            "setores": [{"id": str(s.id), "nome": s.nome} for s in Setor.objects.order_by("nome")],
+            "setores": [
+                {"id": str(s.id), "nome": f"{s.nome} ({s.centro_custo})" if s.centro_custo else s.nome}
+                for s in Setor.objects.order_by("nome")
+            ],
+            "cargos": [{"valor": c, "rotulo": c} for c in sorted(_catalogo_cargos().values())],
             "produtos": [{"id": str(p.id), "nome": p.nome} for p in Produto.objects.order_by("nome")],
             "status": [{"valor": k, "rotulo": v} for k, v in estados.ROTULOS.items()],
         },

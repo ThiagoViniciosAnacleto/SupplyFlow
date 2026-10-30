@@ -23,7 +23,7 @@
         <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
           <div>
             <h1 class="pagina-titulo">Políticas de fornecimento</h1>
-            <p class="pagina-descricao">Limites mensais e periodicidade de troca por setor e/ou cargo. Sem política específica, vale o padrão do produto. Quando mais de uma se aplica, vale a mais específica (setor + cargo &gt; cargo &gt; setor).</p>
+            <p class="pagina-descricao">Limites mensais e periodicidade de troca por setor/centro de custo, cargo/função ou funcionário. Sem política específica, vale o padrão do produto. Quando mais de uma se aplica, vale a mais específica (funcionário &gt; setor + cargo &gt; cargo &gt; setor).</p>
           </div>
           <button type="button" class="btn btn-primary d-none" id="btn-nova-regra"><i class="bi bi-plus-lg" aria-hidden="true"></i> Nova política</button>
         </div>
@@ -65,27 +65,31 @@
           <label for="regra-produto" class="form-label fw-semibold">Produto *</label>
           <select id="regra-produto" class="form-select mb-3" required></select>
           <div class="row g-2 mb-3">
-            <div class="col-6">
-              <label for="regra-setor" class="form-label fw-semibold">Setor</label>
+            <div class="col-12 col-sm-6">
+              <label for="regra-setor" class="form-label fw-semibold">Setor / Centro de custo</label>
               <select id="regra-setor" class="form-select"></select>
             </div>
-            <div class="col-6">
-              <label for="regra-cargo" class="form-label fw-semibold">Cargo</label>
+            <div class="col-12 col-sm-6">
+              <label for="regra-cargo" class="form-label fw-semibold">Cargo / Função</label>
               <input id="regra-cargo" class="form-control" list="lista-cargos" maxlength="100">
               <datalist id="lista-cargos"></datalist>
             </div>
           </div>
+          <div class="mb-3">
+            <label for="regra-funcionario" class="form-label fw-semibold">Funcionário específico (opcional)</label>
+            <select id="regra-funcionario" class="form-select"></select>
+          </div>
           <div class="row g-2">
-            <div class="col-6">
+            <div class="col-12 col-sm-6">
               <label for="regra-limite" class="form-label fw-semibold">Limite mensal (un.)</label>
               <input type="number" id="regra-limite" class="form-control" min="0">
             </div>
-            <div class="col-6">
+            <div class="col-12 col-sm-6">
               <label for="regra-periodicidade" class="form-label fw-semibold">Troca a cada (dias)</label>
               <input type="number" id="regra-periodicidade" class="form-control" min="1">
             </div>
           </div>
-          <div class="form-text">Informe pelo menos um escopo (setor ou cargo) e pelo menos um valor.</div>
+          <div class="form-text">Informe pelo menos um escopo (setor, cargo ou funcionário) e pelo menos um valor.</div>
           <div class="invalid-feedback d-block" id="erro-regra" role="alert"></div>
         </div>
         <div class="modal-footer">

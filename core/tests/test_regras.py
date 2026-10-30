@@ -1,11 +1,11 @@
 """Regras de negócio: elegibilidade, estados, estoque, decisão, entrega e devolução
-(RF-15 a RF-20, RF-24 a RF-30, RF-35, RF-39 a RF-42, RF-50, RNF-08, RNF-11)."""
+(RF-03, RF-04, RF-12, RF-14, RF-15 a RF-20, RF-24 a RF-30, RF-35, RF-36, RF-39 a RF-42, RF-50, RNF-08, RNF-11)."""
 from datetime import timedelta
 
 from django.test import Client
 from django.utils import timezone
 
-from core.models import (AnaliseIA, Devolucao, Entrega, EstoqueTotem, MovimentacaoEstoque, RegraFornecimento,
+from core.models import (AnaliseIA, Devolucao, Entrega, EstoqueTotem, MovimentacaoEstoque, Produto, RegraFornecimento,
                          Solicitacao)
 from core.servicos.solicitacoes import _proximo_codigo
 
@@ -61,6 +61,16 @@ class TotemRegrasTeste(BaseTeste):
     def test_politica_por_cargo_sobrepoe_o_padrao(self):
         RegraFornecimento.objects.create(produto=self.disco, cargo="Soldador", limite_mensal=1)
         self.assertEqual(self.pedir(self.disco, 2).status_code, 400)  # 2 > 1: exceção sem justificativa
+
+    def test_politica_por_funcionario_tem_maior_precedencia(self):
+        """RF-12 e RF-14: regra nominal para o funcionário sobrepõe a regra de setor+cargo."""
+        RegraFornecimento.objects.create(produto=self.disco, setor=self.setor, cargo="Soldador", limite_mensal=5)
+        RegraFornecimento.objects.create(
+            produto=self.disco,
+            cargo=f"MAT:{self.colaborador.codigo_matricula}",
+            limite_mensal=1,
+        )
+        self.assertEqual(self.pedir(self.disco, 2).status_code, 400)  # limite individual = 1
 
     def test_sem_estoque_e_recusado_com_mensagem_clara(self):
         resposta = self.pedir(self.disco, 3)  # só há 2
@@ -215,6 +225,58 @@ class CadastrosValidacaoTeste(BaseTeste):
         r = self.post("/api/produtos/salvar/", {"sku": "X2", "nome": "Capacete",
                                                 "categoria_id": str(self.luva.categoria_id)})
         self.assertEqual(r.status_code, 400)
+
+    def test_novo_produto_cria_vinculo_automatico_no_estoque_do_totem(self):
+        """RF-36: todo novo produto recebe linha inicial no estoque dos totens para permitir reposição imediata."""
+        r = self.post("/api/produtos/salvar/", {
+            "sku": "EPI-CAP-99",
+            "nome": "Capacete com Jugular",
+            "categoria_id": str(self.luva.categoria_id),
+            "ca": "CA-99887",
+            "custo_unitario": "42.50",
+        })
+        self.assertEqual(r.status_code, 200, r.content)
+        novo_prod = Produto.objects.get(sku="EPI-CAP-99")
+        estoque_criado = EstoqueTotem.objects.filter(totem=self.totem, produto=novo_prod).first()
+        self.assertIsNotNone(estoque_criado)
+        self.assertEqual(estoque_criado.quantidade_disponivel, 0)
+
+    def test_gerenciar_cargos_e_funcoes_cadastrar_renomear_e_excluir(self):
+        """RF-03 e RF-04: cadastrar cargo no catálogo, renomear atualizando funcionários/regras e excluir sem vínculo."""
+        r_novo = self.post("/api/cargos/salvar/", {"cargo": "Inspetor de Qualidade"})
+        self.assertEqual(r_novo.status_code, 200, r_novo.content)
+        cargos = {c["cargo"]: c for c in self.client.get("/api/cargos/").json()["cargos"]}
+        self.assertIn("Inspetor de Qualidade", cargos)
+        self.assertEqual(cargos["Inspetor de Qualidade"]["total_funcionarios"], 0)
+
+        # Renomear "Soldador" (que tem colaborador ativo) para "Soldador Industrial"
+        RegraFornecimento.objects.create(produto=self.luva, cargo="Soldador", periodicidade_dias=60)
+        r_ren = self.post("/api/cargos/salvar/", {"cargo_original": "Soldador", "cargo": "Soldador Industrial"})
+        self.assertEqual(r_ren.status_code, 200, r_ren.content)
+        self.colaborador.refresh_from_db()
+        self.assertEqual(self.colaborador.cargo, "Soldador Industrial")
+        self.assertTrue(RegraFornecimento.objects.filter(cargo="Soldador Industrial").exists())
+
+        # Não exclui cargo com funcionário ativo
+        self.assertEqual(self.post("/api/cargos/excluir/", {"cargo": "Soldador Industrial"}).status_code, 409)
+
+        # Exclui cargo sem funcionários ativos
+        self.assertEqual(self.post("/api/cargos/excluir/", {"cargo": "Inspetor de Qualidade"}).status_code, 200)
+        cargos_apos = {c["cargo"] for c in self.client.get("/api/cargos/").json()["cargos"]}
+        self.assertNotIn("Inspetor de Qualidade", cargos_apos)
+
+    def test_salvar_politica_por_funcionario(self):
+        """RF-12 e RF-14: criar política vinculada diretamente ao funcionário via API."""
+        r = self.post("/api/politicas/salvar/", {
+            "produto_id": str(self.disco.id),
+            "funcionario_id": str(self.colaborador.id),
+            "limite_mensal": 3,
+        })
+        self.assertEqual(r.status_code, 200, r.content)
+        regras = self.client.get("/api/politicas/").json()["regras"]
+        self.assertEqual(len(regras), 1)
+        self.assertEqual(regras[0]["funcionario_id"], str(self.colaborador.id))
+        self.assertIn("João da Silva", regras[0]["funcionario"])
 
     def test_fornecedor_valida_cnpj(self):
         self.assertEqual(self.post("/api/fornecedores/salvar/", {"razao_social": "A", "cnpj": "11.111.111/1111-11"})

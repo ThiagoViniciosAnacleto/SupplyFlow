@@ -2,9 +2,10 @@
    SupplyFlow — Políticas de Fornecimento (RF-12, RF-13, RF-14)
    ---------------------------------------------------------------------
    Define limites mensais e periodicidade de troca específicos por
-   setor e/ou cargo. Quando mais de uma política se aplica ao mesmo
-   funcionário, o servidor prioriza a mais específica:
-   (Setor + Cargo) > (Somente Cargo) > (Somente Setor) > Padrão do Produto.
+   setor/centro de custo, cargo/função ou funcionário individual.
+   Quando mais de uma política se aplica ao mesmo funcionário, o
+   servidor prioriza a mais específica:
+   Funcionário > (Setor + Cargo) > (Somente Cargo) > (Somente Setor) > Padrão.
    ===================================================================== */
 
 (function () {
@@ -35,6 +36,9 @@
     }
     if (regra.cargo) {
       partesEscopo.push("Cargo: " + regra.cargo);
+    }
+    if (regra.funcionario) {
+      partesEscopo.push("Funcionário: " + regra.funcionario);
     }
     var textoEscopo = partesEscopo.join(" · ");
 
@@ -90,6 +94,10 @@
         document.getElementById("btn-nova-regra").classList.toggle("d-none", !podeEditar);
         document.getElementById("regra-produto").innerHTML = montarOpcoesSelect(dados.produtos || [], "Selecione…");
         document.getElementById("regra-setor").innerHTML = montarOpcoesSelect(dados.setores || [], "Todos os setores");
+        var selectFunc = document.getElementById("regra-funcionario");
+        if (selectFunc) {
+          selectFunc.innerHTML = montarOpcoesSelect(dados.funcionarios || [], "Qualquer funcionário do escopo");
+        }
         document.getElementById("lista-cargos").innerHTML = (dados.cargos || []).map(function (cargo) {
           return '<option value="' + escapar(cargo) + '">';
         }).join("");
@@ -114,6 +122,10 @@
       document.getElementById("regra-produto").value = regra.produto_id;
       document.getElementById("regra-setor").value = regra.setor_id || "";
       document.getElementById("regra-cargo").value = regra.cargo || "";
+      var selectFunc = document.getElementById("regra-funcionario");
+      if (selectFunc) {
+        selectFunc.value = regra.funcionario_id || "";
+      }
       document.getElementById("regra-limite").value = (regra.limite_mensal != null) ? regra.limite_mensal : "";
       document.getElementById("regra-periodicidade").value = regra.periodicidade_dias || "";
     }
@@ -146,11 +158,13 @@
 
   form.addEventListener("submit", function (evento) {
     evento.preventDefault();
+    var selectFunc = document.getElementById("regra-funcionario");
     var dadosFormulario = {
       id: document.getElementById("regra-id").value || null,
       produto_id: document.getElementById("regra-produto").value,
       setor_id: document.getElementById("regra-setor").value || null,
       cargo: document.getElementById("regra-cargo").value.trim(),
+      funcionario_id: selectFunc ? (selectFunc.value || null) : null,
       limite_mensal: document.getElementById("regra-limite").value,
       periodicidade_dias: document.getElementById("regra-periodicidade").value
     };
