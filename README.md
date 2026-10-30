@@ -66,7 +66,7 @@ Variáveis de ambiente obrigatórias: `SECRET_KEY` (gere com `python -c "import 
 - **Start:** `gunicorn config.wsgi`
 - **Banco que já existia antes das migrações** (criado à mão): rode **uma vez** `python manage.py migrate --fake-initial`. A migração `0004` converte os registros antigos (status, categorias da IA, entregas e reservas).
 - Senhas e PINs antigos em MD5 continuam funcionando e são convertidos para hash forte no primeiro uso correto.
-- Para o e-mail de senha: `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL`.
+- Para o e-mail de senha: `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL` (ou `BREVO_API_KEY` / `RESEND_API_KEY` via HTTPS em ambientes que bloqueiam a porta 587).
 
 ## Estrutura
 
@@ -79,6 +79,7 @@ SupplyFlow/
 │   ├── permissoes.py       Perfis e ações permitidas (RF-09)
 │   ├── seguranca.py        PIN, senhas antigas e limite de tentativas
 │   ├── contas.py           Contas do backoffice e link de senha
+│   ├── correio.py          Envio resiliente de e-mail (SMTP com timeout + API HTTPS + fallback console)
 │   ├── auditoria.py        Registro das operações críticas
 │   ├── servicos/           Regras de negócio (estados, elegibilidade, estoque, decisão, entrega)
 │   ├── ia/                 Classificador, linha de base, treino e dados
@@ -91,6 +92,19 @@ SupplyFlow/
 ├── totem/                  Tela do autoatendimento
 └── static/                 CSS, JavaScript e bibliotecas (funcionam sem internet)
 ```
+
+## Arquitetura do Frontend (`static/js/`, `backoffice/` e `totem/`)
+
+O frontend foi construído em **HTML semântico + Bootstrap 5 + JavaScript puro**, organizado no namespace global `window.SF`:
+
+1. **`static/js/api.js` (`SF.api`)**: centraliza todas as chamadas `fetch()` para `/api/...`, incluindo automaticamente o cookie de sessão e o cabeçalho `X-CSRFToken` nas requisições `POST`. Quando o servidor retorna `401`, redireciona para `/?proximo=...`.
+2. **`static/js/sessao.js` (`SF.sessao`)**: mantém em `sessionStorage` apenas um cache visual dos dados de exibição do usuário (`nome`, `iniciais`, `perfil`, `acoes`) para que o topo e o menu não pisquem a cada troca de página. **Decisão de segurança**: a autorização real nunca confia no navegador; toda rota HTML e JSON valida a sessão e o perfil no servidor Django.
+3. **`static/js/menu.js` (`SF.menu`) e `static/js/backoffice.js`**: montam dinamicamente a barra lateral (`#sidebar`) e o cabeçalho (`#topbar`) lendo `data-pagina`, `data-menu` e `data-trilha` do `<body>`, além de fornecer `SF.escapar()` para sanitização contra XSS ao montar HTML dinâmico.
+4. **Scripts por tela (`static/js/*.js`)**: cada página possui seu próprio módulo em IIFE (`(function () { ... })()`), separando funções de formatação/renderização de linhas (`criarLinha...Html`) dos ouvintes de eventos e chamadas à API.
+5. **Acessibilidade e Semântica**:
+   - Controles interativos utilizam elementos nativos (`<button type="button">`, `<a>`, `<input>`, `<select>`, `<textarea>`).
+   - Todos os campos de formulário e filtros possuem `<label for="...">` associado ao `id` do controle e descrições auxiliares conectadas via `aria-describedby`.
+   - Botões que exibem apenas ícones possuem `aria-label` descritivo e ícones decorativos usam `aria-hidden="true"`.
 
 ## Perfis e permissões
 

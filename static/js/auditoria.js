@@ -1,48 +1,76 @@
 /* =====================================================================
-   SupplyFlow — Auditoria (somente ADMIN)
+   SupplyFlow — Trilha de Auditoria (somente ADMIN · /api/auditoria/)
+   ---------------------------------------------------------------------
+   Lista os eventos críticos registrados no sistema (logins, decisões,
+   entregas, movimentações de estoque e alterações de cadastro) com
+   filtros por tipo de ação, busca textual e período.
    ===================================================================== */
 
 (function () {
   var escapar = SF.escapar;
-  var corpo = document.getElementById("corpo-eventos");
-  var meta = document.getElementById("meta-eventos");
+  var corpoEventos = document.getElementById("corpo-eventos");
+  var metaEventos = document.getElementById("meta-eventos");
   var seletorAcao = document.getElementById("filtro-acao");
-  var acoesCarregadas = false;
+  var acoesJaCarregadas = false;
+
+  var CAMPOS_FILTRO = [
+    { idElemento: "filtro-termo", parametroUrl: "q" },
+    { idElemento: "filtro-de",    parametroUrl: "de" },
+    { idElemento: "filtro-ate",   parametroUrl: "ate" }
+  ];
+
+  function criarLinhaEventoAuditoriaHtml(eventoAuditoria) {
+    return (
+      "<tr>" +
+        '<td class="text-nowrap">' + escapar(eventoAuditoria.data) + "</td>" +
+        "<td>" + escapar(eventoAuditoria.usuario) + "</td>" +
+        '<td><span class="numero">' + escapar(eventoAuditoria.acao) + "</span></td>" +
+        "<td>" + escapar(eventoAuditoria.descricao) + "</td>" +
+        '<td class="text-nowrap">' + escapar(eventoAuditoria.ip) + "</td>" +
+      "</tr>"
+    );
+  }
 
   function carregar() {
-    var params = new URLSearchParams();
-    if (seletorAcao.value) params.set("acao", seletorAcao.value);
-    ["termo:q", "de:de", "ate:ate"].forEach(function (par) {
-      var partes = par.split(":");
-      var valor = document.getElementById("filtro-" + partes[0]).value.trim();
-      if (valor) params.set(partes[1], valor);
+    var parametros = new URLSearchParams();
+    if (seletorAcao.value) {
+      parametros.set("acao", seletorAcao.value);
+    }
+
+    CAMPOS_FILTRO.forEach(function (campo) {
+      var valor = document.getElementById(campo.idElemento).value.trim();
+      if (valor) {
+        parametros.set(campo.parametroUrl, valor);
+      }
     });
 
-    SF.api.get("/api/auditoria/?" + params.toString())
+    SF.api.get("/api/auditoria/?" + parametros.toString())
       .then(function (dados) {
-        if (!acoesCarregadas) {
-          dados.acoes.forEach(function (acao) {
+        if (!acoesJaCarregadas) {
+          (dados.acoes || []).forEach(function (codigoAcao) {
             var opcao = document.createElement("option");
-            opcao.value = acao;
-            opcao.textContent = acao;
+            opcao.value = codigoAcao;
+            opcao.textContent = codigoAcao;
             seletorAcao.appendChild(opcao);
           });
-          acoesCarregadas = true;
+          acoesJaCarregadas = true;
         }
-        meta.textContent = dados.eventos.length + " evento(s)" +
-          (dados.eventos.length >= dados.limite ? " — mostrando os " + dados.limite + " mais recentes" : "");
-        corpo.innerHTML = dados.eventos.length ? dados.eventos.map(function (e) {
-          return "<tr>" +
-            '<td class="text-nowrap">' + escapar(e.data) + "</td>" +
-            "<td>" + escapar(e.usuario) + "</td>" +
-            '<td><span class="numero">' + escapar(e.acao) + "</span></td>" +
-            "<td>" + escapar(e.descricao) + "</td>" +
-            '<td class="text-nowrap">' + escapar(e.ip) + "</td>" +
-          "</tr>";
-        }).join("") : '<tr><td colspan="5" class="tabela-solicitacoes__vazio">Nenhum evento encontrado.</td></tr>';
+
+        var listaEventos = dados.eventos || [];
+        var textoMeta = listaEventos.length + " evento(s)";
+        if (listaEventos.length >= dados.limite) {
+          textoMeta += " — mostrando os " + dados.limite + " mais recentes";
+        }
+        metaEventos.textContent = textoMeta;
+
+        if (listaEventos.length === 0) {
+          corpoEventos.innerHTML = '<tr><td colspan="5" class="tabela-solicitacoes__vazio">Nenhum evento encontrado.</td></tr>';
+          return;
+        }
+        corpoEventos.innerHTML = listaEventos.map(criarLinhaEventoAuditoriaHtml).join("");
       })
       .catch(function (erro) {
-        corpo.innerHTML = '<tr><td colspan="5" class="tabela-solicitacoes__vazio">' + escapar(erro.message) + "</td></tr>";
+        corpoEventos.innerHTML = '<tr><td colspan="5" class="tabela-solicitacoes__vazio">' + escapar(erro.message) + "</td></tr>";
       });
   }
 

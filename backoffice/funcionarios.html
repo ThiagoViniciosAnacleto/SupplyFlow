@@ -27,21 +27,23 @@
           </div>
           <div>
             <button type="button" class="btn btn-primary" id="btn-novo-funcionario">
-              <i class="bi bi-person-plus"></i> Novo Funcionário
+              <i class="bi bi-person-plus" aria-hidden="true"></i> Novo Funcionário
             </button>
           </div>
         </div>
 
         <!-- Filtros e Busca -->
-        <div class="cartao p-3 mb-4">
+        <div class="cartao p-3 mb-4" role="search" aria-label="Filtrar funcionários">
           <div class="row g-3">
             <div class="col-md-6">
+              <label for="filtro-termo" class="visually-hidden">Buscar por nome, matrícula ou e-mail</label>
               <div class="input-group">
-                <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                <span class="input-group-text bg-white border-end-0" aria-hidden="true"><i class="bi bi-search text-muted"></i></span>
                 <input type="text" id="filtro-termo" class="form-control border-start-0" placeholder="Buscar por nome, matrícula ou e-mail...">
               </div>
             </div>
             <div class="col-md-4">
+              <label for="filtro-setor" class="visually-hidden">Filtrar por setor</label>
               <select id="filtro-setor" class="form-select">
                 <option value="">Todos os setores</option>
               </select>
@@ -155,4 +157,3 @@
   <script src="../static/js/funcionarios.js"></script>
 </body>
 </html>
-

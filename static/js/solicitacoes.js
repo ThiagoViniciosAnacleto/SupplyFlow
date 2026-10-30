@@ -1,7 +1,10 @@
 /* =====================================================================
-   SupplyFlow — Solicitações (lista integrada à API Django /api/solicitacoes/)
-   Monta a tabela a partir de dados reais do PostgreSQL e filtra pelas abas.
-   O status, a categoria da IA e a decisão vêm sempre do servidor.
+   SupplyFlow — Lista de Solicitações (/api/solicitacoes/)
+   ---------------------------------------------------------------------
+   Monta a tabela de solicitações a partir do banco de dados e filtra
+   pelas três abas (Excepcionais, Aguardando análise e Todas).
+   Inclui navegação por teclado nas abas (Setas, Home e End) seguindo o
+   padrão de acessibilidade WAI-ARIA Tabs.
    ===================================================================== */
 
 (function () {
@@ -11,7 +14,7 @@
     return div.innerHTML;
   };
 
-  var STATUS_MAP = {
+  var MAPA_STATUS = {
     "aguardando":        { rotulo: "Aguardando aprovação",  selo: "selo--aguardando" },
     "aprovada":          { rotulo: "Aprovada",              selo: "selo--aprovado" },
     "aprovada-condicao": { rotulo: "Aprovada com condição", selo: "selo--condicional" },
@@ -20,127 +23,174 @@
     "cancelada":         { rotulo: "Cancelada",             selo: "selo--cancelado" }
   };
 
-  /* Cada aba é uma regra que diz se a solicitação aparece ou não */
-  var FILTROS = {
+  /* Regras de filtragem para cada aba */
+  var FILTROS_ABAS = {
     excepcionais: {
       legenda: "Solicitações excepcionais",
-      mostra: function (s) { return Boolean(s.excepcional || s.fora_da_cota); }
+      mostra: function (solicitacao) {
+        return Boolean(solicitacao.excepcional || solicitacao.fora_da_cota);
+      }
     },
     aguardando: {
       legenda: "Solicitações aguardando análise",
-      mostra: function (s) { return s.status === "aguardando"; }
+      mostra: function (solicitacao) {
+        return solicitacao.status === "aguardando";
+      }
     },
     todas: {
       legenda: "Todas as solicitações",
-      mostra: function () { return true; }
+      mostra: function () {
+        return true;
+      }
     }
   };
 
-  var abas = Array.prototype.slice.call(document.querySelectorAll('.abas [role="tab"]'));
-  var painel = document.getElementById("painel-solicitacoes");
-  var corpo = document.getElementById("corpo-tabela");
-  var legenda = document.getElementById("legenda-tabela");
-  var resumo = document.getElementById("resumo-filtro");
-  var abaAtiva = abas[0];
+  var botoesAbas = Array.prototype.slice.call(document.querySelectorAll('.abas [role="tab"]'));
+  var painelTabela = document.getElementById("painel-solicitacoes");
+  var corpoTabela = document.getElementById("corpo-tabela");
+  var legendaTabela = document.getElementById("legenda-tabela");
+  var resumoFiltro = document.getElementById("resumo-filtro");
+  var abaAtiva = botoesAbas[0];
   var solicitacoes = [];
 
-  /* ---------- Uma linha da tabela ---------- */
-  function htmlClassificacao(s) {
-    if (!s.ia || !s.ia.categoria) {
-      return '<span class="classificacao-ia classificacao-ia--vazia">' +
-        '<span aria-hidden="true">—</span><span class="visually-hidden">Não se aplica</span></span>';
+  /* ---------- Formatação de uma Linha da Tabela ---------- */
+  function criarHtmlClassificacaoIa(solicitacao) {
+    if (!solicitacao.ia || !solicitacao.ia.categoria) {
+      return (
+        '<span class="classificacao-ia classificacao-ia--vazia">' +
+          '<span aria-hidden="true">—</span>' +
+          '<span class="visually-hidden">Não se aplica</span>' +
+        "</span>"
+      );
     }
-    var conf = s.ia.confianca != null
-      ? ' <span class="classificacao-ia__confianca">· ' + Math.round(s.ia.confianca) + "%</span>"
-      : ' <span class="classificacao-ia__confianca">· sem confiança</span>';
-    return '<span class="classificacao-ia">' +
-      escapar(s.ia.categoria) + conf +
-    "</span>";
+
+    var htmlConfianca;
+    if (solicitacao.ia.confianca != null) {
+      htmlConfianca = ' <span class="classificacao-ia__confianca">· ' + Math.round(solicitacao.ia.confianca) + "%</span>";
+    } else {
+      htmlConfianca = ' <span class="classificacao-ia__confianca">· sem confiança</span>';
+    }
+
+    return '<span class="classificacao-ia">' + escapar(solicitacao.ia.categoria) + htmlConfianca + "</span>";
   }
 
-  function htmlLinha(s) {
-    var statusChave = s.status || "aguardando";
-    var status = STATUS_MAP[statusChave] || { rotulo: s.status_rotulo || statusChave, selo: "selo--aguardando" };
-    var numeroTexto = s.numero || s.codigo || s.id;
-    var dataHora = s.data && s.hora ? s.data + ", " + s.hora : (s.data || "");
+  function criarHtmlLinhaSolicitacao(solicitacao) {
+    var chaveStatus = solicitacao.status || "aguardando";
+    var infoStatus = MAPA_STATUS[chaveStatus] || {
+      rotulo: solicitacao.status_rotulo || chaveStatus,
+      selo: "selo--aguardando"
+    };
 
-    return "<tr>" +
-      '<td><span class="numero">' + escapar(numeroTexto) + "</span></td>" +
-      "<td>" + escapar(s.funcionario || (s.solicitante && s.solicitante.nome)) + "</td>" +
-      "<td>" + escapar(s.funcao || "—") + "</td>" +
-      "<td>" + escapar(s.centroCusto || "—") + "</td>" +
-      "<td>" + escapar(s.produto || "—") + "</td>" +
-      '<td class="text-nowrap">' + escapar(dataHora) + "</td>" +
-      "<td>" + escapar(s.motivo || "—") + "</td>" +
-      "<td>" + htmlClassificacao(s) + "</td>" +
-      '<td class="tabela-solicitacoes__status"><span class="selo ' + status.selo + '">' + escapar(status.rotulo) + "</span></td>" +
-      '<td class="tabela-solicitacoes__acao">' +
-        '<a class="link-abrir" href="solicitacao.html?id=' + encodeURIComponent(s.id) + '"' +
-        ' aria-label="Abrir solicitação ' + escapar(numeroTexto) + '">' +
-          'Abrir <i class="bi bi-chevron-right" aria-hidden="true"></i></a>' +
-      "</td>" +
-    "</tr>";
+    var codigoExibicao = solicitacao.numero || solicitacao.codigo || solicitacao.id;
+    var nomeFuncionario = solicitacao.funcionario || (solicitacao.solicitante && solicitacao.solicitante.nome);
+
+    var textoDataHora = solicitacao.data || "";
+    if (solicitacao.data && solicitacao.hora) {
+      textoDataHora = solicitacao.data + ", " + solicitacao.hora;
+    }
+
+    return (
+      "<tr>" +
+        '<td><span class="numero">' + escapar(codigoExibicao) + "</span></td>" +
+        "<td>" + escapar(nomeFuncionario) + "</td>" +
+        "<td>" + escapar(solicitacao.funcao || "—") + "</td>" +
+        "<td>" + escapar(solicitacao.centroCusto || "—") + "</td>" +
+        "<td>" + escapar(solicitacao.produto || "—") + "</td>" +
+        '<td class="text-nowrap">' + escapar(textoDataHora) + "</td>" +
+        "<td>" + escapar(solicitacao.motivo || "—") + "</td>" +
+        "<td>" + criarHtmlClassificacaoIa(solicitacao) + "</td>" +
+        '<td class="tabela-solicitacoes__status">' +
+          '<span class="selo ' + infoStatus.selo + '">' + escapar(infoStatus.rotulo) + "</span>" +
+        "</td>" +
+        '<td class="tabela-solicitacoes__acao">' +
+          '<a class="link-abrir" href="solicitacao.html?id=' + encodeURIComponent(solicitacao.id) + '"' +
+             ' aria-label="Abrir solicitação ' + escapar(codigoExibicao) + '">' +
+            'Abrir <i class="bi bi-chevron-right" aria-hidden="true"></i>' +
+          "</a>" +
+        "</td>" +
+      "</tr>"
+    );
   }
 
-  /* ---------- Troca de aba ---------- */
-  function mostrar(aba) {
-    if (!aba || !corpo) return;
-    abaAtiva = aba;
-    var filtro = FILTROS[aba.dataset.filtro] || FILTROS.todas;
-    var listaBase = solicitacoes;
-    var lista = listaBase.filter(filtro.mostra);
+  /* ---------- Troca de Aba e Atualização de Acessibilidade ---------- */
+  function mostrarAba(abaSelecionada) {
+    if (!abaSelecionada || !corpoTabela) {
+      return;
+    }
+    abaAtiva = abaSelecionada;
 
-    abas.forEach(function (outra) {
-      var ativa = outra === aba;
-      outra.setAttribute("aria-selected", ativa ? "true" : "false");
-      outra.tabIndex = ativa ? 0 : -1;
+    var configuracaoFiltro = FILTROS_ABAS[abaSelecionada.dataset.filtro] || FILTROS_ABAS.todas;
+    var listaFiltrada = solicitacoes.filter(configuracaoFiltro.mostra);
+
+    botoesAbas.forEach(function (botaoAba) {
+      var ehAbaAtiva = (botaoAba === abaSelecionada);
+      botaoAba.setAttribute("aria-selected", ehAbaAtiva ? "true" : "false");
+      botaoAba.tabIndex = ehAbaAtiva ? 0 : -1;
     });
 
-    if (painel) painel.setAttribute("aria-labelledby", aba.id);
-    if (legenda) legenda.textContent = filtro.legenda;
+    if (painelTabela) {
+      painelTabela.setAttribute("aria-labelledby", abaSelecionada.id);
+    }
+    if (legendaTabela) {
+      legendaTabela.textContent = configuracaoFiltro.legenda;
+    }
 
-    corpo.innerHTML = lista.length
-      ? lista.map(htmlLinha).join("")
-      : '<tr><td colspan="10" class="tabela-solicitacoes__vazio">Nenhuma solicitação nesta aba.</td></tr>';
+    if (listaFiltrada.length === 0) {
+      corpoTabela.innerHTML = '<tr><td colspan="10" class="tabela-solicitacoes__vazio">Nenhuma solicitação nesta aba.</td></tr>';
+    } else {
+      corpoTabela.innerHTML = listaFiltrada.map(criarHtmlLinhaSolicitacao).join("");
+    }
 
-    if (resumo) {
-      resumo.textContent = lista.length === 1
-        ? "1 solicitação encontrada."
-        : lista.length + " solicitações encontradas.";
+    if (resumoFiltro) {
+      if (listaFiltrada.length === 1) {
+        resumoFiltro.textContent = "1 solicitação encontrada.";
+      } else {
+        resumoFiltro.textContent = listaFiltrada.length + " solicitações encontradas.";
+      }
     }
   }
 
-  abas.forEach(function (aba, posicao) {
-    aba.addEventListener("click", function () { mostrar(aba); });
+  botoesAbas.forEach(function (botaoAba, indice) {
+    botaoAba.addEventListener("click", function () {
+      mostrarAba(botaoAba);
+    });
 
-    /* Teclado: setas esquerda/direita, Home e End trocam de aba */
-    aba.addEventListener("keydown", function (evento) {
-      var destino = null;
-      if (evento.key === "ArrowRight") destino = abas[(posicao + 1) % abas.length];
-      if (evento.key === "ArrowLeft")  destino = abas[(posicao - 1 + abas.length) % abas.length];
-      if (evento.key === "Home")       destino = abas[0];
-      if (evento.key === "End")        destino = abas[abas.length - 1];
-      if (!destino) return;
+    /* Navegação por teclado nas abas: Setas Esquerda/Direita, Home e End */
+    botaoAba.addEventListener("keydown", function (evento) {
+      var abaDestino = null;
+      if (evento.key === "ArrowRight") {
+        abaDestino = botoesAbas[(indice + 1) % botoesAbas.length];
+      } else if (evento.key === "ArrowLeft") {
+        abaDestino = botoesAbas[(indice - 1 + botoesAbas.length) % botoesAbas.length];
+      } else if (evento.key === "Home") {
+        abaDestino = botoesAbas[0];
+      } else if (evento.key === "End") {
+        abaDestino = botoesAbas[botoesAbas.length - 1];
+      }
+
+      if (!abaDestino) {
+        return;
+      }
 
       evento.preventDefault();
-      destino.focus();
-      mostrar(destino);
+      abaDestino.focus();
+      mostrarAba(abaDestino);
     });
   });
 
-  // Mostra indicador de carregamento inicial
-  if (corpo) {
-    corpo.innerHTML = '<tr><td colspan="10" class="tabela-solicitacoes__vazio">Carregando solicitações do sistema...</td></tr>';
+  if (corpoTabela) {
+    corpoTabela.innerHTML = '<tr><td colspan="10" class="tabela-solicitacoes__vazio">Carregando solicitações do sistema...</td></tr>';
   }
 
-  // Busca as solicitações no servidor. Em caso de erro, mostra o erro (nunca dados de exemplo).
   SF.api.get("/api/solicitacoes/")
     .then(function (dados) {
       solicitacoes = dados.solicitacoes || [];
-      mostrar(abaAtiva || abas[0]);
+      mostrarAba(abaAtiva || botoesAbas[0]);
     })
     .catch(function (erro) {
-      corpo.innerHTML = '<tr><td colspan="10" class="tabela-solicitacoes__vazio" role="alert">' +
-        escapar("Não foi possível carregar as solicitações: " + erro.message) + "</td></tr>";
+      corpoTabela.innerHTML =
+        '<tr><td colspan="10" class="tabela-solicitacoes__vazio" role="alert">' +
+          escapar("Não foi possível carregar as solicitações: " + erro.message) +
+        "</td></tr>";
     });
 })();

@@ -27,7 +27,7 @@
           </div>
           <div>
             <button type="button" class="btn btn-outline-primary" id="btn-recarregar-estoque">
-              <i class="bi bi-arrow-clockwise"></i> Atualizar Saldos
+              <i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Atualizar Saldos
             </button>
           </div>
         </div>
@@ -40,7 +40,7 @@
                 <p class="indicador__rotulo">Itens Monitorados</p>
                 <p class="indicador__valor" id="res-total-estoque">0</p>
               </div>
-              <span class="indicador__icone tom-azul"><i class="bi bi-box-seam"></i></span>
+              <span class="indicador__icone tom-azul" aria-hidden="true"><i class="bi bi-box-seam"></i></span>
             </div>
           </div>
           <div class="col-md-4">
@@ -49,7 +49,7 @@
                 <p class="indicador__rotulo">Estoque Baixo (Ponto de Pedido)</p>
                 <p class="indicador__valor" id="res-critico-estoque">0</p>
               </div>
-              <span class="indicador__icone tom-ambar"><i class="bi bi-exclamation-triangle"></i></span>
+              <span class="indicador__icone tom-ambar" aria-hidden="true"><i class="bi bi-exclamation-triangle"></i></span>
             </div>
           </div>
           <div class="col-md-4">
@@ -58,7 +58,7 @@
                 <p class="indicador__rotulo">Itens Zerados</p>
                 <p class="indicador__valor" id="res-zerado-estoque">0</p>
               </div>
-              <span class="indicador__icone tom-vermelho"><i class="bi bi-x-circle"></i></span>
+              <span class="indicador__icone tom-vermelho" aria-hidden="true"><i class="bi bi-x-circle"></i></span>
             </div>
           </div>
         </div>
@@ -104,7 +104,7 @@
           <div class="modal-body p-4">
             <input type="hidden" id="repor-id">
             <div class="mb-3">
-              <label class="form-label small text-muted">Produto & Totem</label>
+              <div class="form-label small text-muted">Produto e Totem</div>
               <div class="fw-bold fs-6" id="repor-prod-nome">—</div>
               <div class="small text-secondary" id="repor-totem-nome">—</div>
             </div>
@@ -134,88 +134,117 @@
   <script src="../static/js/sessao.js"></script>
   <script src="../static/js/backoffice.js"></script>
   <script>
-    (function() {
+    (function () {
+      var escapar = SF.escapar;
       var corpo = document.getElementById("tabela-estoque-corpo");
       var modalEl = document.getElementById("modal-repor");
       var modalBs = modalEl ? new bootstrap.Modal(modalEl) : null;
       var form = document.getElementById("form-repor");
       var estoqueCache = [];
 
+      function criarLinhaEstoqueHtml(itemEstoque, podeRepor) {
+        var badgeStatus = '<span class="badge bg-success-subtle text-success border border-success-subtle">Normal</span>';
+        if (itemEstoque.status_estoque === "critico") {
+          badgeStatus = '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Estoque Baixo</span>';
+        } else if (itemEstoque.status_estoque === "zerado") {
+          badgeStatus = '<span class="badge bg-danger-subtle text-danger border border-danger-subtle">Esgotado</span>';
+        }
+
+        var htmlAcao = "—";
+        if (podeRepor) {
+          htmlAcao =
+            '<button type="button" class="btn btn-sm btn-outline-primary btn-abrir-repor" data-id="' + escapar(itemEstoque.id) + '"' +
+                    ' aria-label="Registrar entrada de ' + escapar(itemEstoque.produto_nome) + '">' +
+              '<i class="bi bi-box-arrow-in-down" aria-hidden="true"></i> Entrada' +
+            "</button>";
+        }
+
+        return (
+          "<tr>" +
+            '<td><span class="badge bg-light text-dark border">' + escapar(itemEstoque.totem_codigo) + '</span> <span class="small text-muted d-block">' + escapar(itemEstoque.totem_nome) + "</span></td>" +
+            "<td><strong>" + escapar(itemEstoque.produto_nome) + '</strong> <span class="small text-muted d-block">SKU: ' + escapar(itemEstoque.produto_sku) + "</span></td>" +
+            "<td>" + escapar(itemEstoque.categoria) + "</td>" +
+            '<td><strong class="fs-6">' + escapar(itemEstoque.quantidade_disponivel) + "</strong> un.</td>" +
+            "<td>" + escapar(itemEstoque.quantidade_reservada) + " un.</td>" +
+            "<td>" + escapar(itemEstoque.quantidade_livre) + " un.</td>" +
+            "<td>" + escapar(itemEstoque.quantidade_minima) + " un.</td>" +
+            '<td><span class="numero">' + escapar(itemEstoque.lote) + "</span></td>" +
+            "<td>" + badgeStatus + "</td>" +
+            '<td class="text-end">' + htmlAcao + "</td>" +
+          "</tr>"
+        );
+      }
+
       function carregarEstoque() {
         SF.api.get("/api/estoque/")
-          .then(function(d) {
-            estoqueCache = d.estoque || [];
-            document.getElementById("res-total-estoque").textContent = d.resumo.total_registros || 0;
-            document.getElementById("res-critico-estoque").textContent = d.resumo.itens_criticos || 0;
-            document.getElementById("res-zerado-estoque").textContent = d.resumo.itens_zerados || 0;
+          .then(function (dados) {
+            estoqueCache = dados.estoque || [];
+            document.getElementById("res-total-estoque").textContent = dados.resumo.total_registros || 0;
+            document.getElementById("res-critico-estoque").textContent = dados.resumo.itens_criticos || 0;
+            document.getElementById("res-zerado-estoque").textContent = dados.resumo.itens_zerados || 0;
 
             if (estoqueCache.length === 0) {
               corpo.innerHTML = '<tr><td colspan="10" class="text-center py-4 text-muted">Nenhum estoque cadastrado.</td></tr>';
               return;
             }
 
-            corpo.innerHTML = estoqueCache.map(function(e) {
-              var badgeStatus = '<span class="badge bg-success-subtle text-success border border-success-subtle">Normal</span>';
-              if (e.status_estoque === "critico") {
-                badgeStatus = '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Estoque Baixo</span>';
-              } else if (e.status_estoque === "zerado") {
-                badgeStatus = '<span class="badge bg-danger-subtle text-danger border border-danger-subtle">Esgotado</span>';
-              }
-
-              var esc = SF.escapar;
-              return '<tr>' +
-                '<td><span class="badge bg-light text-dark border">' + esc(e.totem_codigo) + '</span> <span class="small text-muted d-block">' + esc(e.totem_nome) + '</span></td>' +
-                '<td><strong>' + esc(e.produto_nome) + '</strong> <span class="small text-muted d-block">SKU: ' + esc(e.produto_sku) + '</span></td>' +
-                '<td>' + esc(e.categoria) + '</td>' +
-                '<td><strong class="fs-6">' + esc(e.quantidade_disponivel) + '</strong> un.</td>' +
-                '<td>' + esc(e.quantidade_reservada) + ' un.</td>' +
-                '<td>' + esc(e.quantidade_livre) + ' un.</td>' +
-                '<td>' + esc(e.quantidade_minima) + ' un.</td>' +
-                '<td><span class="numero">' + esc(e.lote) + '</span></td>' +
-                '<td>' + badgeStatus + '</td>' +
-                '<td class="text-end">' + (d.pode_repor
-                  ? '<button type="button" class="btn btn-sm btn-outline-primary btn-abrir-repor" data-id="' + esc(e.id) + '"' +
-                    ' aria-label="Registrar entrada de ' + esc(e.produto_nome) + '"><i class="bi bi-box-arrow-in-down" aria-hidden="true"></i> Entrada</button>'
-                  : '—') +
-                '</td>' +
-              '</tr>';
+            corpo.innerHTML = estoqueCache.map(function (itemEstoque) {
+              return criarLinhaEstoqueHtml(itemEstoque, dados.pode_repor);
             }).join("");
 
-            document.querySelectorAll(".btn-abrir-repor").forEach(function(btn) {
-              btn.addEventListener("click", function() {
-                var item = estoqueCache.find(function(it) { return it.id === btn.dataset.id; });
-                if (!item) return;
+            document.querySelectorAll(".btn-abrir-repor").forEach(function (botao) {
+              botao.addEventListener("click", function () {
+                var item = estoqueCache.find(function (registro) {
+                  return registro.id === botao.dataset.id;
+                });
+                if (!item) {
+                  return;
+                }
                 document.getElementById("repor-id").value = item.id;
                 document.getElementById("repor-prod-nome").textContent = item.produto_nome + " (SKU: " + item.produto_sku + ")";
                 document.getElementById("repor-totem-nome").textContent = item.totem_nome + " (" + item.totem_codigo + ") · Lote atual: " + item.lote;
                 document.getElementById("repor-qtd").value = "10";
                 document.getElementById("repor-lote").value = "";
                 document.getElementById("repor-obs").value = "";
-                if (modalBs) modalBs.show();
+                if (modalBs) {
+                  modalBs.show();
+                }
               });
             });
+          })
+          .catch(function (erro) {
+            corpo.innerHTML =
+              '<tr><td colspan="10" class="text-center py-4 text-danger">' +
+                "Falha ao carregar saldos de estoque: " + escapar(erro.message) +
+              "</td></tr>";
           });
       }
 
       var btnRecarregar = document.getElementById("btn-recarregar-estoque");
-      if (btnRecarregar) btnRecarregar.addEventListener("click", carregarEstoque);
+      if (btnRecarregar) {
+        btnRecarregar.addEventListener("click", carregarEstoque);
+      }
 
       if (form) {
-        form.addEventListener("submit", function(e) {
-          e.preventDefault();
+        form.addEventListener("submit", function (evento) {
+          evento.preventDefault();
           var payload = {
             estoque_id: document.getElementById("repor-id").value,
             quantidade: document.getElementById("repor-qtd").value,
             lote: document.getElementById("repor-lote").value.trim(),
-            observacao: document.getElementById("repor-obs").value.trim(),
+            observacao: document.getElementById("repor-obs").value.trim()
           };
 
           SF.api.post("/api/estoque/repor/", payload)
-            .then(function(res) {
-              if (modalBs) modalBs.hide();
+            .then(function () {
+              if (modalBs) {
+                modalBs.hide();
+              }
               carregarEstoque();
             })
-            .catch(function(err) { alert(err.message); });
+            .catch(function (erro) {
+              alert(erro.message);
+            });
         });
       }
 
@@ -224,4 +253,3 @@
   </script>
 </body>
 </html>
-

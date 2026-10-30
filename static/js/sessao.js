@@ -1,55 +1,76 @@
 /* =====================================================================
-   SupplyFlow — dados de exibição da sessão
+   SupplyFlow — Dados de Exibição da Sessão
    ---------------------------------------------------------------------
-   A sessão de verdade fica no SERVIDOR (cookie do Django). Aqui guardamos
-   só uma cópia do nome/perfil para desenhar o topo da página sem esperar
-   a rede. Quem decide o que cada um pode fazer é sempre o servidor.
+   DECISÃO ARQUITETURAL:
+   A sessão real fica no SERVIDOR (cookie HttpOnly do Django).
+   Aqui guardamos em sessionStorage apenas uma cópia dos dados visuais
+   (nome, iniciais, perfil e ações permitidas) para desenhar o topo e
+   o menu da página sem esperar a rede a cada clique.
+   Quem decide e bloqueia o que cada perfil pode fazer é sempre o servidor.
    ===================================================================== */
 
 window.SF = window.SF || {};
 
 SF.sessao = (function () {
-  var CHAVE = "supplyflow.usuario";
+  var CHAVE_STORAGE = "supplyflow.usuario";
 
-  function ler() {
+  function lerUsuarioSalvo() {
     try {
-      return JSON.parse(window.sessionStorage.getItem(CHAVE)) || null;
+      var textoSalvo = window.sessionStorage.getItem(CHAVE_STORAGE);
+      if (!textoSalvo) {
+        return null;
+      }
+      return JSON.parse(textoSalvo) || null;
     } catch (erro) {
       return null;
     }
   }
 
-  function gravar(usuario) {
+  function gravarUsuarioSalvo(usuario) {
     try {
-      window.sessionStorage.setItem(CHAVE, JSON.stringify(usuario));
-    } catch (erro) { /* sem armazenamento: o topo é atualizado pela API */ }
+      window.sessionStorage.setItem(CHAVE_STORAGE, JSON.stringify(usuario));
+    } catch (erro) {
+      /* Caso o navegador bloqueie sessionStorage, o topo ainda funciona via API */
+    }
+  }
+
+  function removerUsuarioSalvo() {
+    try {
+      window.sessionStorage.removeItem(CHAVE_STORAGE);
+    } catch (erro) {
+      /* Ignora falha de acesso ao sessionStorage */
+    }
   }
 
   return {
     /* Chamado após o login com os dados devolvidos pelo servidor */
-    iniciar: gravar,
+    iniciar: gravarUsuarioSalvo,
 
-    /* Cópia local de quem está logado (ou null). */
-    usuarioAtual: ler,
+    /* Retorna a cópia local de quem está logado (ou null se não houver) */
+    usuarioAtual: lerUsuarioSalvo,
 
     /* Confere no servidor quem está logado e atualiza a cópia local.
-       Se a sessão expirou, SF.api volta para o login. */
+       Se a sessão expirou, SF.api redireciona automaticamente para o login. */
     confirmar: function () {
       return SF.api.get("/api/sessao/").then(function (resposta) {
-        gravar(resposta.usuario);
+        gravarUsuarioSalvo(resposta.usuario);
         return resposta.usuario;
       });
     },
 
-    /* O perfil logado pode executar esta ação? (só para mostrar/esconder botões) */
+    /* Verifica se o perfil logado possui determinada permissão (ex.: "decidir", "estoque").
+       Usado apenas para mostrar ou esconder botões na interface. */
     pode: function (acao) {
-      var usuario = ler();
-      return !!(usuario && usuario.acoes && usuario.acoes.indexOf(acao) !== -1);
+      var usuario = lerUsuarioSalvo();
+      if (!usuario || !Array.isArray(usuario.acoes)) {
+        return false;
+      }
+      return usuario.acoes.indexOf(acao) !== -1;
     },
 
-    /* Sair: encerra a sessão no servidor e limpa a cópia local */
+    /* Sair: limpa a cópia local e encerra a sessão no servidor */
     encerrar: function () {
-      try { window.sessionStorage.removeItem(CHAVE); } catch (erro) {}
+      removerUsuarioSalvo();
       return SF.api.post("/api/logout/", {}, { semRedirecionar: true }).catch(function () {});
     }
   };

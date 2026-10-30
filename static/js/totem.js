@@ -1,11 +1,20 @@
 /* =====================================================================
    SupplyFlow — Lógica do Totem de Autoatendimento
-   Conectado 100% à API Django (/api/totem/...) e ao PostgreSQL no Render.
+   ---------------------------------------------------------------------
+   Fluxo em 5 passos (máquina de estados visual):
+   1. Boas-vindas: escolha do método de identificação (Matrícula).
+   2. Matrícula: digitação e validação em /api/totem/identificar/.
+   3. PIN: digitação de 4 dígitos e autenticação em /api/totem/login/.
+   4. Vitrine: exibição dos EPIs e consumíveis calculados pelo servidor
+      (/api/totem/produtos/), respeitando estoque, cota e periodicidade.
+   5. Justificativa: obrigatória quando o pedido é uma substituição
+      antecipada ou fora da cota mensal (/api/totem/solicitar/).
    ===================================================================== */
 
 (function () {
   var TAMANHO_MAX_MATRICULA = 12;
-  // Estado da sessão no Totem
+
+  /* Estado atual do atendimento no Totem */
   var estado = {
     matricula: "",
     pin: "",
@@ -13,11 +22,10 @@
     produtos: [],
     produtoSelecionado: null,
     totemCodigo: "TOTEM-01",
-    timerSucesso: null,
+    timerSucesso: null
   };
 
-
-  // Elementos do DOM
+  /* Elementos principais do DOM */
   var inputMatricula = document.getElementById("input-matricula");
   var gridProdutos = document.getElementById("grid-produtos-totem");
   var modalMinhasSolsEl = document.getElementById("modal-minhas-sols");
@@ -26,10 +34,21 @@
   var bsModalSols = modalMinhasSolsEl ? new bootstrap.Modal(modalMinhasSolsEl) : null;
   var bsModalSucesso = modalSucessoEl ? new bootstrap.Modal(modalSucessoEl) : null;
 
-  /* ---------- Troca de Passo ---------- */
+  /* Escapa caracteres especiais para evitar XSS ao inserir dados no HTML */
+  function escapar(texto) {
+    var div = document.createElement("div");
+    if (texto == null) {
+      div.textContent = "";
+    } else {
+      div.textContent = String(texto);
+    }
+    return div.innerHTML;
+  }
+
+  /* ---------- Navegação entre Passos ---------- */
   function mostrarPasso(passoId) {
-    document.querySelectorAll(".totem-passo").forEach(function (el) {
-      el.classList.remove("ativo");
+    document.querySelectorAll(".totem-passo").forEach(function (secaoPasso) {
+      secaoPasso.classList.remove("ativo");
     });
     var destino = document.getElementById(passoId);
     if (destino) {
@@ -38,26 +57,45 @@
     }
   }
 
+  /* Limpa todos os dados do colaborador atual e volta ao Passo 1 */
   function reiniciarSessao() {
     if (estado.timerSucesso) {
       clearInterval(estado.timerSucesso);
       estado.timerSucesso = null;
     }
-    if (bsModalSucesso) bsModalSucesso.hide();
-    if (bsModalSols) bsModalSols.hide();
+    if (bsModalSucesso) {
+      bsModalSucesso.hide();
+    }
+    if (bsModalSols) {
+      bsModalSols.hide();
+    }
 
-    // Encerra a sessão do totem no servidor (o próximo colaborador começa do zero)
+    /* Encerra a sessão do totem no servidor para que o próximo colaborador comece do zero */
     if (estado.colaborador) {
       SF.api.post("/api/totem/sair/", {}, { semRedirecionar: true }).catch(function () {});
     }
+
     estado.matricula = "";
     estado.pin = "";
     estado.colaborador = null;
     estado.produtoSelecionado = null;
 
-    if (inputMatricula) inputMatricula.value = "";
+    if (inputMatricula) {
+      inputMatricula.value = "";
+    }
     atualizarPinDots();
     mostrarPasso("passo-boas-vindas");
+  }
+
+  /* Tratamento centralizado de erros das chamadas à API no Totem */
+  function tratarErro(erro) {
+    if (erro && erro.status === 401) {
+      alert("Sua sessão no totem expirou. Identifique-se novamente.");
+      reiniciarSessao();
+      return;
+    }
+    var mensagem = (erro && erro.message) ? erro.message : "Não foi possível concluir. Tente novamente.";
+    alert(mensagem);
   }
 
   /* ---------- Passo 1: Boas-vindas ---------- */
@@ -65,25 +103,19 @@
   if (opcaoMatricula) {
     opcaoMatricula.addEventListener("click", function () {
       estado.matricula = "";
-      if (inputMatricula) inputMatricula.value = "";
-      mostrarPasso("passo-matricula");
-    });
-    // É um "botão" feito com div (role="button"): Enter e Espaço precisam funcionar como clique
-    opcaoMatricula.addEventListener("keydown", function (e) {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        e.stopPropagation();
-        opcaoMatricula.click();
+      if (inputMatricula) {
+        inputMatricula.value = "";
       }
+      mostrarPasso("passo-matricula");
     });
   }
 
   /* ---------- Passo 2: Teclado de Matrícula ---------- */
-  document.querySelectorAll(".tecla-num").forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      var val = this.dataset.val;
+  document.querySelectorAll(".tecla-num").forEach(function (botaoTecla) {
+    botaoTecla.addEventListener("click", function () {
+      var digito = this.dataset.val;
       if (estado.matricula.length < TAMANHO_MAX_MATRICULA) {
-        estado.matricula += val;
+        estado.matricula += digito;
         inputMatricula.value = estado.matricula;
       }
     });
@@ -97,15 +129,6 @@
     });
   }
 
-  // Chips de teste rápido
-  document.querySelectorAll(".chip-demo").forEach(function (chip) {
-    chip.addEventListener("click", function () {
-      estado.matricula = this.dataset.mat;
-      inputMatricula.value = estado.matricula;
-      validarMatriculaEAvancar();
-    });
-  });
-
   var btnMatriculaConfirmar = document.getElementById("btn-matricula-confirmar");
   if (btnMatriculaConfirmar) {
     btnMatriculaConfirmar.addEventListener("click", function () {
@@ -114,49 +137,48 @@
   }
 
   function validarMatriculaEAvancar() {
-    var mat = (inputMatricula.value || estado.matricula).trim().toUpperCase();
-    if (!mat) {
+    var matriculaDigitada = (inputMatricula.value || estado.matricula).trim().toUpperCase();
+    if (!matriculaDigitada) {
       alert("Por favor, digite ou selecione uma matrícula.");
       return;
     }
-    estado.matricula = mat;
+    estado.matricula = matriculaDigitada;
 
-    // Chama o endpoint de identificação
-    SF.api.post("/api/totem/identificar/", { matricula: mat }, { semRedirecionar: true })
+    /* Consulta o servidor: por privacidade, retorna apenas o primeiro nome antes do PIN */
+    SF.api.post("/api/totem/identificar/", { matricula: matriculaDigitada }, { semRedirecionar: true })
       .then(function (dados) {
         document.getElementById("pin-colaborador-nome").textContent = dados.primeiro_nome;
-
         estado.pin = "";
         atualizarPinDots();
         mostrarPasso("passo-pin");
       })
-      .catch(function (err) {
-        alert(err.message || "Matrícula não localizada no sistema. Verifique os dígitos.");
+      .catch(function (erro) {
+        alert(erro.message || "Matrícula não localizada no sistema. Verifique os dígitos.");
       });
   }
 
-  /* ---------- Passo 3: PIN e Teclado de PIN ---------- */
+  /* ---------- Passo 3: PIN de 4 Dígitos ---------- */
   function atualizarPinDots() {
     for (var i = 0; i < 4; i++) {
-      var dot = document.getElementById("dot-" + i);
-      if (dot) {
+      var bolinha = document.getElementById("dot-" + i);
+      if (bolinha) {
         if (i < estado.pin.length) {
-          dot.classList.add("preenchido");
+          bolinha.classList.add("preenchido");
         } else {
-          dot.classList.remove("preenchido");
+          bolinha.classList.remove("preenchido");
         }
       }
     }
   }
 
-  document.querySelectorAll(".tecla-pin").forEach(function (btn) {
-    btn.addEventListener("click", function () {
+  document.querySelectorAll(".tecla-pin").forEach(function (botaoPin) {
+    botaoPin.addEventListener("click", function () {
       if (estado.pin.length < 4) {
         estado.pin += this.dataset.val;
         atualizarPinDots();
 
         if (estado.pin.length === 4) {
-          // Validação automática no 4º dígito com microdelay para feedback visual
+          /* Aguarda 150ms para o colaborador ver a 4ª bolinha preenchida antes de enviar */
           setTimeout(autenticarPin, 150);
         }
       }
@@ -187,130 +209,181 @@
         estado.colaborador = dados.colaborador;
         carregarVitrineProdutos();
       })
-      .catch(function (err) {
-        alert(err.message || "PIN inválido. Tente novamente.");
+      .catch(function (erro) {
+        alert(erro.message || "PIN inválido. Tente novamente.");
         estado.pin = "";
         atualizarPinDots();
       });
   }
 
   /* ---------- Passo 4: Vitrine de Produtos ---------- */
+  var ESTILOS_SITUACAO_PRODUTO = {
+    disponivel:  { classe: "totem-status-badge--disponivel", icone: "bi-check-circle" },
+    excecao:     { classe: "totem-status-badge--fora",       icone: "bi-exclamation-triangle" },
+    aguardando:  { classe: "totem-status-badge--aguardando", icone: "bi-clock-history" },
+    sem_estoque: { classe: "totem-status-badge--fora",       icone: "bi-exclamation-circle" }
+  };
+
   function carregarVitrineProdutos() {
-    document.getElementById("vitrine-nome").textContent = estado.colaborador.primeiro_nome || estado.colaborador.nome;
+    var nomeExibicao = estado.colaborador.primeiro_nome || estado.colaborador.nome;
+    document.getElementById("vitrine-nome").textContent = nomeExibicao;
     document.getElementById("vitrine-cargo").textContent = estado.colaborador.cargo;
     document.getElementById("vitrine-setor").textContent = estado.colaborador.setor;
 
-    gridProdutos.innerHTML = '<div class="text-center py-5 w-100 text-muted"><div class="spinner-border text-primary" role="status"></div><div class="mt-2">Consultando estoque do totem...</div></div>';
+    gridProdutos.innerHTML =
+      '<div class="text-center py-5 w-100 text-muted">' +
+        '<div class="spinner-border text-primary" role="status"></div>' +
+        '<div class="mt-2">Consultando estoque do totem...</div>' +
+      "</div>";
     mostrarPasso("passo-vitrine");
 
-    SF.api.get("/api/totem/produtos/?totem_codigo=" + encodeURIComponent(estado.totemCodigo), { semRedirecionar: true })
+    var urlProdutos = "/api/totem/produtos/?totem_codigo=" + encodeURIComponent(estado.totemCodigo);
+    SF.api.get(urlProdutos, { semRedirecionar: true })
       .then(function (dados) {
         estado.produtos = dados.produtos || [];
         document.getElementById("count-minhas-sols").textContent = dados.total_solicitacoes_pendentes || "0";
         renderizarCardsProdutos(estado.produtos);
       })
-      .catch(function (err) {
-        if (err.status === 401) { tratarErro(err); return; }
-        gridProdutos.innerHTML = '<div class="alert alert-danger w-100" role="alert">Falha ao carregar os produtos: ' + escapar(err.message) + "</div>";
+      .catch(function (erro) {
+        if (erro.status === 401) {
+          tratarErro(erro);
+          return;
+        }
+        gridProdutos.innerHTML =
+          '<div class="alert alert-danger w-100" role="alert">' +
+            "Falha ao carregar os produtos: " + escapar(erro.message) +
+          "</div>";
       });
   }
 
-  function escapar(texto) {
-    var div = document.createElement("div");
-    div.textContent = texto == null ? "" : String(texto);
-    return div.innerHTML;
-  }
-
-  /* Erro da API: sessão expirada volta ao início; o resto vira aviso legível */
-  function tratarErro(erro) {
-    if (erro && erro.status === 401) {
-      alert("Sua sessão no totem expirou. Identifique-se novamente.");
-      reiniciarSessao();
-      return;
+  /* Cria o botão de ação adequado para a situação de elegibilidade do produto */
+  function criarBotaoAcaoProduto(produto) {
+    if (produto.situacao === "disponivel") {
+      return (
+        '<button type="button" class="btn-solicitar-retirada w-100" data-acao="retirar" data-id="' + escapar(produto.id) + '">' +
+          '<i class="bi bi-box-arrow-down" aria-hidden="true"></i> Solicitar retirada' +
+        "</button>"
+      );
     }
-    alert((erro && erro.message) || "Não foi possível concluir. Tente novamente.");
+
+    if (produto.situacao === "excecao") {
+      var rotuloBotaoExcecao = "Solicitar com justificativa";
+      if (produto.motivo_excecao === "Substituição antecipada") {
+        rotuloBotaoExcecao = "Solicitar substituição antecipada";
+      }
+      return (
+        '<button type="button" class="btn-solicitar-substituicao w-100" data-acao="justificar" data-id="' + escapar(produto.id) + '">' +
+          '<i class="bi bi-arrow-repeat" aria-hidden="true"></i> ' + escapar(rotuloBotaoExcecao) +
+        "</button>"
+      );
+    }
+
+    var rotuloDesabilitado = "Indisponível no totem";
+    if (produto.situacao === "aguardando") {
+      rotuloDesabilitado = "Pedido em andamento";
+    }
+    return (
+      '<button type="button" class="btn btn-outline-secondary w-100 py-2" disabled>' +
+        escapar(rotuloDesabilitado) +
+      "</button>"
+    );
   }
 
-  var SITUACAO = {
-    disponivel: { classe: "totem-status-badge--disponivel", icone: "bi-check-circle" },
-    excecao: { classe: "totem-status-badge--fora", icone: "bi-exclamation-triangle" },
-    aguardando: { classe: "totem-status-badge--aguardando", icone: "bi-clock-history" },
-    sem_estoque: { classe: "totem-status-badge--fora", icone: "bi-exclamation-circle" }
-  };
+  /* Monta o HTML de um cartão de produto na vitrine */
+  function criarCardProdutoHtml(produto) {
+    var ehEpi = (produto.tipo === "EPI");
+    var estiloSituacao = ESTILOS_SITUACAO_PRODUTO[produto.situacao] || ESTILOS_SITUACAO_PRODUTO.sem_estoque;
+    var iconeProduto = ehEpi ? "bi-shield-check" : "bi-box-seam";
+    var classeBadgeTipo = ehEpi ? "totem-badge-tipo--epi" : "totem-badge-tipo--consumivel";
+
+    var linhasInfo = [];
+    if (produto.limite_mensal != null) {
+      linhasInfo.push(
+        "Limite mensal: " + produto.limite_mensal + " " + produto.unidade_medida +
+        " (usado: " + produto.consumido_mes + ")"
+      );
+    }
+    if (ehEpi) {
+      if (produto.ultima_retirada) {
+        linhasInfo.push("Última retirada: " + produto.ultima_retirada);
+      } else {
+        linhasInfo.push("Primeira retirada");
+      }
+    }
+
+    var htmlInfos = linhasInfo.map(function (textoLinha) {
+      return '<span><i class="bi bi-info-circle me-1" aria-hidden="true"></i> ' + escapar(textoLinha) + "</span>";
+    }).join("");
+
+    return (
+      '<div class="totem-card-produto">' +
+        "<div>" +
+          '<div class="totem-card-produto__cabecalho">' +
+            '<div class="totem-produto-icone" aria-hidden="true"><i class="bi ' + iconeProduto + '"></i></div>' +
+            '<span class="totem-badge-tipo ' + classeBadgeTipo + '">' + escapar(produto.tipo) + "</span>" +
+          "</div>" +
+          '<div class="totem-card-produto__nome">' + escapar(produto.nome) + "</div>" +
+          '<div class="totem-card-produto__info">' + htmlInfos + "</div>" +
+          '<div class="totem-status-badge ' + estiloSituacao.classe + '">' +
+            '<i class="bi ' + estiloSituacao.icone + '" aria-hidden="true"></i> ' + escapar(produto.mensagem) +
+          "</div>" +
+        "</div>" +
+        "<div>" + criarBotaoAcaoProduto(produto) + "</div>" +
+      "</div>"
+    );
+  }
 
   function renderizarCardsProdutos(produtos) {
     if (!produtos || produtos.length === 0) {
       gridProdutos.innerHTML = '<div class="text-center py-5 w-100 text-muted">Nenhum produto disponível neste totem.</div>';
       return;
     }
-
-    gridProdutos.innerHTML = produtos.map(function (p) {
-      var ehEpi = p.tipo === "EPI";
-      var sit = SITUACAO[p.situacao] || SITUACAO.sem_estoque;
-      var botao;
-      if (p.situacao === "disponivel") {
-        botao = '<button type="button" class="btn-solicitar-retirada w-100" data-acao="retirar" data-id="' + escapar(p.id) + '">' +
-          '<i class="bi bi-box-arrow-down" aria-hidden="true"></i> Solicitar retirada</button>';
-      } else if (p.situacao === "excecao") {
-        botao = '<button type="button" class="btn-solicitar-substituicao w-100" data-acao="justificar" data-id="' + escapar(p.id) + '">' +
-          '<i class="bi bi-arrow-repeat" aria-hidden="true"></i> ' + escapar(p.motivo_excecao === "Substituição antecipada"
-            ? "Solicitar substituição antecipada" : "Solicitar com justificativa") + "</button>";
-      } else {
-        botao = '<button type="button" class="btn btn-outline-secondary w-100 py-2" disabled>' +
-          escapar(p.situacao === "aguardando" ? "Pedido em andamento" : "Indisponível no totem") + "</button>";
-      }
-
-      var info = [];
-      if (p.limite_mensal != null) info.push("Limite mensal: " + p.limite_mensal + " " + p.unidade_medida + " (usado: " + p.consumido_mes + ")");
-      if (ehEpi) info.push(p.ultima_retirada ? "Última retirada: " + p.ultima_retirada : "Primeira retirada");
-
-      return '<div class="totem-card-produto">' +
-          "<div>" +
-            '<div class="totem-card-produto__cabecalho">' +
-              '<div class="totem-produto-icone" aria-hidden="true"><i class="bi ' + (ehEpi ? "bi-shield-check" : "bi-box-seam") + '"></i></div>' +
-              '<span class="totem-badge-tipo ' + (ehEpi ? "totem-badge-tipo--epi" : "totem-badge-tipo--consumivel") + '">' + escapar(p.tipo) + "</span>" +
-            "</div>" +
-            '<div class="totem-card-produto__nome">' + escapar(p.nome) + "</div>" +
-            '<div class="totem-card-produto__info">' +
-              info.map(function (linha) { return '<span><i class="bi bi-info-circle me-1" aria-hidden="true"></i> ' + escapar(linha) + "</span>"; }).join("") +
-            "</div>" +
-            '<div class="totem-status-badge ' + sit.classe + '"><i class="bi ' + sit.icone + '" aria-hidden="true"></i> ' + escapar(p.mensagem) + "</div>" +
-          "</div>" +
-          "<div>" + botao + "</div>" +
-        "</div>";
-    }).join("");
+    gridProdutos.innerHTML = produtos.map(criarCardProdutoHtml).join("");
   }
 
   gridProdutos.addEventListener("click", function (evento) {
     var botao = evento.target.closest("[data-acao]");
-    if (!botao) return;
-    if (botao.dataset.acao === "retirar") executarSolicitacao(botao.dataset.id, "retirada", "");
-    else abrirTelaJustificativa(botao.dataset.id);
+    if (!botao) {
+      return;
+    }
+    if (botao.dataset.acao === "retirar") {
+      executarSolicitacao(botao.dataset.id, "retirada", "");
+    } else {
+      abrirTelaJustificativa(botao.dataset.id);
+    }
   });
 
-  /* ---------- Passo 5: Justificativa ---------- */
-  function abrirTelaJustificativa(prodId) {
-    var p = estado.produtos.find(function (item) { return item.id === prodId; });
-    if (!p) return;
-    estado.produtoSelecionado = p;
+  /* ---------- Passo 5: Justificativa de Substituição Antecipada ---------- */
+  function abrirTelaJustificativa(produtoId) {
+    var produto = estado.produtos.find(function (item) {
+      return item.id === produtoId;
+    });
+    if (!produto) {
+      return;
+    }
+    estado.produtoSelecionado = produto;
 
-    document.getElementById("just-prod-nome").textContent = p.nome;
-    document.getElementById("just-prod-detalhes").textContent = p.tipo + (p.motivo_excecao ? " · " + p.motivo_excecao : "");
-    document.getElementById("just-prod-ultima").textContent = p.ultima_retirada || "Não registrada";
-    // A próxima troca regular vem da mensagem calculada pelo servidor (sem data inventada)
-    document.getElementById("just-prod-proxima").textContent = p.mensagem;
+    var textoDetalhes = produto.tipo;
+    if (produto.motivo_excecao) {
+      textoDetalhes += " · " + produto.motivo_excecao;
+    }
 
-    var txtJust = document.getElementById("texto-justificativa");
-    txtJust.value = "";
+    document.getElementById("just-prod-nome").textContent = produto.nome;
+    document.getElementById("just-prod-detalhes").textContent = textoDetalhes;
+    document.getElementById("just-prod-ultima").textContent = produto.ultima_retirada || "Não registrada";
+    document.getElementById("just-prod-proxima").textContent = produto.mensagem;
+
+    var campoJustificativa = document.getElementById("texto-justificativa");
+    campoJustificativa.value = "";
     mostrarPasso("passo-justificativa");
-    txtJust.focus();
+    campoJustificativa.focus();
   }
 
-  document.querySelectorAll(".chip-sugestao").forEach(function (chip) {
-    chip.addEventListener("click", function () {
-      var txtJust = document.getElementById("texto-justificativa");
-      txtJust.value = this.dataset.texto;
-      txtJust.focus();
+  document.querySelectorAll(".chip-sugestao").forEach(function (botaoSugestao) {
+    botaoSugestao.addEventListener("click", function () {
+      var campoJustificativa = document.getElementById("texto-justificativa");
+      campoJustificativa.value = this.dataset.texto;
+      campoJustificativa.focus();
     });
   });
 
@@ -328,30 +401,52 @@
     });
   }
 
-  /* ---------- Envio da solicitação ---------- */
-  function executarSolicitacao(prodId, tipo, justificativa) {
-    var payload = { produto_id: prodId, quantidade: 1, tipo: tipo, justificativa: justificativa,
-                    totem_codigo: estado.totemCodigo };
+  /* ---------- Envio da Solicitação ao Servidor ---------- */
+  function executarSolicitacao(produtoId, tipoSolicitacao, justificativa) {
+    var payload = {
+      produto_id: produtoId,
+      quantidade: 1,
+      tipo: tipoSolicitacao,
+      justificativa: justificativa,
+      totem_codigo: estado.totemCodigo
+    };
 
     SF.api.post("/api/totem/solicitar/", payload, { semRedirecionar: true })
-      .then(function (res) {
+      .then(function (resposta) {
         document.getElementById("sucesso-titulo").textContent = "Pedido enviado!";
-        document.getElementById("sucesso-mensagem").textContent = res.mensagem;
-        var elIa = document.getElementById("sucesso-detalhe-ia");
-        elIa.classList.toggle("d-none", !res.excepcional);
-        document.getElementById("sucesso-ia-texto").textContent = res.excepcional
-          ? "Como o pedido foge da regra normal, sua justificativa será analisada por um responsável."
-          : "";
+        document.getElementById("sucesso-mensagem").textContent = resposta.mensagem;
 
-        if (bsModalSucesso) bsModalSucesso.show();
-        var segundos = 5;
-        var elContagem = document.getElementById("contagem-regressiva");
-        if (elContagem) elContagem.textContent = segundos;
-        if (estado.timerSucesso) clearInterval(estado.timerSucesso);
+        var caixaDetalheIa = document.getElementById("sucesso-detalhe-ia");
+        var textoDetalheIa = document.getElementById("sucesso-ia-texto");
+
+        if (resposta.excepcional) {
+          caixaDetalheIa.classList.remove("d-none");
+          textoDetalheIa.textContent = "Como o pedido foge da regra normal, sua justificativa será analisada por um responsável.";
+        } else {
+          caixaDetalheIa.classList.add("d-none");
+          textoDetalheIa.textContent = "";
+        }
+
+        if (bsModalSucesso) {
+          bsModalSucesso.show();
+        }
+
+        var segundosRestantes = 5;
+        var elementoContagem = document.getElementById("contagem-regressiva");
+        if (elementoContagem) {
+          elementoContagem.textContent = segundosRestantes;
+        }
+        if (estado.timerSucesso) {
+          clearInterval(estado.timerSucesso);
+        }
         estado.timerSucesso = setInterval(function () {
-          segundos--;
-          if (elContagem) elContagem.textContent = segundos;
-          if (segundos <= 0) reiniciarSessao();
+          segundosRestantes--;
+          if (elementoContagem) {
+            elementoContagem.textContent = segundosRestantes;
+          }
+          if (segundosRestantes <= 0) {
+            reiniciarSessao();
+          }
         }, 1000);
       })
       .catch(tratarErro);
@@ -364,62 +459,106 @@
     });
   }
 
-  /* ---------- Modal: Minhas solicitações (RF-21) e cancelamento (RF-50) ---------- */
+  /* ---------- Modal: Minhas Solicitações (RF-21) e Cancelamento (RF-50) ---------- */
   var CORES_STATUS = {
-    "aguardando": "bg-warning text-dark", "aprovada": "bg-success", "aprovada-condicao": "bg-primary",
-    "entregue": "bg-success", "rejeitada": "bg-danger", "cancelada": "bg-secondary"
+    "aguardando": "bg-warning text-dark",
+    "aprovada": "bg-success",
+    "aprovada-condicao": "bg-primary",
+    "entregue": "bg-success",
+    "rejeitada": "bg-danger",
+    "cancelada": "bg-secondary"
   };
   var corpoMinhas = document.getElementById("lista-minhas-sols-body");
 
+  function criarLinhaMinhaSolicitacaoHtml(solicitacao) {
+    var classeBadgeStatus = CORES_STATUS[solicitacao.status] || "bg-secondary";
+    var htmlBotaoCancelar = "—";
+
+    if (solicitacao.pode_cancelar) {
+      htmlBotaoCancelar =
+        '<button type="button" class="btn btn-sm btn-outline-danger" data-cancelar="' + escapar(solicitacao.id) + '"' +
+                ' aria-label="Cancelar pedido ' + escapar(solicitacao.codigo) + '">' +
+          "Cancelar" +
+        "</button>";
+    }
+
+    return (
+      "<tr>" +
+        '<td class="fw-bold font-monospace">' + escapar(solicitacao.codigo) + "</td>" +
+        '<td class="text-muted small">' + escapar(solicitacao.data) + "</td>" +
+        "<td>" + escapar(solicitacao.produto) + "</td>" +
+        '<td><span class="badge bg-light text-dark border">' + escapar(solicitacao.motivo) + "</span></td>" +
+        '<td><span class="badge ' + classeBadgeStatus + '">' + escapar(solicitacao.status_rotulo) + "</span></td>" +
+        "<td>" + htmlBotaoCancelar + "</td>" +
+      "</tr>"
+    );
+  }
+
   function carregarMinhas() {
-    corpoMinhas.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm me-2" role="status"></div>Buscando seu histórico...</td></tr>';
+    corpoMinhas.innerHTML =
+      '<tr><td colspan="6" class="text-center py-4 text-muted">' +
+        '<div class="spinner-border spinner-border-sm me-2" role="status"></div>Buscando seu histórico...' +
+      "</td></tr>";
+
     SF.api.get("/api/totem/solicitacoes/", { semRedirecionar: true })
       .then(function (dados) {
-        var sols = dados.solicitacoes || [];
-        corpoMinhas.innerHTML = sols.length ? sols.map(function (s) {
-          return "<tr>" +
-            '<td class="fw-bold font-monospace">' + escapar(s.codigo) + "</td>" +
-            '<td class="text-muted small">' + escapar(s.data) + "</td>" +
-            "<td>" + escapar(s.produto) + "</td>" +
-            '<td><span class="badge bg-light text-dark border">' + escapar(s.motivo) + "</span></td>" +
-            '<td><span class="badge ' + (CORES_STATUS[s.status] || "bg-secondary") + '">' + escapar(s.status_rotulo) + "</span></td>" +
-            "<td>" + (s.pode_cancelar
-              ? '<button type="button" class="btn btn-sm btn-outline-danger" data-cancelar="' + escapar(s.id) + '"' +
-                ' aria-label="Cancelar pedido ' + escapar(s.codigo) + '">Cancelar</button>'
-              : "—") + "</td>" +
-          "</tr>";
-        }).join("") : '<tr><td colspan="6" class="text-center py-4 text-muted">Você ainda não fez pedidos.</td></tr>';
+        var solicitacoes = dados.solicitacoes || [];
+        if (solicitacoes.length === 0) {
+          corpoMinhas.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">Você ainda não fez pedidos.</td></tr>';
+          return;
+        }
+        corpoMinhas.innerHTML = solicitacoes.map(criarLinhaMinhaSolicitacaoHtml).join("");
       })
       .catch(function (erro) {
-        if (erro.status === 401) { if (bsModalSols) bsModalSols.hide(); tratarErro(erro); return; }
+        if (erro.status === 401) {
+          if (bsModalSols) {
+            bsModalSols.hide();
+          }
+          tratarErro(erro);
+          return;
+        }
         corpoMinhas.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-danger">Erro ao carregar histórico.</td></tr>';
       });
   }
 
   corpoMinhas.addEventListener("click", function (evento) {
     var botao = evento.target.closest("[data-cancelar]");
-    if (!botao || !confirm("Cancelar este pedido?")) return;
+    if (!botao || !confirm("Cancelar este pedido?")) {
+      return;
+    }
     botao.disabled = true;
-    SF.api.post("/api/totem/solicitacoes/" + encodeURIComponent(botao.dataset.cancelar) + "/cancelar/", {},
-      { semRedirecionar: true })
-      .then(function () { carregarMinhas(); carregarVitrineProdutos(); })
-      .catch(function (erro) { botao.disabled = false; tratarErro(erro); });
+    var urlCancelar = "/api/totem/solicitacoes/" + encodeURIComponent(botao.dataset.cancelar) + "/cancelar/";
+    SF.api.post(urlCancelar, {}, { semRedirecionar: true })
+      .then(function () {
+        carregarMinhas();
+        carregarVitrineProdutos();
+      })
+      .catch(function (erro) {
+        botao.disabled = false;
+        tratarErro(erro);
+      });
   });
 
   var btnMinhasSols = document.getElementById("btn-abrir-minhas-sols");
   if (btnMinhasSols) {
     btnMinhasSols.addEventListener("click", function () {
-      if (!estado.colaborador) return;
-      if (bsModalSols) bsModalSols.show();
+      if (!estado.colaborador) {
+        return;
+      }
+      if (bsModalSols) {
+        bsModalSols.show();
+      }
       carregarMinhas();
     });
   }
 
   /* ---------- Botões Universais de Navegação e Reinício ---------- */
-  document.querySelectorAll(".btn-voltar").forEach(function (btn) {
-    btn.addEventListener("click", function () {
+  document.querySelectorAll(".btn-voltar").forEach(function (botaoVoltar) {
+    botaoVoltar.addEventListener("click", function () {
       var destino = this.dataset.destino;
-      if (destino) mostrarPasso(destino);
+      if (destino) {
+        mostrarPasso(destino);
+      }
     });
   });
 
@@ -432,31 +571,35 @@
     });
   }
 
-  // Teclado físico: permite digitar matrícula ou PIN normalmente em computadores/testes
-  window.addEventListener("keydown", function (e) {
+  /* Teclado físico: permite digitar matrícula ou PIN em computadores ou leitores USB */
+  window.addEventListener("keydown", function (evento) {
     var passoAtual = document.querySelector(".totem-passo.ativo");
-    if (!passoAtual) return;
+    if (!passoAtual) {
+      return;
+    }
 
     if (passoAtual.id === "passo-matricula") {
-      if (e.key >= "0" && e.key <= "9") {
+      if (evento.key >= "0" && evento.key <= "9") {
         if (estado.matricula.length < TAMANHO_MAX_MATRICULA) {
-          estado.matricula += e.key;
+          estado.matricula += evento.key;
           inputMatricula.value = estado.matricula;
         }
-      } else if (e.key === "Backspace") {
+      } else if (evento.key === "Backspace") {
         estado.matricula = estado.matricula.slice(0, -1);
         inputMatricula.value = estado.matricula;
-      } else if (e.key === "Enter") {
+      } else if (evento.key === "Enter") {
         validarMatriculaEAvancar();
       }
     } else if (passoAtual.id === "passo-pin") {
-      if (e.key >= "0" && e.key <= "9") {
+      if (evento.key >= "0" && evento.key <= "9") {
         if (estado.pin.length < 4) {
-          estado.pin += e.key;
+          estado.pin += evento.key;
           atualizarPinDots();
-          if (estado.pin.length === 4) setTimeout(autenticarPin, 150);
+          if (estado.pin.length === 4) {
+            setTimeout(autenticarPin, 150);
+          }
         }
-      } else if (e.key === "Backspace") {
+      } else if (evento.key === "Backspace") {
         if (estado.pin.length > 0) {
           estado.pin = estado.pin.slice(0, -1);
           atualizarPinDots();
@@ -465,4 +608,3 @@
     }
   });
 })();
-
