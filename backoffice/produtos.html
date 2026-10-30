@@ -27,21 +27,23 @@
           </div>
           <div>
             <button type="button" class="btn btn-primary" id="btn-novo-produto">
-              <i class="bi bi-plus-circle"></i> Novo Produto
+              <i class="bi bi-plus-circle" aria-hidden="true"></i> Novo Produto
             </button>
           </div>
         </div>
 
         <!-- Filtros -->
-        <div class="cartao p-3 mb-4">
+        <div class="cartao p-3 mb-4" role="search" aria-label="Filtrar produtos">
           <div class="row g-3">
             <div class="col-md-7">
+              <label for="filtro-termo-prod" class="visually-hidden">Buscar por nome ou SKU</label>
               <div class="input-group">
-                <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                <span class="input-group-text bg-white border-end-0" aria-hidden="true"><i class="bi bi-search text-muted"></i></span>
                 <input type="text" id="filtro-termo-prod" class="form-control border-start-0" placeholder="Buscar por nome ou SKU...">
               </div>
             </div>
             <div class="col-md-3">
+              <label for="filtro-categoria-prod" class="visually-hidden">Filtrar por categoria</label>
               <select id="filtro-categoria-prod" class="form-select">
                 <option value="">Todas as categorias</option>
               </select>
@@ -133,6 +135,7 @@
               <div class="col-4">
                 <label for="prod-limite" class="form-label small fw-semibold">Cota Mensal</label>
                 <input type="number" id="prod-limite" class="form-control" min="0" aria-describedby="ajuda-limite">
+                <div class="form-text" id="ajuda-limite">Vazio = sem limite.</div>
               </div>
             </div>
 
@@ -186,4 +189,3 @@
   <script src="../static/js/produtos.js"></script>
 </body>
 </html>
-

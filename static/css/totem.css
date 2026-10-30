@@ -160,7 +160,7 @@ body.totem-body {
   line-height: 1.5;
 }
 
-/* Cartões de Seleção (Passo 1) */
+/* Cartões de Seleção (Passo 1 — elementos nativos <button>) */
 .totem-opcoes-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -170,6 +170,9 @@ body.totem-body {
 }
 
 .totem-card-opcao {
+  width: 100%;
+  font-family: inherit;
+  color: inherit;
   background: var(--totem-card-bg);
   border: 2px solid var(--totem-borda);
   border-radius: 16px;
@@ -180,13 +183,14 @@ body.totem-body {
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
 }
 
-.totem-card-opcao:hover:not(.desabilitado) {
+.totem-card-opcao:hover:not(.desabilitado):not(:disabled) {
   border-color: var(--totem-verde);
   transform: translateY(-4px);
   box-shadow: 0 12px 20px -5px rgba(13, 148, 136, 0.15);
 }
 
-.totem-card-opcao.desabilitado {
+.totem-card-opcao.desabilitado,
+.totem-card-opcao:disabled {
   opacity: 0.55;
   cursor: not-allowed;
   background: #f8fafc;
@@ -204,7 +208,8 @@ body.totem-body {
   font-size: 26px;
 }
 
-.totem-card-opcao.desabilitado .totem-card-opcao__icone {
+.totem-card-opcao.desabilitado .totem-card-opcao__icone,
+.totem-card-opcao:disabled .totem-card-opcao__icone {
   background: #e2e8f0;
   color: #94a3b8;
 }
@@ -588,8 +593,6 @@ body.totem-body {
 .btn-voltar-totem:hover {
   color: var(--totem-texto);
 }
-
-
 
 /* Topo no celular: só ícones (o nome continua disponível para leitores de tela) */
 .totem-header { gap: 12px; }

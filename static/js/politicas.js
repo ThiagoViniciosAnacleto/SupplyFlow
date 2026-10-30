@@ -1,9 +1,14 @@
 /* =====================================================================
-   SupplyFlow — Políticas de fornecimento (RF-12, RF-13, RF-14)
+   SupplyFlow — Políticas de Fornecimento (RF-12, RF-13, RF-14)
+   ---------------------------------------------------------------------
+   Define limites mensais e periodicidade de troca específicos por
+   setor e/ou cargo. Quando mais de uma política se aplica ao mesmo
+   funcionário, o servidor prioriza a mais específica:
+   (Setor + Cargo) > (Somente Cargo) > (Somente Setor) > Padrão do Produto.
    ===================================================================== */
 
 (function () {
-  var esc = SF.escapar;
+  var escapar = SF.escapar;
   var aviso = document.getElementById("aviso-regras");
   var modal = new bootstrap.Modal(document.getElementById("modal-regra"));
   var form = document.getElementById("form-regra");
@@ -16,40 +21,92 @@
     aviso.focus();
   }
 
-  function opcoes(lista, vazio) {
-    return '<option value="">' + esc(vazio) + "</option>" + lista.map(function (o) {
-      return '<option value="' + esc(o.id) + '">' + esc(o.nome) + "</option>";
+  function montarOpcoesSelect(lista, rotuloVazio) {
+    var htmlOpcoes = lista.map(function (item) {
+      return '<option value="' + escapar(item.id) + '">' + escapar(item.nome) + "</option>";
     }).join("");
+    return '<option value="">' + escapar(rotuloVazio) + "</option>" + htmlOpcoes;
+  }
+
+  function criarLinhaRegraHtml(regra) {
+    var partesEscopo = [];
+    if (regra.setor) {
+      partesEscopo.push("Setor: " + regra.setor);
+    }
+    if (regra.cargo) {
+      partesEscopo.push("Cargo: " + regra.cargo);
+    }
+    var textoEscopo = partesEscopo.join(" · ");
+
+    var htmlLimiteMensal;
+    if (regra.limite_mensal != null) {
+      htmlLimiteMensal = escapar(regra.limite_mensal) + " un.";
+    } else {
+      var valorPadraoLimite = (regra.padrao_limite != null) ? regra.padrao_limite : "—";
+      htmlLimiteMensal = '<span class="text-muted">padrão (' + escapar(valorPadraoLimite) + ")</span>";
+    }
+
+    var htmlPeriodicidade;
+    if (regra.periodicidade_dias) {
+      htmlPeriodicidade = escapar(regra.periodicidade_dias) + " dias";
+    } else {
+      var valorPadraoPeriodicidade = regra.padrao_periodicidade || "—";
+      htmlPeriodicidade = '<span class="text-muted">padrão (' + escapar(valorPadraoPeriodicidade) + ")</span>";
+    }
+
+    var classeSelo = regra.ativo ? "selo--aprovado" : "selo--cancelado";
+    var textoSituacao = regra.ativo ? "Ativa" : "Inativa";
+
+    var htmlAcoes = "—";
+    if (podeEditar) {
+      var corBotaoAlternar = regra.ativo ? "danger" : "success";
+      var rotuloAlternar = regra.ativo ? "Inativar" : "Ativar";
+      htmlAcoes =
+        '<button type="button" class="btn btn-sm btn-outline-secondary me-1" data-editar="' + escapar(regra.id) + '"' +
+                ' aria-label="Editar política de ' + escapar(regra.produto) + '">' +
+          '<i class="bi bi-pencil" aria-hidden="true"></i>' +
+        "</button>" +
+        '<button type="button" class="btn btn-sm btn-outline-' + corBotaoAlternar + '" data-alternar="' + escapar(regra.id) + '">' +
+          rotuloAlternar +
+        "</button>";
+    }
+
+    return (
+      "<tr>" +
+        "<td><strong>" + escapar(regra.produto) + '</strong><span class="small text-muted d-block">' + escapar(regra.tipo) + "</span></td>" +
+        "<td>" + escapar(textoEscopo) + "</td>" +
+        "<td>" + htmlLimiteMensal + "</td>" +
+        "<td>" + htmlPeriodicidade + "</td>" +
+        '<td><span class="selo ' + classeSelo + '">' + textoSituacao + "</span></td>" +
+        '<td class="tabela-solicitacoes__acao text-nowrap">' + htmlAcoes + "</td>" +
+      "</tr>"
+    );
   }
 
   function carregar() {
-    SF.api.get("/api/politicas/").then(function (d) {
-      regras = d.regras;
-      document.getElementById("btn-nova-regra").classList.toggle("d-none", !podeEditar);
-      document.getElementById("regra-produto").innerHTML = opcoes(d.produtos, "Selecione…");
-      document.getElementById("regra-setor").innerHTML = opcoes(d.setores, "Todos os setores");
-      document.getElementById("lista-cargos").innerHTML = d.cargos.map(function (c) {
-        return '<option value="' + esc(c) + '">';
-      }).join("");
+    SF.api.get("/api/politicas/")
+      .then(function (dados) {
+        regras = dados.regras || [];
+        document.getElementById("btn-nova-regra").classList.toggle("d-none", !podeEditar);
+        document.getElementById("regra-produto").innerHTML = montarOpcoesSelect(dados.produtos || [], "Selecione…");
+        document.getElementById("regra-setor").innerHTML = montarOpcoesSelect(dados.setores || [], "Todos os setores");
+        document.getElementById("lista-cargos").innerHTML = (dados.cargos || []).map(function (cargo) {
+          return '<option value="' + escapar(cargo) + '">';
+        }).join("");
 
-      document.getElementById("corpo-regras").innerHTML = regras.length ? regras.map(function (r) {
-        var escopo = [r.setor ? "Setor: " + r.setor : "", r.cargo ? "Cargo: " + r.cargo : ""].filter(Boolean).join(" · ");
-        return "<tr>" +
-          "<td><strong>" + esc(r.produto) + '</strong><span class="small text-muted d-block">' + esc(r.tipo) + "</span></td>" +
-          "<td>" + esc(escopo) + "</td>" +
-          "<td>" + (r.limite_mensal != null ? esc(r.limite_mensal) + " un." : '<span class="text-muted">padrão (' + esc(r.padrao_limite != null ? r.padrao_limite : "—") + ")</span>") + "</td>" +
-          "<td>" + (r.periodicidade_dias ? esc(r.periodicidade_dias) + " dias" : '<span class="text-muted">padrão (' + esc(r.padrao_periodicidade || "—") + ")</span>") + "</td>" +
-          '<td><span class="selo ' + (r.ativo ? "selo--aprovado" : "selo--cancelado") + '">' + (r.ativo ? "Ativa" : "Inativa") + "</span></td>" +
-          '<td class="tabela-solicitacoes__acao text-nowrap">' + (podeEditar
-            ? '<button type="button" class="btn btn-sm btn-outline-secondary me-1" data-editar="' + esc(r.id) + '" aria-label="Editar política de ' + esc(r.produto) + '"><i class="bi bi-pencil" aria-hidden="true"></i></button>' +
-              '<button type="button" class="btn btn-sm btn-outline-' + (r.ativo ? "danger" : "success") + '" data-alternar="' + esc(r.id) + '">' + (r.ativo ? "Inativar" : "Ativar") + "</button>"
-            : "—") + "</td>" +
-        "</tr>";
-      }).join("") : '<tr><td colspan="6" class="tabela-solicitacoes__vazio">Nenhuma política cadastrada: valem os padrões de cada produto.</td></tr>';
-    }).catch(function (e) { mostrarAviso(e.message, "danger"); });
+        var corpo = document.getElementById("corpo-regras");
+        if (regras.length === 0) {
+          corpo.innerHTML = '<tr><td colspan="6" class="tabela-solicitacoes__vazio">Nenhuma política cadastrada: valem os padrões de cada produto.</td></tr>';
+          return;
+        }
+        corpo.innerHTML = regras.map(criarLinhaRegraHtml).join("");
+      })
+      .catch(function (erro) {
+        mostrarAviso(erro.message, "danger");
+      });
   }
 
-  function abrir(regra) {
+  function abrirModalRegra(regra) {
     form.reset();
     document.getElementById("erro-regra").textContent = "";
     document.getElementById("regra-id").value = regra ? regra.id : "";
@@ -57,38 +114,56 @@
       document.getElementById("regra-produto").value = regra.produto_id;
       document.getElementById("regra-setor").value = regra.setor_id || "";
       document.getElementById("regra-cargo").value = regra.cargo || "";
-      document.getElementById("regra-limite").value = regra.limite_mensal != null ? regra.limite_mensal : "";
+      document.getElementById("regra-limite").value = (regra.limite_mensal != null) ? regra.limite_mensal : "";
       document.getElementById("regra-periodicidade").value = regra.periodicidade_dias || "";
     }
     modal.show();
   }
 
-  document.getElementById("btn-nova-regra").addEventListener("click", function () { abrir(null); });
+  document.getElementById("btn-nova-regra").addEventListener("click", function () {
+    abrirModalRegra(null);
+  });
 
   document.getElementById("corpo-regras").addEventListener("click", function (evento) {
-    var editar = evento.target.closest("[data-editar]");
-    var alternar = evento.target.closest("[data-alternar]");
-    if (editar) abrir(regras.find(function (r) { return r.id === editar.dataset.editar; }));
-    if (alternar) {
-      SF.api.post("/api/politicas/" + encodeURIComponent(alternar.dataset.alternar) + "/toggle/")
-        .then(carregar).catch(function (e) { mostrarAviso(e.message, "danger"); });
+    var botaoEditar = evento.target.closest("[data-editar]");
+    var botaoAlternar = evento.target.closest("[data-alternar]");
+
+    if (botaoEditar) {
+      var regraEncontrada = regras.find(function (item) {
+        return item.id === botaoEditar.dataset.editar;
+      });
+      abrirModalRegra(regraEncontrada);
+    }
+
+    if (botaoAlternar) {
+      SF.api.post("/api/politicas/" + encodeURIComponent(botaoAlternar.dataset.alternar) + "/toggle/")
+        .then(carregar)
+        .catch(function (erro) {
+          mostrarAviso(erro.message, "danger");
+        });
     }
   });
 
   form.addEventListener("submit", function (evento) {
     evento.preventDefault();
-    SF.api.post("/api/politicas/salvar/", {
+    var dadosFormulario = {
       id: document.getElementById("regra-id").value || null,
       produto_id: document.getElementById("regra-produto").value,
       setor_id: document.getElementById("regra-setor").value || null,
       cargo: document.getElementById("regra-cargo").value.trim(),
       limite_mensal: document.getElementById("regra-limite").value,
       periodicidade_dias: document.getElementById("regra-periodicidade").value
-    }).then(function (r) {
-      modal.hide();
-      mostrarAviso(r.mensagem, "success");
-      carregar();
-    }).catch(function (e) { document.getElementById("erro-regra").textContent = e.message; });
+    };
+
+    SF.api.post("/api/politicas/salvar/", dadosFormulario)
+      .then(function (resposta) {
+        modal.hide();
+        mostrarAviso(resposta.mensagem, "success");
+        carregar();
+      })
+      .catch(function (erro) {
+        document.getElementById("erro-regra").textContent = erro.message;
+      });
   });
 
   carregar();

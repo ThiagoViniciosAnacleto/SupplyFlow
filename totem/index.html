@@ -44,56 +44,57 @@
   <main class="totem-main">
 
     <!-- PASSO 1: BOAS-VINDAS / ESCOLHA DO MÉTODO DE IDENTIFICAÇÃO -->
-    <section class="totem-passo ativo" id="passo-boas-vindas">
-      <div class="totem-hero-icone">
+    <section class="totem-passo ativo" id="passo-boas-vindas" aria-labelledby="titulo-boas-vindas">
+      <div class="totem-hero-icone" aria-hidden="true">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M10 10V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5"/><path d="M14 6a6 6 0 0 1 6 6v3"/><path d="M4 15v-3a6 6 0 0 1 6-6"/><rect x="2" y="15" width="20" height="4" rx="1"/>
         </svg>
       </div>
-      <h1 class="totem-titulo">Bem-vindo</h1>
+      <h1 class="totem-titulo" id="titulo-boas-vindas">Bem-vindo</h1>
       <p class="totem-subtitulo">
         Identifique-se para consultar seus produtos autorizados e realizar retiradas de EPIs e materiais consumíveis.
       </p>
 
       <div class="totem-opcoes-grid">
-        <div class="totem-card-opcao" id="opcao-matricula" role="button" tabindex="0">
-          <div class="totem-card-opcao__icone">
+        <button type="button" class="totem-card-opcao" id="opcao-matricula">
+          <span class="totem-card-opcao__icone" aria-hidden="true">
             <i class="bi bi-person-vcard"></i>
-          </div>
-          <div class="totem-card-opcao__titulo">Matrícula</div>
-          <div class="totem-card-opcao__sub">Digite sua matrícula de colaborador</div>
-        </div>
+          </span>
+          <span class="totem-card-opcao__titulo d-block">Matrícula</span>
+          <span class="totem-card-opcao__sub d-block">Digite sua matrícula de colaborador</span>
+        </button>
 
-        <div class="totem-card-opcao desabilitado" aria-disabled="true">
-          <div class="totem-card-opcao__icone">
+        <button type="button" class="totem-card-opcao desabilitado" disabled aria-disabled="true">
+          <span class="totem-card-opcao__icone" aria-hidden="true">
             <i class="bi bi-credit-card-2-front"></i>
-          </div>
-          <div class="totem-card-opcao__titulo">Crachá / RFID</div>
-          <div class="totem-card-opcao__sub">Indisponível no protótipo</div>
-        </div>
+          </span>
+          <span class="totem-card-opcao__titulo d-block">Crachá / RFID</span>
+          <span class="totem-card-opcao__sub d-block">Indisponível no protótipo</span>
+        </button>
       </div>
 
       <div class="text-center mt-5 text-muted small">
-        <i class="bi bi-shield-check text-success"></i> Ambiente seguro de autoatendimento · Rastreabilidade integrada
+        <i class="bi bi-shield-check text-success" aria-hidden="true"></i> Ambiente seguro de autoatendimento · Rastreabilidade integrada
       </div>
     </section>
 
     <!-- PASSO 2: DIGITAÇÃO DA MATRÍCULA -->
-    <section class="totem-passo" id="passo-matricula">
+    <section class="totem-passo" id="passo-matricula" aria-labelledby="titulo-passo-matricula">
       <button type="button" class="btn-voltar-totem btn-voltar" data-destino="passo-boas-vindas">
-        <i class="bi bi-arrow-left"></i> Voltar
+        <i class="bi bi-arrow-left" aria-hidden="true"></i> Voltar
       </button>
 
-      <div class="totem-hero-icone totem-hero-icone--lock">
+      <div class="totem-hero-icone totem-hero-icone--lock" aria-hidden="true">
         <i class="bi bi-person-badge"></i>
       </div>
-      <h2 class="totem-titulo">Digite sua Matrícula</h2>
+      <h2 class="totem-titulo" id="titulo-passo-matricula">Digite sua Matrícula</h2>
       <p class="totem-subtitulo">Utilize o teclado na tela ou o leitor para informar seu código.</p>
 
       <div class="totem-teclado-container">
+        <label for="input-matricula" class="visually-hidden">Matrícula digitada</label>
         <input type="text" id="input-matricula" class="totem-display-input w-100" placeholder="Sua matrícula" aria-label="Matrícula digitada" readonly>
 
-        <div class="totem-teclado">
+        <div class="totem-teclado" role="group" aria-label="Teclado numérico de matrícula">
           <button type="button" class="btn-tecla tecla-num" data-val="1">1</button>
           <button type="button" class="btn-tecla tecla-num" data-val="2">2</button>
           <button type="button" class="btn-tecla tecla-num" data-val="3">3</button>
@@ -103,41 +104,41 @@
           <button type="button" class="btn-tecla tecla-num" data-val="7">7</button>
           <button type="button" class="btn-tecla tecla-num" data-val="8">8</button>
           <button type="button" class="btn-tecla tecla-num" data-val="9">9</button>
-          <button type="button" class="btn-tecla btn-tecla--acao btn-tecla--apagar" id="btn-matricula-apagar">
-            <i class="bi bi-backspace"></i>
+          <button type="button" class="btn-tecla btn-tecla--acao btn-tecla--apagar" id="btn-matricula-apagar" aria-label="Apagar último dígito da matrícula">
+            <i class="bi bi-backspace" aria-hidden="true"></i>
           </button>
           <button type="button" class="btn-tecla tecla-num" data-val="0">0</button>
           <button type="button" class="btn-tecla btn-tecla--acao btn-tecla--verde" id="btn-matricula-confirmar">
-            OK <i class="bi bi-arrow-right"></i>
+            OK <i class="bi bi-arrow-right" aria-hidden="true"></i>
           </button>
         </div>
       </div>
     </section>
 
     <!-- PASSO 3: INFORME SEU PIN -->
-    <section class="totem-passo" id="passo-pin">
+    <section class="totem-passo" id="passo-pin" aria-labelledby="titulo-passo-pin">
       <button type="button" class="btn-voltar-totem btn-voltar" data-destino="passo-matricula">
-        <i class="bi bi-arrow-left"></i> Voltar
+        <i class="bi bi-arrow-left" aria-hidden="true"></i> Voltar
       </button>
 
-      <div class="totem-hero-icone totem-hero-icone--lock">
+      <div class="totem-hero-icone totem-hero-icone--lock" aria-hidden="true">
         <i class="bi bi-lock"></i>
       </div>
-      <h2 class="totem-titulo">Informe seu PIN</h2>
+      <h2 class="totem-titulo" id="titulo-passo-pin">Informe seu PIN</h2>
       <p class="totem-subtitulo">
         Olá, <strong id="pin-colaborador-nome">Colaborador</strong>. Digite sua senha de acesso de 4 dígitos.
       </p>
 
       <div class="totem-teclado-container">
         <!-- Indicador das 4 bolinhas preenchidas -->
-        <div class="totem-pin-dots" id="pin-dots">
+        <div class="totem-pin-dots" id="pin-dots" aria-hidden="true">
           <div class="pin-dot" id="dot-0"></div>
           <div class="pin-dot" id="dot-1"></div>
           <div class="pin-dot" id="dot-2"></div>
           <div class="pin-dot" id="dot-3"></div>
         </div>
 
-        <div class="totem-teclado">
+        <div class="totem-teclado" role="group" aria-label="Teclado numérico do PIN">
           <button type="button" class="btn-tecla tecla-pin" data-val="1">1</button>
           <button type="button" class="btn-tecla tecla-pin" data-val="2">2</button>
           <button type="button" class="btn-tecla tecla-pin" data-val="3">3</button>
@@ -149,15 +150,15 @@
           <button type="button" class="btn-tecla tecla-pin" data-val="9">9</button>
           <button type="button" class="btn-tecla btn-tecla--acao text-secondary" id="btn-pin-limpar">Limpar</button>
           <button type="button" class="btn-tecla tecla-pin" data-val="0">0</button>
-          <button type="button" class="btn-tecla btn-tecla--acao btn-tecla--apagar" id="btn-pin-apagar">
-            <i class="bi bi-backspace"></i>
+          <button type="button" class="btn-tecla btn-tecla--acao btn-tecla--apagar" id="btn-pin-apagar" aria-label="Apagar último dígito do PIN">
+            <i class="bi bi-backspace" aria-hidden="true"></i>
           </button>
         </div>
       </div>
     </section>
 
     <!-- PASSO 4: VITRINE DE PRODUTOS DISPONÍVEIS -->
-    <section class="totem-passo" id="passo-vitrine">
+    <section class="totem-passo" id="passo-vitrine" aria-label="Vitrine de produtos disponíveis">
       <div class="totem-vitrine-topo">
         <div class="totem-vitrine-usuario">
           <h2>Olá, <span id="vitrine-nome">Colaborador</span>!</h2>
@@ -168,7 +169,7 @@
 
         <div>
           <button type="button" class="btn-minhas-sols" id="btn-abrir-minhas-sols">
-            <i class="bi bi-clock-history"></i> Minhas solicitações
+            <i class="bi bi-clock-history" aria-hidden="true"></i> Minhas solicitações
             <span class="badge-sols-count" id="count-minhas-sols">0</span>
           </button>
         </div>
@@ -180,14 +181,14 @@
     </section>
 
     <!-- PASSO 5: JUSTIFICATIVA DE SUBSTITUIÇÃO ANTECIPADA -->
-    <section class="totem-passo" id="passo-justificativa">
+    <section class="totem-passo" id="passo-justificativa" aria-label="Justificativa de substituição antecipada">
       <button type="button" class="btn-voltar-totem btn-voltar" data-destino="passo-vitrine">
-        <i class="bi bi-arrow-left"></i> Voltar aos produtos
+        <i class="bi bi-arrow-left" aria-hidden="true"></i> Voltar aos produtos
       </button>
 
       <div class="totem-alerta-substituicao">
         <div class="totem-alerta-substituicao__titulo">
-          <i class="bi bi-exclamation-triangle-fill"></i> Substituição antecipada
+          <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i> Substituição antecipada
         </div>
         <p class="totem-alerta-substituicao__texto">
           Este EPI está fora do período regular de retirada ou acima do limite mensal. Informe o motivo detalhado para análise técnica pelo gestor.
@@ -242,7 +243,7 @@
         <div class="d-flex justify-content-end gap-3 mt-4">
           <button type="button" class="btn btn-light px-4 btn-voltar" data-destino="passo-vitrine">Cancelar</button>
           <button type="button" class="btn btn-primary px-4 fw-bold" id="btn-enviar-justificativa">
-            <i class="bi bi-send-check"></i> Confirmar e enviar solicitação
+            <i class="bi bi-send-check" aria-hidden="true"></i> Confirmar e enviar solicitação
           </button>
         </div>
       </div>
@@ -258,7 +259,7 @@
       <div class="modal-content rounded-4 border-0 shadow">
         <div class="modal-header border-bottom">
           <h5 class="modal-title fw-bold" id="modalSolsTitulo">
-            <i class="bi bi-clock-history text-primary"></i> Minhas Solicitações Recentes
+            <i class="bi bi-clock-history text-primary" aria-hidden="true"></i> Minhas Solicitações Recentes
           </h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
         </div>
@@ -267,16 +268,16 @@
             <table class="table table-hover align-middle mb-0">
               <thead class="table-light">
                 <tr>
-                  <th>Código</th>
-                  <th>Data</th>
-                  <th>Produto</th>
-                  <th>Tipo</th>
-                  <th>Status</th>
-                  <th>Ação</th>
+                  <th scope="col">Código</th>
+                  <th scope="col">Data</th>
+                  <th scope="col">Produto</th>
+                  <th scope="col">Tipo</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Ação</th>
                 </tr>
               </thead>
               <tbody id="lista-minhas-sols-body">
-                <tr><td colspan="5" class="text-center py-4 text-muted">Carregando histórico...</td></tr>
+                <tr><td colspan="6" class="text-center py-4 text-muted">Carregando histórico...</td></tr>
               </tbody>
             </table>
           </div>
@@ -291,11 +292,11 @@
   <!-- =====================================================================
        MODAL: SUCESSO / DISPENSAÇÃO
        ===================================================================== -->
-  <div class="modal fade" id="modal-sucesso" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
+  <div class="modal fade" id="modal-sucesso" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="sucesso-titulo" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content rounded-4 border-0 text-center p-4 shadow-lg">
         <div class="my-3">
-          <div class="totem-hero-icone bg-success text-white">
+          <div class="totem-hero-icone bg-success text-white" aria-hidden="true">
             <i class="bi bi-check-lg" style="font-size: 40px;"></i>
           </div>
         </div>
@@ -305,7 +306,7 @@
         </p>
 
         <div id="sucesso-detalhe-ia" class="d-none alert alert-info text-start small mb-4">
-          <strong><i class="bi bi-stars text-primary"></i> Análise da IA:</strong>
+          <strong><i class="bi bi-stars text-primary" aria-hidden="true"></i> Análise da IA:</strong>
           <div id="sucesso-ia-texto">Classificado como 'Dano em Serviço' com 89% de confiança.</div>
         </div>
 
@@ -322,4 +323,3 @@
   <script src="/static/js/totem.js"></script>
 </body>
 </html>
-

@@ -1,7 +1,9 @@
 /* =====================================================================
-   SupplyFlow — tela de login
-   Envia e-mail + senha para /api/login/. O servidor confere a senha,
-   abre a sessão e devolve os dados de exibição do usuário.
+   SupplyFlow — Tela de Login do Backoffice
+   ---------------------------------------------------------------------
+   Envia e-mail e senha para /api/login/. O servidor confere o hash da
+   senha, abre a sessão autenticada e devolve os dados de exibição do
+   usuário.
    ===================================================================== */
 
 (function () {
@@ -9,7 +11,7 @@
   var campoEmail = document.getElementById("email");
   var campoSenha = document.getElementById("senha");
   var caixaErro = document.getElementById("login-erro");
-  var botao = document.getElementById("btn-entrar");
+  var botaoEntrar = document.getElementById("btn-entrar");
 
   function mostrarErro(mensagem) {
     caixaErro.textContent = mensagem;
@@ -19,10 +21,17 @@
     campoSenha.focus();
   }
 
-  /* Só aceita voltar para páginas do próprio sistema (evita redirecionar para outro site) */
+  /* Regra de segurança (evita Open Redirect):
+     Só aceita redirecionar para páginas internas dentro de /backoffice/*.html. */
   function destinoSeguro() {
-    var proximo = new URLSearchParams(window.location.search).get("proximo") || "";
-    return /^\/backoffice\/[a-z0-9-]+\.html(\?[^#]*)?$/i.test(proximo) ? proximo : "/backoffice/visao-geral.html";
+    var parametrosUrl = new URLSearchParams(window.location.search);
+    var proximo = parametrosUrl.get("proximo") || "";
+    var padraoPaginaInterna = /^\/backoffice\/[a-z0-9-]+\.html(\?[^#]*)?$/i;
+
+    if (padraoPaginaInterna.test(proximo)) {
+      return proximo;
+    }
+    return "/backoffice/visao-geral.html";
   }
 
   formulario.addEventListener("submit", function (evento) {
@@ -37,7 +46,7 @@
       return;
     }
 
-    botao.disabled = true;
+    botaoEntrar.disabled = true;
     SF.api.post("/api/login/", { email: email, senha: senha }, { semRedirecionar: true })
       .then(function (resposta) {
         SF.sessao.iniciar(resposta.usuario);
@@ -47,7 +56,7 @@
         mostrarErro(erro.message);
       })
       .finally(function () {
-        botao.disabled = false;
+        botaoEntrar.disabled = false;
       });
   });
 })();

@@ -57,24 +57,41 @@
   <script>
     (function () {
       var corpo = document.getElementById("tabela-cargos-corpo");
-      var esc = SF.escapar;
+      var escapar = SF.escapar;
+
+      function criarLinhaCargoHtml(itemCargo) {
+        var textoSetores = itemCargo.setores.join(", ") || "—";
+        var htmlProdutosVinculados;
+
+        if (itemCargo.produtos_vinculados && itemCargo.produtos_vinculados.length > 0) {
+          htmlProdutosVinculados = escapar(itemCargo.produtos_vinculados.join(", "));
+        } else {
+          htmlProdutosVinculados = '<span class="text-muted">Nenhuma política específica — vale o padrão de cada produto</span>';
+        }
+
+        return (
+          "<tr>" +
+            "<td><strong>" + escapar(itemCargo.cargo) + "</strong></td>" +
+            "<td>" + escapar(textoSetores) + "</td>" +
+            "<td>" + escapar(itemCargo.total_funcionarios) + "</td>" +
+            '<td class="small">' + htmlProdutosVinculados + "</td>" +
+          "</tr>"
+        );
+      }
+
       SF.api.get("/api/cargos/")
-        .then(function (d) {
-          corpo.innerHTML = d.cargos.length ? d.cargos.map(function (c) {
-            return "<tr>" +
-              "<td><strong>" + esc(c.cargo) + "</strong></td>" +
-              "<td>" + esc(c.setores.join(", ") || "—") + "</td>" +
-              "<td>" + esc(c.total_funcionarios) + "</td>" +
-              '<td class="small">' + (c.produtos_vinculados.length ? esc(c.produtos_vinculados.join(", "))
-                : '<span class="text-muted">Nenhuma política específica — vale o padrão de cada produto</span>') + "</td>" +
-            "</tr>";
-          }).join("") : '<tr><td colspan="4" class="tabela-solicitacoes__vazio">Nenhum cargo cadastrado.</td></tr>';
+        .then(function (dados) {
+          var listaCargos = dados.cargos || [];
+          if (listaCargos.length === 0) {
+            corpo.innerHTML = '<tr><td colspan="4" class="tabela-solicitacoes__vazio">Nenhum cargo cadastrado.</td></tr>';
+            return;
+          }
+          corpo.innerHTML = listaCargos.map(criarLinhaCargoHtml).join("");
         })
         .catch(function (erro) {
-          corpo.innerHTML = '<tr><td colspan="4" class="tabela-solicitacoes__vazio">' + esc(erro.message) + "</td></tr>";
+          corpo.innerHTML = '<tr><td colspan="4" class="tabela-solicitacoes__vazio">' + escapar(erro.message) + "</td></tr>";
         });
     })();
   </script>
 </body>
 </html>
-

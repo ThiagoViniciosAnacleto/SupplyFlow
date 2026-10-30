@@ -1,17 +1,20 @@
 /* =====================================================================
-   SupplyFlow — Detalhe da solicitação e decisão
+   SupplyFlow — Detalhe da Solicitação e Tomada de Decisão
    ---------------------------------------------------------------------
    Lê /api/solicitacoes/<id>/ e envia a decisão para .../decidir/.
-   A IA só sugere a categoria; quem aprova, aprova com condição ou
-   rejeita é sempre a pessoa logada (o servidor confere o perfil).
+   REGRA DE NEGÓCIO IMPORTANTE:
+   A IA apenas sugere uma categoria para apoiar a triagem. Quem aprova,
+   aprova com condição ou rejeita é sempre o profissional habilitado,
+   podendo manter ou reclassificar a categoria sugerida.
    ===================================================================== */
 
 (function () {
   var escapar = SF.escapar;
-  var id = new URLSearchParams(window.location.search).get("id") || "";
-  var atual = null;
+  var parametrosUrl = new URLSearchParams(window.location.search);
+  var idSolicitacao = parametrosUrl.get("id") || "";
+  var solicitacaoAtual = null;
 
-  var SELOS = {
+  var CLASSES_SELO_STATUS = {
     "aguardando": "selo--aguardando",
     "aprovada": "selo--aprovado",
     "aprovada-condicao": "selo--condicional",
@@ -20,202 +23,325 @@
     "entregue": "selo--entregue"
   };
 
-  function el(idElemento) { return document.getElementById(idElemento); }
+  function obterElemento(idElemento) {
+    return document.getElementById(idElemento);
+  }
 
-  /* Lista de pares rótulo/valor; valor vazio vira "—" (nada de dado inventado) */
-  function dados(pares) {
-    return pares.map(function (p) {
-      var valor = p[1] === null || p[1] === undefined || p[1] === "" ? "—" : p[1];
-      return "<div><dt>" + escapar(p[0]) + "</dt><dd>" + escapar(valor) + "</dd></div>";
+  /* Monta uma lista de definições (<dt>/<dd>) substituindo valores vazios por "—" */
+  function montarListaDadosHtml(listaPares) {
+    return listaPares.map(function (par) {
+      var rotulo = par[0];
+      var valorBruto = par[1];
+      var valorExibicao = "—";
+
+      if (valorBruto !== null && valorBruto !== undefined && valorBruto !== "") {
+        valorExibicao = valorBruto;
+      }
+      return "<div><dt>" + escapar(rotulo) + "</dt><dd>" + escapar(valorExibicao) + "</dd></div>";
     }).join("");
   }
 
-  function mostrarNaoEncontrada(texto) {
-    el("conteudo-detalhe").classList.add("d-none");
-    el("nao-encontrada").classList.remove("d-none");
-    if (texto) el("nao-encontrada-texto").textContent = texto;
+  function mostrarTelaNaoEncontrada(mensagemPersonalizada) {
+    obterElemento("conteudo-detalhe").classList.add("d-none");
+    obterElemento("nao-encontrada").classList.remove("d-none");
+    if (mensagemPersonalizada) {
+      obterElemento("nao-encontrada-texto").textContent = mensagemPersonalizada;
+    }
   }
 
-  function renderizar(s, categorias) {
-    atual = s;
-    el("conteudo-detalhe").classList.remove("d-none");
-    document.title = "Solicitação " + s.codigo + " · SupplyFlow";
-
-    el("det-codigo").textContent = s.codigo;
-    var selo = el("det-status");
-    selo.className = "selo " + (SELOS[s.status] || "selo--aguardando");
-    selo.textContent = s.status_rotulo;
-    el("det-motivo").textContent = s.motivo;
-    el("det-data-hora").textContent = s.data + ", " + s.hora;
-
-    var f = s.solicitante;
-    el("dados-funcionario").innerHTML = dados([
-      ["Nome", f.nome], ["Matrícula", f.matricula], ["Função", f.cargo],
-      ["Centro de custo", f.setor ? f.setor + (f.centro_custo ? " (" + f.centro_custo + ")" : "") : null]
-    ]);
-
-    el("link-ficha").href = "ficha-epi.html?id=" + encodeURIComponent(f.id);
-
-    var p = s.produto;
-    el("det-prod-nome").textContent = p.nome || "—";
-    el("det-prod-tipo").textContent = p.tipo || "";
-    el("dados-produto").innerHTML = dados([
-      ["Descrição", p.descricao], ["CA", p.ca], ["Validade do CA", p.validade_ca], ["Tamanho", p.tamanho],
-      ["Quantidade", p.quantidade != null ? p.quantidade + " " + (p.unidade || "") : null]
-    ]);
-
-    var r = s.regra || {};
-    el("dados-regra").innerHTML = dados([
-      ["Escopo", r.origem],
-      ["Periodicidade", r.periodicidade_dias ? r.periodicidade_dias + " dias" : null],
-      ["Limite mensal", r.limite_mensal != null ? r.limite_mensal + " un." : null],
-      ["Exceção", r.excecao]
-    ]);
-
-    el("det-historico").innerHTML = s.historico.length
-      ? s.historico.map(function (h) {
-          return '<li><span class="numero">' + escapar(h.data) + "</span><span>" + escapar(h.tipo) +
-            " · " + escapar(h.quantidade) + " un. · " + escapar(h.solicitacao) + "</span></li>";
-        }).join("")
-      : "<li>Nenhuma entrega anterior deste item.</li>";
-
-    el("det-justificativa").textContent = s.justificativa ? "“" + s.justificativa + "”" : "Retirada regular — sem justificativa.";
-    el("det-justificativa").classList.toggle("citacao--vazia", !s.justificativa);
-
-    renderizarIA(s, categorias);
-    renderizarDecisao(s);
+  function formatarCentroCustoSolicitante(solicitante) {
+    if (!solicitante || !solicitante.setor) {
+      return null;
+    }
+    if (solicitante.centro_custo) {
+      return solicitante.setor + " (" + solicitante.centro_custo + ")";
+    }
+    return solicitante.setor;
   }
 
-  function renderizarIA(s, categorias) {
-    var ia = s.ia;
-    var cartao = el("cartao-ia");
-    if (!ia) {
-      cartao.querySelector(".cartao__corpo").innerHTML =
+  function renderizarSolicitacao(solicitacao, categoriasDisponiveis) {
+    solicitacaoAtual = solicitacao;
+    obterElemento("conteudo-detalhe").classList.remove("d-none");
+    document.title = "Solicitação " + solicitacao.codigo + " · SupplyFlow";
+
+    obterElemento("det-codigo").textContent = solicitacao.codigo;
+    var elementoSelo = obterElemento("det-status");
+    var classeSelo = CLASSES_SELO_STATUS[solicitacao.status] || "selo--aguardando";
+    elementoSelo.className = "selo " + classeSelo;
+    elementoSelo.textContent = solicitacao.status_rotulo;
+
+    obterElemento("det-motivo").textContent = solicitacao.motivo;
+    obterElemento("det-data-hora").textContent = solicitacao.data + ", " + solicitacao.hora;
+
+    /* 1. Dados do Funcionário */
+    var solicitante = solicitacao.solicitante;
+    obterElemento("dados-funcionario").innerHTML = montarListaDadosHtml([
+      ["Nome", solicitante.nome],
+      ["Matrícula", solicitante.matricula],
+      ["Função", solicitante.cargo],
+      ["Centro de custo", formatarCentroCustoSolicitante(solicitante)]
+    ]);
+    obterElemento("link-ficha").href = "ficha-epi.html?id=" + encodeURIComponent(solicitante.id);
+
+    /* 2. Dados do Produto Solicitado */
+    var produto = solicitacao.produto;
+    obterElemento("det-prod-nome").textContent = produto.nome || "—";
+    obterElemento("det-prod-tipo").textContent = produto.tipo || "";
+
+    var textoQuantidade = null;
+    if (produto.quantidade != null) {
+      textoQuantidade = produto.quantidade + " " + (produto.unidade || "");
+    }
+    obterElemento("dados-produto").innerHTML = montarListaDadosHtml([
+      ["Descrição", produto.descricao],
+      ["CA", produto.ca],
+      ["Validade do CA", produto.validade_ca],
+      ["Tamanho", produto.tamanho],
+      ["Quantidade", textoQuantidade]
+    ]);
+
+    /* 3. Regra de Fornecimento Aplicada */
+    var regra = solicitacao.regra || {};
+    var textoPeriodicidade = regra.periodicidade_dias ? (regra.periodicidade_dias + " dias") : null;
+    var textoLimiteMensal = (regra.limite_mensal != null) ? (regra.limite_mensal + " un.") : null;
+
+    obterElemento("dados-regra").innerHTML = montarListaDadosHtml([
+      ["Escopo", regra.origem],
+      ["Periodicidade", textoPeriodicidade],
+      ["Limite mensal", textoLimiteMensal],
+      ["Exceção", regra.excecao]
+    ]);
+
+    /* 4. Histórico de Entregas Anteriores deste Item */
+    var elementoHistorico = obterElemento("det-historico");
+    if (!solicitacao.historico || solicitacao.historico.length === 0) {
+      elementoHistorico.innerHTML = "<li>Nenhuma entrega anterior deste item.</li>";
+    } else {
+      elementoHistorico.innerHTML = solicitacao.historico.map(function (itemHistorico) {
+        return (
+          "<li>" +
+            '<span class="numero">' + escapar(itemHistorico.data) + "</span>" +
+            "<span>" +
+              escapar(itemHistorico.tipo) + " · " +
+              escapar(itemHistorico.quantidade) + " un. · " +
+              escapar(itemHistorico.solicitacao) +
+            "</span>" +
+          "</li>"
+        );
+      }).join("");
+    }
+
+    /* 5. Justificativa do Funcionário */
+    var elementoJustificativa = obterElemento("det-justificativa");
+    if (solicitacao.justificativa) {
+      elementoJustificativa.textContent = "“" + solicitacao.justificativa + "”";
+      elementoJustificativa.classList.remove("citacao--vazia");
+    } else {
+      elementoJustificativa.textContent = "Retirada regular — sem justificativa.";
+      elementoJustificativa.classList.add("citacao--vazia");
+    }
+
+    renderizarBlocoIa(solicitacao, categoriasDisponiveis);
+    renderizarBlocoDecisao(solicitacao);
+  }
+
+  function obterTextoFonteIa(dadosIa) {
+    if (dadosIa.fonte === "modelo") {
+      var complementoTermos = "";
+      if (dadosIa.termos && dadosIa.termos.length > 0) {
+        complementoTermos = " · termos que mais pesaram: " + dadosIa.termos.join(", ");
+      }
+      return "Modelo " + dadosIa.modelo_versao + complementoTermos;
+    }
+    if (dadosIa.fonte === "palavras-chave") {
+      return "Linha de base por palavras-chave (modelo treinado indisponível): sem estimativa de confiança.";
+    }
+    if (dadosIa.fonte === "legado") {
+      return "Classificação feita pela versão anterior do sistema.";
+    }
+    return "";
+  }
+
+  function renderizarBlocoIa(solicitacao, categoriasDisponiveis) {
+    var dadosIa = solicitacao.ia;
+    var cartaoIa = obterElemento("cartao-ia");
+
+    if (!dadosIa) {
+      cartaoIa.querySelector(".cartao__corpo").innerHTML =
         '<p class="mb-0 text-muted">A IA só analisa justificativas de solicitações excepcionais. Esta é uma retirada regular.</p>';
       return;
     }
-    el("ia-categoria").textContent = ia.categoria || "—";
-    el("ia-confianca").textContent = ia.confianca != null ? Math.round(ia.confianca) + "%" : "—";
-    var fontes = {
-      "modelo": "Modelo " + ia.modelo_versao + (ia.termos && ia.termos.length ? " · termos que mais pesaram: " + ia.termos.join(", ") : ""),
-      "palavras-chave": "Linha de base por palavras-chave (modelo treinado indisponível): sem estimativa de confiança.",
-      "legado": "Classificação feita pela versão anterior do sistema."
-    };
-    el("ia-fonte").textContent = fontes[ia.fonte] || "";
 
-    var seletor = el("reclassificar");
-    seletor.innerHTML = categorias.map(function (c) {
-      return '<option value="' + escapar(c) + '"' + (c === ia.categoria ? " selected" : "") + ">" + escapar(c) + "</option>";
+    obterElemento("ia-categoria").textContent = dadosIa.categoria || "—";
+    obterElemento("ia-confianca").textContent = (dadosIa.confianca != null) ? (Math.round(dadosIa.confianca) + "%") : "—";
+    obterElemento("ia-fonte").textContent = obterTextoFonteIa(dadosIa);
+
+    var seletorReclassificacao = obterElemento("reclassificar");
+    seletorReclassificacao.innerHTML = (categoriasDisponiveis || []).map(function (categoria) {
+      var atributoSelected = (categoria === dadosIa.categoria) ? " selected" : "";
+      return '<option value="' + escapar(categoria) + '"' + atributoSelected + ">" + escapar(categoria) + "</option>";
     }).join("");
 
-    var d = s.decisao;
-    var mostrarSeletor = s.pode_decidir;
-    el("bloco-reclassificar").classList.toggle("d-none", !mostrarSeletor);
-    var quadro = el("ia-categorias-decisao");
-    if (d && d.categoria_confirmada) {
-      quadro.classList.remove("d-none");
-      quadro.innerHTML = d.reclassificada
-        ? dados([["Sugerida pela IA", d.categoria_ia], ["Confirmada pelo responsável", d.categoria_confirmada]])
-        : dados([["Categoria confirmada", d.categoria_confirmada + " (igual à sugerida)"]]);
+    var decisao = solicitacao.decisao;
+    obterElemento("bloco-reclassificar").classList.toggle("d-none", !solicitacao.pode_decidir);
+
+    var quadroCategoriasDecisao = obterElemento("ia-categorias-decisao");
+    if (decisao && decisao.categoria_confirmada) {
+      quadroCategoriasDecisao.classList.remove("d-none");
+      if (decisao.reclassificada) {
+        quadroCategoriasDecisao.innerHTML = montarListaDadosHtml([
+          ["Sugerida pela IA", decisao.categoria_ia],
+          ["Confirmada pelo responsável", decisao.categoria_confirmada]
+        ]);
+      } else {
+        quadroCategoriasDecisao.innerHTML = montarListaDadosHtml([
+          ["Categoria confirmada", decisao.categoria_confirmada + " (igual à sugerida)"]
+        ]);
+      }
     } else {
-      quadro.classList.add("d-none");
+      quadroCategoriasDecisao.classList.add("d-none");
     }
   }
 
-  function renderizarDecisao(s) {
-    var form = el("form-decisao");
-    var resultado = el("decisao-tomada");
-    var semPermissao = el("sem-permissao");
-    form.classList.toggle("d-none", !s.pode_decidir);
-    semPermissao.classList.toggle("d-none", s.pode_decidir || !!s.decisao || s.status !== "aguardando");
+  function renderizarBlocoDecisao(solicitacao) {
+    var formularioDecisao = obterElemento("form-decisao");
+    var caixaResultadoDecisao = obterElemento("decisao-tomada");
+    var avisoSemPermissao = obterElemento("sem-permissao");
 
-    var d = s.decisao;
-    if (!d) {
-      resultado.classList.add("d-none");
+    formularioDecisao.classList.toggle("d-none", !solicitacao.pode_decidir);
+
+    var deveEsconderAvisoSemPermissao =
+      solicitacao.pode_decidir || Boolean(solicitacao.decisao) || solicitacao.status !== "aguardando";
+    avisoSemPermissao.classList.toggle("d-none", deveEsconderAvisoSemPermissao);
+
+    var decisao = solicitacao.decisao;
+    if (!decisao) {
+      caixaResultadoDecisao.classList.add("d-none");
       return;
     }
-    var linhas = [
-      "<strong>" + escapar(d.rotulo) + "</strong> por " + escapar(d.responsavel || "—") + " em " + escapar(d.data_hora)
+
+    var linhasResumo = [
+      "<strong>" + escapar(decisao.rotulo) + "</strong> por " +
+      escapar(decisao.responsavel || "—") + " em " + escapar(decisao.data_hora)
     ];
-    if (d.observacao) linhas.push("Observação: " + escapar(d.observacao));
-    if (d.exige_devolucao) {
-      var dev = s.devolucao || {};
-      linhas.push("Condição: devolução do EPI anterior — <strong>" + escapar(dev.rotulo || "pendente") + "</strong>" +
-        (dev.condicao ? " (" + escapar(dev.condicao) + ", destino: " + escapar(dev.destinacao) + ")" : ""));
+
+    if (decisao.observacao) {
+      linhasResumo.push("Observação: " + escapar(decisao.observacao));
     }
-    resultado.innerHTML = '<div class="alert alert-light border mb-0">' + linhas.join("<br>") + "</div>";
-    resultado.classList.remove("d-none");
+
+    if (decisao.exige_devolucao) {
+      var devolucao = solicitacao.devolucao || {};
+      var detalheCondicaoDevolucao = "";
+      if (devolucao.condicao) {
+        detalheCondicaoDevolucao = " (" + escapar(devolucao.condicao) + ", destino: " + escapar(devolucao.destinacao) + ")";
+      }
+      linhasResumo.push(
+        "Condição: devolução do EPI anterior — <strong>" +
+        escapar(devolucao.rotulo || "pendente") + "</strong>" + detalheCondicaoDevolucao
+      );
+    }
+
+    caixaResultadoDecisao.innerHTML = '<div class="alert alert-light border mb-0">' + linhasResumo.join("<br>") + "</div>";
+    caixaResultadoDecisao.classList.remove("d-none");
   }
 
-  /* ---------- Envio da decisão ---------- */
-  function mostrarErro(texto, campo) {
-    var caixa = el("erro-decisao");
-    caixa.textContent = texto;
-    ["observacao", "exigir-devolucao"].forEach(function (c) {
-      el(c).removeAttribute("aria-invalid");
-      el(c).classList.remove("is-invalid");
+  /* ---------- Validação e Envio da Decisão ---------- */
+  function mostrarErroDecisao(mensagemErro, idsCamposInvalidos) {
+    var caixaErro = obterElemento("erro-decisao");
+    caixaErro.textContent = mensagemErro;
+
+    ["observacao", "exigir-devolucao"].forEach(function (idCampo) {
+      var campo = obterElemento(idCampo);
+      campo.removeAttribute("aria-invalid");
+      campo.classList.remove("is-invalid");
     });
-    if (campo) {
-      campo.forEach(function (c) {
-        el(c).setAttribute("aria-invalid", "true");
-        el(c).classList.add("is-invalid");
-        el(c).setAttribute("aria-describedby", "erro-decisao");
+
+    if (idsCamposInvalidos && idsCamposInvalidos.length > 0) {
+      idsCamposInvalidos.forEach(function (idCampo) {
+        var campo = obterElemento(idCampo);
+        campo.setAttribute("aria-invalid", "true");
+        campo.classList.add("is-invalid");
+        campo.setAttribute("aria-describedby", "erro-decisao");
       });
-      el(campo[0]).focus();
+      obterElemento(idsCamposInvalidos[0]).focus();
     }
   }
 
-  function travar(travado) {
-    document.querySelectorAll("[data-decisao]").forEach(function (b) { b.disabled = travado; });
+  function definirBotoesDecisaoDesabilitados(desabilitado) {
+    document.querySelectorAll("[data-decisao]").forEach(function (botao) {
+      botao.disabled = desabilitado;
+    });
   }
 
-  el("form-decisao").addEventListener("click", function (evento) {
-    var botao = evento.target.closest("[data-decisao]");
-    if (!botao || !atual) return;
-    var decisao = botao.dataset.decisao;
-    var observacao = el("observacao").value.trim();
-    var exige = el("exigir-devolucao").checked;
-    mostrarErro("");
-
-    // Mesmas regras do servidor, só para avisar antes de enviar
-    if (decisao === "rejeitar" && !observacao) {
-      mostrarErro("Para rejeitar, explique o motivo na observação.", ["observacao"]);
-      return;
-    }
-    if (decisao === "aprovar_condicao" && !exige && !observacao) {
-      mostrarErro("Para aprovar com condição, marque a devolução do EPI ou descreva a condição na observação.",
-        ["exigir-devolucao", "observacao"]);
-      return;
-    }
-    if (decisao === "aprovar" && exige) {
-      mostrarErro("A devolução marcada é uma condição: use “Aprovar com condição” ou desmarque-a.", ["exigir-devolucao"]);
+  obterElemento("form-decisao").addEventListener("click", function (evento) {
+    var botaoClicado = evento.target.closest("[data-decisao]");
+    if (!botaoClicado || !solicitacaoAtual) {
       return;
     }
 
-    travar(true);
-    var seletor = el("reclassificar");
-    SF.api.post("/api/solicitacoes/" + encodeURIComponent(atual.id) + "/decidir/", {
-      decisao: decisao,
-      observacao: observacao,
-      exige_devolucao: exige,
-      categoria_confirmada: atual.ia && seletor ? seletor.value : ""
-    })
+    var tipoDecisao = botaoClicado.dataset.decisao;
+    var textoObservacao = obterElemento("observacao").value.trim();
+    var exigeDevolucao = obterElemento("exigir-devolucao").checked;
+    mostrarErroDecisao("");
+
+    /* Validações de regra de negócio antes do envio ao servidor */
+    if (tipoDecisao === "rejeitar" && !textoObservacao) {
+      mostrarErroDecisao("Para rejeitar, explique o motivo na observação.", ["observacao"]);
+      return;
+    }
+    if (tipoDecisao === "aprovar_condicao" && !exigeDevolucao && !textoObservacao) {
+      mostrarErroDecisao(
+        "Para aprovar com condição, marque a devolução do EPI ou descreva a condição na observação.",
+        ["exigir-devolucao", "observacao"]
+      );
+      return;
+    }
+    if (tipoDecisao === "aprovar" && exigeDevolucao) {
+      mostrarErroDecisao(
+        "A devolução marcada é uma condição: use “Aprovar com condição” ou desmarque-a.",
+        ["exigir-devolucao"]
+      );
+      return;
+    }
+
+    definirBotoesDecisaoDesabilitados(true);
+    var seletorReclassificacao = obterElemento("reclassificar");
+    var categoriaConfirmada = "";
+    if (solicitacaoAtual.ia && seletorReclassificacao) {
+      categoriaConfirmada = seletorReclassificacao.value;
+    }
+
+    var payload = {
+      decisao: tipoDecisao,
+      observacao: textoObservacao,
+      exige_devolucao: exigeDevolucao,
+      categoria_confirmada: categoriaConfirmada
+    };
+
+    SF.api.post("/api/solicitacoes/" + encodeURIComponent(solicitacaoAtual.id) + "/decidir/", payload)
       .then(function (resposta) {
-        renderizar(resposta.solicitacao, []);
-        el("decisao-tomada").focus();
+        renderizarSolicitacao(resposta.solicitacao, []);
+        obterElemento("decisao-tomada").focus();
       })
       .catch(function (erro) {
-        mostrarErro(erro.message);
-        travar(false);
+        mostrarErroDecisao(erro.message);
+        definirBotoesDecisaoDesabilitados(false);
       });
   });
 
-  /* ---------- Carga ---------- */
-  if (!/^[0-9a-f-]{36}$/i.test(id)) {
-    mostrarNaoEncontrada("Abra uma solicitação a partir da lista.");
+  /* ---------- Carregamento Inicial ---------- */
+  var padraoUuid = /^[0-9a-f-]{36}$/i;
+  if (!padraoUuid.test(idSolicitacao)) {
+    mostrarTelaNaoEncontrada("Abra uma solicitação a partir da lista.");
     return;
   }
-  SF.api.get("/api/solicitacoes/" + encodeURIComponent(id) + "/")
-    .then(function (resposta) { renderizar(resposta.solicitacao, resposta.categorias); })
-    .catch(function (erro) { mostrarNaoEncontrada(erro.status === 404 ? null : erro.message); });
+
+  SF.api.get("/api/solicitacoes/" + encodeURIComponent(idSolicitacao) + "/")
+    .then(function (resposta) {
+      renderizarSolicitacao(resposta.solicitacao, resposta.categorias);
+    })
+    .catch(function (erro) {
+      var mensagem = (erro.status === 404) ? null : erro.message;
+      mostrarTelaNaoEncontrada(mensagem);
+    });
 })();

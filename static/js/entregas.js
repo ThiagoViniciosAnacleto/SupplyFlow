@@ -1,7 +1,9 @@
 /* =====================================================================
-   SupplyFlow — Entregas (RF-40 a RF-42)
-   O almoxarife confirma a retirada física; o servidor dá baixa no estoque
-   e recusa (com o motivo) quando a entrega não é permitida.
+   SupplyFlow — Entregas (RF-40 a RF-42 · /api/entregas/)
+   ---------------------------------------------------------------------
+   O almoxarife confirma a retirada física do item aprovado; o servidor
+   dá baixa na reserva de estoque e impede a entrega caso ainda exista
+   uma devolução obrigatória pendente para aquela solicitação.
    ===================================================================== */
 
 (function () {
@@ -14,56 +16,114 @@
     aviso.focus();
   }
 
-  function vazio(colunas, texto) {
-    return '<tr><td colspan="' + colunas + '" class="tabela-solicitacoes__vazio">' + escapar(texto) + "</td></tr>";
+  function criarLinhaTabelaVazia(quantidadeColunas, mensagem) {
+    return '<tr><td colspan="' + quantidadeColunas + '" class="tabela-solicitacoes__vazio">' + escapar(mensagem) + "</td></tr>";
+  }
+
+  /* Monta a coluna de ação da tabela de entregas pendentes */
+  function criarHtmlAcaoPendente(pendencia, podeEntregar) {
+    if (!podeEntregar) {
+      return "—";
+    }
+    if (pendencia.bloqueio) {
+      return '<a class="btn btn-sm btn-outline-secondary" href="devolucoes.html">Ver devolução</a>';
+    }
+    return (
+      '<button type="button" class="btn btn-sm btn-success" data-confirmar="' + escapar(pendencia.id) + '"' +
+              ' aria-label="Confirmar entrega da solicitação ' + escapar(pendencia.codigo) + '">' +
+        '<i class="bi bi-box-arrow-up" aria-hidden="true"></i> Confirmar entrega' +
+      "</button>"
+    );
+  }
+
+  function criarLinhaEntregaPendenteHtml(pendencia, podeEntregar) {
+    var classeSelo = pendencia.bloqueio ? "selo--aguardando" : "selo--aprovado";
+    var textoSelo = pendencia.bloqueio || pendencia.status_rotulo;
+    var htmlAcao = criarHtmlAcaoPendente(pendencia, podeEntregar);
+
+    return (
+      "<tr>" +
+        '<td><a class="numero" href="solicitacao.html?id=' + encodeURIComponent(pendencia.id) + '">' + escapar(pendencia.codigo) + "</a></td>" +
+        '<td class="text-nowrap">' + escapar(pendencia.data) + "</td>" +
+        "<td>" +
+          escapar(pendencia.colaborador) +
+          '<br><span class="text-muted small">' + escapar(pendencia.matricula) + " · " + escapar(pendencia.setor) + "</span>" +
+        "</td>" +
+        "<td>" + escapar(pendencia.produto) + "</td>" +
+        "<td>" + escapar(pendencia.quantidade) + "</td>" +
+        '<td><span class="selo ' + classeSelo + '">' + escapar(textoSelo) + "</span></td>" +
+        '<td class="tabela-solicitacoes__acao">' + htmlAcao + "</td>" +
+      "</tr>"
+    );
+  }
+
+  function criarLinhaEntregaConfirmadaHtml(entrega) {
+    var textoSetor = escapar(entrega.setor);
+    if (entrega.centro_custo && entrega.centro_custo !== "—") {
+      textoSetor += " (" + escapar(entrega.centro_custo) + ")";
+    }
+
+    return (
+      "<tr>" +
+        '<td class="text-nowrap">' + escapar(entrega.data) + "</td>" +
+        '<td><span class="numero">' + escapar(entrega.codigo) + "</span></td>" +
+        "<td>" + escapar(entrega.colaborador) + "</td>" +
+        "<td>" + textoSetor + "</td>" +
+        "<td>" + escapar(entrega.produto) + "</td>" +
+        "<td>" + escapar(entrega.quantidade) + "</td>" +
+        "<td>" + escapar(entrega.ca) + "</td>" +
+        "<td>" + escapar(entrega.lote) + "</td>" +
+        "<td>" + escapar(entrega.almoxarife) + "</td>" +
+      "</tr>"
+    );
   }
 
   function carregar() {
     SF.api.get("/api/entregas/")
-      .then(function (d) {
-        document.getElementById("meta-pendentes").textContent = d.pendentes.length + " pendente(s)";
-        document.getElementById("corpo-pendentes").innerHTML = d.pendentes.length ? d.pendentes.map(function (p) {
-          var acao = !d.pode_entregar ? "—" : p.bloqueio
-            ? '<a class="btn btn-sm btn-outline-secondary" href="devolucoes.html">Ver devolução</a>'
-            : '<button type="button" class="btn btn-sm btn-success" data-confirmar="' + escapar(p.id) + '"' +
-              ' aria-label="Confirmar entrega da solicitação ' + escapar(p.codigo) + '">' +
-              '<i class="bi bi-box-arrow-up" aria-hidden="true"></i> Confirmar entrega</button>';
-          return "<tr>" +
-            '<td><a class="numero" href="solicitacao.html?id=' + encodeURIComponent(p.id) + '">' + escapar(p.codigo) + "</a></td>" +
-            '<td class="text-nowrap">' + escapar(p.data) + "</td>" +
-            "<td>" + escapar(p.colaborador) + '<br><span class="text-muted small">' + escapar(p.matricula) + " · " + escapar(p.setor) + "</span></td>" +
-            "<td>" + escapar(p.produto) + "</td>" +
-            "<td>" + escapar(p.quantidade) + "</td>" +
-            '<td><span class="selo ' + (p.bloqueio ? "selo--aguardando" : "selo--aprovado") + '">' +
-              escapar(p.bloqueio || p.status_rotulo) + "</span></td>" +
-            '<td class="tabela-solicitacoes__acao">' + acao + "</td>" +
-          "</tr>";
-        }).join("") : vazio(7, "Nenhuma entrega aguardando retirada.");
+      .then(function (dados) {
+        var listaPendentes = dados.pendentes || [];
+        var listaConfirmadas = dados.entregas || [];
 
-        document.getElementById("corpo-confirmadas").innerHTML = d.entregas.length ? d.entregas.map(function (e) {
-          return "<tr>" +
-            '<td class="text-nowrap">' + escapar(e.data) + "</td>" +
-            '<td><span class="numero">' + escapar(e.codigo) + "</span></td>" +
-            "<td>" + escapar(e.colaborador) + "</td>" +
-            "<td>" + escapar(e.setor) + (e.centro_custo !== "—" ? " (" + escapar(e.centro_custo) + ")" : "") + "</td>" +
-            "<td>" + escapar(e.produto) + "</td>" +
-            "<td>" + escapar(e.quantidade) + "</td>" +
-            "<td>" + escapar(e.ca) + "</td>" +
-            "<td>" + escapar(e.lote) + "</td>" +
-            "<td>" + escapar(e.almoxarife) + "</td>" +
-          "</tr>";
-        }).join("") : vazio(9, "Nenhuma entrega confirmada ainda.");
+        document.getElementById("meta-pendentes").textContent = listaPendentes.length + " pendente(s)";
+
+        var corpoPendentes = document.getElementById("corpo-pendentes");
+        if (listaPendentes.length === 0) {
+          corpoPendentes.innerHTML = criarLinhaTabelaVazia(7, "Nenhuma entrega aguardando retirada.");
+        } else {
+          corpoPendentes.innerHTML = listaPendentes.map(function (pendencia) {
+            return criarLinhaEntregaPendenteHtml(pendencia, dados.pode_entregar);
+          }).join("");
+        }
+
+        var corpoConfirmadas = document.getElementById("corpo-confirmadas");
+        if (listaConfirmadas.length === 0) {
+          corpoConfirmadas.innerHTML = criarLinhaTabelaVazia(9, "Nenhuma entrega confirmada ainda.");
+        } else {
+          corpoConfirmadas.innerHTML = listaConfirmadas.map(criarLinhaEntregaConfirmadaHtml).join("");
+        }
       })
-      .catch(function (erro) { mostrarAviso(erro.message, "danger"); });
+      .catch(function (erro) {
+        mostrarAviso(erro.message, "danger");
+      });
   }
 
   document.getElementById("corpo-pendentes").addEventListener("click", function (evento) {
-    var botao = evento.target.closest("[data-confirmar]");
-    if (!botao) return;
-    botao.disabled = true;
-    SF.api.post("/api/entregas/" + encodeURIComponent(botao.dataset.confirmar) + "/confirmar/")
-      .then(function (r) { mostrarAviso(r.mensagem, "success"); carregar(); })
-      .catch(function (erro) { mostrarAviso(erro.message, "danger"); botao.disabled = false; });
+    var botaoConfirmar = evento.target.closest("[data-confirmar]");
+    if (!botaoConfirmar) {
+      return;
+    }
+    botaoConfirmar.disabled = true;
+    var urlConfirmar = "/api/entregas/" + encodeURIComponent(botaoConfirmar.dataset.confirmar) + "/confirmar/";
+
+    SF.api.post(urlConfirmar)
+      .then(function (resposta) {
+        mostrarAviso(resposta.mensagem, "success");
+        carregar();
+      })
+      .catch(function (erro) {
+        mostrarAviso(erro.message, "danger");
+        botaoConfirmar.disabled = false;
+      });
   });
 
   aviso.setAttribute("tabindex", "-1");
