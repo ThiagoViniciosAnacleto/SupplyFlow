@@ -16,6 +16,7 @@
     "f-de": "de",
     "f-ate": "ate",
     "f-funcionario": "funcionario",
+    "f-cargo": "cargo",
     "f-setor": "setor",
     "f-produto": "produto",
     "f-status": "status",
@@ -25,7 +26,11 @@
   function montarParametrosBusca() {
     var parametros = new URLSearchParams();
     Object.keys(MAPA_CAMPOS_FILTRO).forEach(function (idCampo) {
-      var valor = document.getElementById(idCampo).value.trim();
+      var elemento = document.getElementById(idCampo);
+      if (!elemento) {
+        return;
+      }
+      var valor = elemento.value.trim();
       if (valor) {
         var nomeParametro = MAPA_CAMPOS_FILTRO[idCampo];
         parametros.set(nomeParametro, valor);
@@ -36,6 +41,9 @@
 
   function preencherSelectFiltro(idSelect, listaOpcoes) {
     var elementoSelect = document.getElementById(idSelect);
+    if (!elementoSelect) {
+      return;
+    }
     (listaOpcoes || []).forEach(function (item) {
       var opcao = document.createElement("option");
       opcao.value = item.valor || item.id;
@@ -88,6 +96,7 @@
       .then(function (dados) {
         if (!filtrosJaForamPreenchidos) {
           preencherSelectFiltro("f-tipo", dados.filtros.tipos);
+          preencherSelectFiltro("f-cargo", dados.filtros.cargos);
           preencherSelectFiltro("f-setor", dados.filtros.setores);
           preencherSelectFiltro("f-produto", dados.filtros.produtos);
           preencherSelectFiltro("f-status", dados.filtros.status);

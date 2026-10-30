@@ -4,15 +4,27 @@ from datetime import datetime
 
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
+from django.db import transaction
 from django.db.models import Count, Q
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 
-from ..auditoria import registrar
+from ..auditoria import ip_da_requisicao, registrar
 from ..contas import enviar_link_de_senha, garantir_conta
-from ..models import CategoriaProduto, Fornecedor, Produto, RegraFornecimento, Setor, Usuario
+from ..models import (
+    CategoriaProduto,
+    EstoqueTotem,
+    Fornecedor,
+    Produto,
+    RegraFornecimento,
+    RegistroAuditoria,
+    Setor,
+    Totem,
+    Usuario,
+)
 from ..permissoes import PERFIS, PERFIS_BACKOFFICE, api_backoffice
 from ..seguranca import definir_pin, validar_novo_pin
+from ..servicos.elegibilidade import PREFIXO_FUNCIONARIO
 from .util import EntradaInvalida, decimal, erro, fmt, gerar_iniciais, inteiro, ler_json, texto
 
 
@@ -174,7 +186,7 @@ def api_enviar_link_senha(request, funcionario_id):
 
 
 # ============================================================================
-# PRODUTOS (RF-06, RF-07, RF-13)
+# PRODUTOS (RF-06, RF-07, RF-13, RF-36)
 # ============================================================================
 def _produto_json(p):
     return {
@@ -227,7 +239,8 @@ def _data_opcional(valor, campo):
 @require_POST
 @api_backoffice("produtos")
 def api_salvar_produto(request):
-    """Cadastra ou edita um produto, com os dados específicos de EPI (CA, validade, tamanho, periodicidade)."""
+    """Cadastra ou edita um produto, com os dados específicos de EPI (CA, validade, tamanho, periodicidade)
+    e garante vínculo inicial de estoque nos totens (RF-36)."""
     dados, erro_json = ler_json(request)
     if erro_json:
         return erro_json
@@ -268,6 +281,15 @@ def api_salvar_produto(request):
     if imagem:
         prod.imagem_url = imagem
     prod.save()
+
+    # RF-36: garante que o produto possua registro de estoque em todos os totens cadastrados
+    for totem in Totem.objects.all():
+        EstoqueTotem.objects.get_or_create(
+            totem=totem,
+            produto=prod,
+            defaults={"quantidade_disponivel": 0, "quantidade_minima": 5},
+        )
+
     registrar(request, "PRODUTO_ATUALIZADO" if prod_id else "PRODUTO_CADASTRADO", prod, f"{prod.sku} — {prod.nome}")
     return JsonResponse({"sucesso": True, "mensagem": "Produto salvo com sucesso.", "id": str(prod.id)})
 
@@ -294,7 +316,7 @@ def api_listar_setores(request):
     setores = Setor.objects.annotate(total_funcionarios=Count("usuario", filter=Q(usuario__ativo=True))).order_by("nome")
     return JsonResponse({"setores": [
         {"id": str(s.id), "nome": s.nome, "centro_custo": s.centro_custo or "—", "ativo": s.ativo,
-         "total_funcionarios": s.total_funcionarios}
+        "total_funcionarios": s.total_funcionarios}
         for s in setores
     ]})
 
@@ -414,7 +436,27 @@ def api_toggle_fornecedor(request, fornecedor_id):
 # ============================================================================
 # POLÍTICAS DE FORNECIMENTO (RF-12, RF-13, RF-14)
 # ============================================================================
-def _regra_json(r):
+def _regra_json(r, mapa_funcionarios=None):
+    cargo_raw = (r.cargo or "").strip()
+    eh_funcionario = cargo_raw.upper().startswith(PREFIXO_FUNCIONARIO)
+    funcionario_id = None
+    funcionario_nome = None
+    cargo_exibicao = cargo_raw or None
+
+    if eh_funcionario:
+        matricula = cargo_raw[len(PREFIXO_FUNCIONARIO):].strip().upper()
+        cargo_exibicao = None
+        func = (
+            mapa_funcionarios.get(matricula)
+            if mapa_funcionarios is not None
+            else Usuario.objects.filter(codigo_matricula__iexact=matricula).first()
+        )
+        if func:
+            funcionario_id = str(func.id)
+            funcionario_nome = f"{func.nome} ({func.codigo_matricula})"
+        else:
+            funcionario_nome = f"Matrícula {matricula}"
+
     return {
         "id": str(r.id),
         "produto_id": str(r.produto_id),
@@ -422,7 +464,9 @@ def _regra_json(r):
         "tipo": "EPI" if r.produto.eh_epi else "Consumível",
         "setor_id": str(r.setor_id) if r.setor_id else None,
         "setor": r.setor.nome if r.setor else None,
-        "cargo": r.cargo or None,
+        "cargo": cargo_exibicao,
+        "funcionario_id": funcionario_id,
+        "funcionario": funcionario_nome,
         "limite_mensal": r.limite_mensal,
         "periodicidade_dias": r.periodicidade_dias,
         "padrao_limite": r.produto.limite_padrao_mensal,
@@ -435,12 +479,20 @@ def _regra_json(r):
 @api_backoffice("ver")
 def api_listar_regras(request):
     regras = RegraFornecimento.objects.select_related("produto__categoria", "setor").order_by("produto__nome", "cargo")
+    funcionarios_ativos = list(Usuario.objects.filter(ativo=True).order_by("nome"))
+    mapa_func = {u.codigo_matricula.upper(): u for u in funcionarios_ativos}
     return JsonResponse({
-        "regras": [_regra_json(r) for r in regras],
+        "regras": [_regra_json(r, mapa_func) for r in regras],
         "produtos": [{"id": str(p.id), "nome": p.nome} for p in Produto.objects.filter(ativo=True).order_by("nome")],
-        "setores": [{"id": str(s.id), "nome": s.nome} for s in Setor.objects.filter(ativo=True).order_by("nome")],
-        "cargos": sorted({c for c in Usuario.objects.exclude(cargo__isnull=True).exclude(cargo="")
-                          .values_list("cargo", flat=True)}),
+        "setores": [
+            {"id": str(s.id), "nome": f"{s.nome} ({s.centro_custo})" if s.centro_custo else s.nome}
+            for s in Setor.objects.filter(ativo=True).order_by("nome")
+        ],
+        "cargos": sorted(_catalogo_cargos().values()),
+        "funcionarios": [
+            {"id": str(u.id), "matricula": u.codigo_matricula, "nome": f"{u.nome} ({u.codigo_matricula})"}
+            for u in funcionarios_ativos
+        ],
     })
 
 
@@ -454,6 +506,7 @@ def api_salvar_regra(request):
     if produto is None:
         return erro("Escolha o produto.")
     setor = Setor.objects.filter(id=dados.get("setor_id")).first() if dados.get("setor_id") else None
+    funcionario = Usuario.objects.filter(id=dados.get("funcionario_id")).first() if dados.get("funcionario_id") else None
     try:
         cargo = texto(dados.get("cargo"), "Cargo", maximo=100)
         limite = inteiro(dados.get("limite_mensal"), "Limite mensal", minimo=0, maximo=10000) \
@@ -462,8 +515,12 @@ def api_salvar_regra(request):
             if dados.get("periodicidade_dias") not in (None, "") else None
     except EntradaInvalida as e:
         return erro(str(e))
+
+    if funcionario is not None:
+        cargo = f"{PREFIXO_FUNCIONARIO}{funcionario.codigo_matricula}"
+
     if not setor and not cargo:
-        return erro("Defina o escopo: um setor, um cargo ou os dois.")
+        return erro("Defina o escopo: um setor, um cargo/função ou um funcionário.")
     if limite is None and periodicidade is None:
         return erro("Informe o limite mensal, a periodicidade ou ambos.")
 
@@ -496,25 +553,162 @@ def api_toggle_regra(request, regra_id):
 
 
 # ============================================================================
-# CARGOS E FUNÇÕES (visão derivada do cadastro de funcionários e das políticas)
+# CARGOS E FUNÇÕES (RF-03, RF-04)
 # ============================================================================
+def _catalogo_cargos():
+    """Devolve um dicionário {chave_lower: nome_exibicao} combinando o catálogo de
+    cargos gerenciados, os cargos atribuídos a funcionários e as políticas de fornecimento."""
+    catalogo = {}
+
+    for evento in RegistroAuditoria.objects.filter(entidade="Cargo").order_by("data", "id"):
+        detalhes = evento.detalhes if isinstance(evento.detalhes, dict) else {}
+        nome = (detalhes.get("cargo") or "").strip()
+        anterior = (detalhes.get("cargo_anterior") or "").strip()
+        if evento.acao in ("CARGO_CADASTRADO", "CARGO_ATUALIZADO") and nome:
+            if anterior and anterior.lower() in catalogo:
+                catalogo.pop(anterior.lower(), None)
+            catalogo[nome.lower()] = nome
+        elif evento.acao == "CARGO_EXCLUIDO" and nome:
+            catalogo.pop(nome.lower(), None)
+
+    for cargo_func in Usuario.objects.filter(ativo=True).exclude(cargo__isnull=True).exclude(cargo="") \
+            .values_list("cargo", flat=True):
+        limpo = cargo_func.strip()
+        if limpo:
+            catalogo.setdefault(limpo.lower(), limpo)
+
+    for cargo_regra in RegraFornecimento.objects.filter(ativo=True).exclude(cargo="") \
+            .values_list("cargo", flat=True):
+        limpo = cargo_regra.strip()
+        if limpo and not limpo.upper().startswith(PREFIXO_FUNCIONARIO):
+            catalogo.setdefault(limpo.lower(), limpo)
+
+    return catalogo
+
+
+def _registrar_evento_cargo(request, acao, descricao, **detalhes):
+    usuario = getattr(request, "usuario", None)
+    RegistroAuditoria.objects.create(
+        usuario=usuario,
+        usuario_nome=usuario.nome if usuario else "",
+        acao=acao,
+        entidade="Cargo",
+        entidade_id=(detalhes.get("cargo") or "")[:64],
+        descricao=descricao[:255],
+        detalhes=detalhes,
+        ip=ip_da_requisicao(request) if request is not None else None,
+    )
+
+
 @require_GET
 @api_backoffice("ver")
 def api_listar_cargos(request):
-    """Cargos em uso, quantos funcionários ativos têm e quais EPIs as políticas vinculam a eles."""
-    contagem = {}
+    """Lista todos os cargos/funções da organização, quantos funcionários ativos têm
+    e quais EPIs/consumíveis as políticas vinculam a cada um (RF-03, RF-04)."""
+    catalogo = _catalogo_cargos()
+    contagem = {
+        chave: {"cargo": nome, "total": 0, "setores": set()}
+        for chave, nome in catalogo.items()
+    }
+
     for cargo, setor in Usuario.objects.filter(ativo=True).exclude(cargo__isnull=True).exclude(cargo="") \
             .values_list("cargo", "setor__nome"):
-        item = contagem.setdefault(cargo, {"cargo": cargo, "total": 0, "setores": set()})
+        chave = cargo.strip().lower()
+        item = contagem.setdefault(chave, {"cargo": cargo.strip(), "total": 0, "setores": set()})
         item["total"] += 1
         if setor:
             item["setores"].add(setor)
+
     regras = RegraFornecimento.objects.filter(ativo=True).exclude(cargo="").select_related("produto")
     epis = {}
     for r in regras:
-        epis.setdefault(r.cargo.lower(), set()).add(r.produto.nome)
-    return JsonResponse({"cargos": [
-        {"cargo": c["cargo"], "total_funcionarios": c["total"], "setores": sorted(c["setores"]),
-         "produtos_vinculados": sorted(epis.get(c["cargo"].lower(), set()))}
-        for c in sorted(contagem.values(), key=lambda x: x["cargo"])
-    ]})
+        if not r.cargo.upper().startswith(PREFIXO_FUNCIONARIO):
+            epis.setdefault(r.cargo.strip().lower(), set()).add(r.produto.nome)
+
+    return JsonResponse({
+        "cargos": [
+            {
+                "cargo": c["cargo"],
+                "total_funcionarios": c["total"],
+                "setores": sorted(c["setores"]),
+                "produtos_vinculados": sorted(epis.get(c["cargo"].lower(), set())),
+            }
+            for c in sorted(contagem.values(), key=lambda x: x["cargo"].lower())
+        ]
+    })
+
+
+@require_POST
+@api_backoffice("pessoas")
+def api_salvar_cargo(request):
+    """Cadastra um novo cargo/função ou renomeia um existente atualizando funcionários e políticas (RF-03, RF-04)."""
+    dados, erro_json = ler_json(request)
+    if erro_json:
+        return erro_json
+    try:
+        nome = texto(dados.get("cargo"), "Nome do cargo / função", obrigatorio=True, maximo=100)
+        original = texto(dados.get("cargo_original"), "Cargo original", maximo=100)
+    except EntradaInvalida as e:
+        return erro(str(e))
+
+    if nome.upper().startswith(PREFIXO_FUNCIONARIO):
+        return erro("Nome de cargo reservado pelo sistema.")
+
+    catalogo = _catalogo_cargos()
+    chave_nova = nome.lower()
+    chave_original = original.lower() if original else ""
+
+    if not original:
+        if chave_nova in catalogo:
+            return erro("Já existe um cargo/função cadastrado com este nome.")
+        _registrar_evento_cargo(
+            request,
+            "CARGO_CADASTRADO",
+            f"Cadastrou o cargo/função '{nome}'",
+            cargo=nome,
+        )
+        return JsonResponse({"sucesso": True, "mensagem": "Cargo / função cadastrado com sucesso.", "cargo": nome})
+
+    if chave_nova != chave_original and chave_nova in catalogo:
+        return erro("Já existe outro cargo/função com este nome.")
+
+    with transaction.atomic():
+        funcionarios_afetados = Usuario.objects.filter(cargo__iexact=original).update(cargo=nome)
+        regras_afetadas = RegraFornecimento.objects.filter(cargo__iexact=original).update(cargo=nome)
+        _registrar_evento_cargo(
+            request,
+            "CARGO_ATUALIZADO",
+            f"Renomeou o cargo/função '{original}' para '{nome}'",
+            cargo=nome,
+            cargo_anterior=original,
+            funcionarios_afetados=funcionarios_afetados,
+            regras_afetadas=regras_afetadas,
+        )
+    return JsonResponse({"sucesso": True, "mensagem": "Cargo / função atualizado com sucesso.", "cargo": nome})
+
+
+@require_POST
+@api_backoffice("pessoas")
+def api_excluir_cargo(request):
+    """Remove um cargo/função do catálogo desde que não possua funcionários ativos vinculados (RF-03, RF-04)."""
+    dados, erro_json = ler_json(request)
+    if erro_json:
+        return erro_json
+    try:
+        nome = texto(dados.get("cargo"), "Cargo / função", obrigatorio=True, maximo=100)
+    except EntradaInvalida as e:
+        return erro(str(e))
+
+    if Usuario.objects.filter(ativo=True, cargo__iexact=nome).exists():
+        return erro("Não é possível remover um cargo que possui funcionários ativos vinculados.", status=409)
+
+    with transaction.atomic():
+        Usuario.objects.filter(cargo__iexact=nome).update(cargo="")
+        RegraFornecimento.objects.filter(cargo__iexact=nome).delete()
+        _registrar_evento_cargo(
+            request,
+            "CARGO_EXCLUIDO",
+            f"Removeu o cargo/função '{nome}'",
+            cargo=nome,
+        )
+    return JsonResponse({"sucesso": True, "mensagem": f"Cargo / função '{nome}' removido."})

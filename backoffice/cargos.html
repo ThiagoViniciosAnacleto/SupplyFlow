@@ -23,7 +23,12 @@
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
           <div>
             <h1 class="pagina-titulo mb-1">Cargos e Funções</h1>
-            <p class="pagina-descricao mb-0">Cargos em uso no cadastro de funcionários e os produtos que as <a href="politicas.html">políticas de fornecimento</a> vinculam a cada um.</p>
+            <p class="pagina-descricao mb-0">Catálogo de cargos e funções da organização, colaboradores ativos vinculados e <a href="politicas.html">políticas de fornecimento</a> associadas (RF-03, RF-04).</p>
+          </div>
+          <div>
+            <button type="button" class="btn btn-primary" id="btn-novo-cargo">
+              <i class="bi bi-briefcase" aria-hidden="true"></i> Novo Cargo / Função
+            </button>
           </div>
         </div>
 
@@ -36,10 +41,11 @@
                   <th scope="col">Setores</th>
                   <th scope="col">Funcionários ativos</th>
                   <th scope="col">Produtos com política para o cargo</th>
+                  <th scope="col" class="text-end">Ações</th>
                 </tr>
               </thead>
               <tbody id="tabela-cargos-corpo">
-                <tr><td colspan="4" class="text-center py-4 text-muted">Carregando cargos...</td></tr>
+                <tr><td colspan="5" class="text-center py-4 text-muted">Carregando cargos...</td></tr>
               </tbody>
             </table>
           </div>
@@ -47,6 +53,32 @@
       </main>
     </div>
 
+  </div>
+
+  <!-- Modal Cargo / Função -->
+  <div class="modal fade" id="modal-cargo" tabindex="-1" aria-labelledby="modalCargoTitulo" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content rounded-4 border-0 shadow">
+        <form id="form-cargo">
+          <div class="modal-header border-bottom">
+            <h5 class="modal-title fw-bold" id="modalCargoTitulo">Novo Cargo / Função</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+          </div>
+          <div class="modal-body p-4">
+            <input type="hidden" id="cargo-original">
+            <div class="mb-2">
+              <label for="cargo-nome" class="form-label small fw-semibold">Nome do Cargo / Função *</label>
+              <input type="text" id="cargo-nome" class="form-control" required maxlength="100" placeholder="Ex.: Operador de Caldeira" aria-describedby="ajuda-cargo">
+              <div class="form-text" id="ajuda-cargo">Ao renomear um cargo existente, os funcionários e políticas vinculados são atualizados automaticamente.</div>
+            </div>
+          </div>
+          <div class="modal-footer border-top">
+            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-primary px-4 fw-bold">Salvar Cargo / Função</button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 
   <script src="../static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
@@ -58,6 +90,15 @@
     (function () {
       var corpo = document.getElementById("tabela-cargos-corpo");
       var escapar = SF.escapar;
+      var modalEl = document.getElementById("modal-cargo");
+      var modalBs = modalEl ? new bootstrap.Modal(modalEl) : null;
+      var form = document.getElementById("form-cargo");
+      var btnNovo = document.getElementById("btn-novo-cargo");
+      var podeGerenciar = SF.sessao.pode("pessoas");
+
+      if (btnNovo && !podeGerenciar) {
+        btnNovo.classList.add("d-none");
+      }
 
       function criarLinhaCargoHtml(itemCargo) {
         var textoSetores = itemCargo.setores.join(", ") || "—";
@@ -69,28 +110,106 @@
           htmlProdutosVinculados = '<span class="text-muted">Nenhuma política específica — vale o padrão de cada produto</span>';
         }
 
+        var htmlAcoes = "—";
+        if (podeGerenciar) {
+          var desabilitarExclusao = itemCargo.total_funcionarios > 0 ? " disabled" : "";
+          var tituloExclusao = itemCargo.total_funcionarios > 0
+            ? "Não é possível remover cargo com funcionários ativos"
+            : "Remover " + escapar(itemCargo.cargo);
+          htmlAcoes =
+            '<button type="button" class="btn btn-sm btn-outline-secondary me-1 btn-edit-cargo" data-cargo="' + escapar(itemCargo.cargo) + '"' +
+                    ' aria-label="Editar ' + escapar(itemCargo.cargo) + '">' +
+              '<i class="bi bi-pencil" aria-hidden="true"></i>' +
+            "</button>" +
+            '<button type="button" class="btn btn-sm btn-outline-danger btn-del-cargo" data-cargo="' + escapar(itemCargo.cargo) + '"' +
+                    ' aria-label="' + tituloExclusao + '" title="' + tituloExclusao + '"' + desabilitarExclusao + ">" +
+              '<i class="bi bi-trash" aria-hidden="true"></i>' +
+            "</button>";
+        }
+
         return (
           "<tr>" +
             "<td><strong>" + escapar(itemCargo.cargo) + "</strong></td>" +
             "<td>" + escapar(textoSetores) + "</td>" +
             "<td>" + escapar(itemCargo.total_funcionarios) + "</td>" +
             '<td class="small">' + htmlProdutosVinculados + "</td>" +
+            '<td class="text-end text-nowrap">' + htmlAcoes + "</td>" +
           "</tr>"
         );
       }
 
-      SF.api.get("/api/cargos/")
-        .then(function (dados) {
-          var listaCargos = dados.cargos || [];
-          if (listaCargos.length === 0) {
-            corpo.innerHTML = '<tr><td colspan="4" class="tabela-solicitacoes__vazio">Nenhum cargo cadastrado.</td></tr>';
-            return;
+      function carregarCargos() {
+        SF.api.get("/api/cargos/")
+          .then(function (dados) {
+            var listaCargos = dados.cargos || [];
+            if (listaCargos.length === 0) {
+              corpo.innerHTML = '<tr><td colspan="5" class="tabela-solicitacoes__vazio">Nenhum cargo cadastrado.</td></tr>';
+              return;
+            }
+            corpo.innerHTML = listaCargos.map(criarLinhaCargoHtml).join("");
+
+            document.querySelectorAll(".btn-edit-cargo").forEach(function (botao) {
+              botao.addEventListener("click", function () {
+                var nomeAtual = botao.dataset.cargo;
+                document.getElementById("modalCargoTitulo").textContent = "Editar Cargo / Função";
+                document.getElementById("cargo-original").value = nomeAtual;
+                document.getElementById("cargo-nome").value = nomeAtual;
+                if (modalBs) {
+                  modalBs.show();
+                }
+              });
+            });
+
+            document.querySelectorAll(".btn-del-cargo").forEach(function (botao) {
+              botao.addEventListener("click", function () {
+                var nomeCargo = botao.dataset.cargo;
+                SF.api.post("/api/cargos/excluir/", { cargo: nomeCargo })
+                  .then(function () {
+                    carregarCargos();
+                  })
+                  .catch(function (erro) {
+                    alert(erro.message);
+                  });
+              });
+            });
+          })
+          .catch(function (erro) {
+            corpo.innerHTML = '<tr><td colspan="5" class="tabela-solicitacoes__vazio">' + escapar(erro.message) + "</td></tr>";
+          });
+      }
+
+      if (btnNovo) {
+        btnNovo.addEventListener("click", function () {
+          form.reset();
+          document.getElementById("modalCargoTitulo").textContent = "Novo Cargo / Função";
+          document.getElementById("cargo-original").value = "";
+          if (modalBs) {
+            modalBs.show();
           }
-          corpo.innerHTML = listaCargos.map(criarLinhaCargoHtml).join("");
-        })
-        .catch(function (erro) {
-          corpo.innerHTML = '<tr><td colspan="4" class="tabela-solicitacoes__vazio">' + escapar(erro.message) + "</td></tr>";
         });
+      }
+
+      if (form) {
+        form.addEventListener("submit", function (evento) {
+          evento.preventDefault();
+          var payload = {
+            cargo_original: document.getElementById("cargo-original").value.trim(),
+            cargo: document.getElementById("cargo-nome").value.trim()
+          };
+          SF.api.post("/api/cargos/salvar/", payload)
+            .then(function () {
+              if (modalBs) {
+                modalBs.hide();
+              }
+              carregarCargos();
+            })
+            .catch(function (erro) {
+              alert(erro.message);
+            });
+        });
+      }
+
+      carregarCargos();
     })();
   </script>
 </body>

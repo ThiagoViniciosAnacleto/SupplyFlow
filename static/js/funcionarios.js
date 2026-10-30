@@ -45,6 +45,24 @@
       });
   }
 
+  /* Carrega o catálogo de cargos e funções para sugerir no modal de funcionário (RF-04) */
+  function carregarCargosSugeridos() {
+    var datalist = document.getElementById("lista-cargos-func");
+    if (!datalist) {
+      return;
+    }
+    SF.api.get("/api/cargos/")
+      .then(function (dados) {
+        var lista = dados.cargos || [];
+        datalist.innerHTML = lista.map(function (item) {
+          return '<option value="' + escapar(item.cargo) + '">';
+        }).join("");
+      })
+      .catch(function (erro) {
+        console.warn("Erro ao carregar cargos:", erro);
+      });
+  }
+
   /* Busca os funcionários aplicando os filtros de texto e setor */
   function carregarFuncionarios() {
     var termo = filtroTermo ? filtroTermo.value.trim() : "";
@@ -205,6 +223,7 @@
             modalBs.hide();
           }
           carregarFuncionarios();
+          carregarCargosSugeridos();
           if (resposta.convite_enviado) {
             alert(resposta.mensagem);
           }
@@ -227,5 +246,6 @@
   }
 
   carregarSetores();
+  carregarCargosSugeridos();
   carregarFuncionarios();
 })();
