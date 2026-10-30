@@ -1,20 +1,25 @@
 /* =====================================================================
    SupplyFlow — Estilos do Totem de Autoatendimento
-   Focado em telas touch, ergonomia visual e conformidade com o protótipo.
+   ---------------------------------------------------------------------
+   Projetado para telas touch, tablets, terminais POS (1024x768 / 1366x768),
+   smartphones (360px+) e monitores de alta resolução (1080p a 4K).
+   Utiliza tipografia e alturas fluidas (clamp / vh) para que o teclado
+   numérico de matrícula e PIN nunca seja cortado verticalmente.
    ===================================================================== */
 
 :root {
   --totem-verde: #0d9488;
   --totem-verde-hover: #0f766e;
   --totem-verde-claro: #f0fdfa;
-  --totem-bg: #f8fafc;
+  --totem-bg: #f4f7fb;
   --totem-card-bg: #ffffff;
   --totem-borda: #e2e8f0;
   --totem-texto: #0f172a;
-  --totem-suave: #64748b;
+  --totem-suave: #475569;
   --totem-amber: #d97706;
   --totem-amber-bg: #fef3c7;
   --totem-azul: #2563eb;
+  --totem-sombra-card: 0 4px 12px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
 }
 
 body.totem-body {
@@ -22,89 +27,111 @@ body.totem-body {
   color: var(--totem-texto);
   font-family: "Inter", system-ui, -apple-system, sans-serif;
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   user-select: none;
 }
 
-/* Header do Totem */
+/* ---------- Cabeçalho do Totem ---------- */
 .totem-header {
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--totem-borda);
-  padding: 14px 28px;
+  padding: clamp(0.625rem, 1.5vh, 0.875rem) clamp(1rem, 2.5vw, 1.75rem);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.75rem;
+  position: sticky;
+  top: 0;
+  z-index: 1020;
 }
 
 .totem-marca {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 0.75rem;
   text-decoration: none;
+  min-width: 0;
 }
 
 .totem-marca__icone {
-  width: 44px;
-  height: 44px;
-  background: var(--totem-verde);
-  color: #fff;
-  border-radius: 12px;
+  width: clamp(2.375rem, 4vw, 2.75rem);
+  height: clamp(2.375rem, 4vw, 2.75rem);
+  background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);
+  color: #ffffff;
+  border-radius: 0.75rem;
   display: grid;
   place-items: center;
+  flex: 0 0 auto;
+  box-shadow: 0 4px 10px rgba(13, 148, 136, 0.25);
 }
 
 .totem-marca__icone svg {
-  width: 24px;
-  height: 24px;
+  width: 1.375rem;
+  height: 1.375rem;
 }
 
 .totem-marca__titulo {
   font-weight: 700;
-  font-size: 17px;
+  font-size: clamp(0.9375rem, 0.5vw + 0.8rem, 1.0625rem);
   color: var(--totem-texto);
   line-height: 1.2;
 }
 
 .totem-marca__sub {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--totem-suave);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.totem-header__acoes {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 0 auto;
 }
 
 .btn-reiniciar {
   background: #ffffff;
   border: 1px solid var(--totem-borda);
   color: var(--totem-texto);
-  font-weight: 500;
-  padding: 8px 16px;
-  border-radius: 8px;
-  display: flex;
+  font-weight: 600;
+  font-size: 0.875rem;
+  min-height: 2.5rem;
+  padding: 0.4375rem 0.9375rem;
+  border-radius: 0.5rem;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  transition: all 0.2s;
+  gap: 0.5rem;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .btn-reiniciar:hover {
   background: #f1f5f9;
-  color: #000;
+  border-color: #cbd5e1;
+  color: #000000;
 }
 
-/* Área central de conteúdo */
+/* ---------- Área Central de Conteúdo (Container Fluido) ---------- */
 .totem-main {
   flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 32px 20px;
-  max-width: 1080px;
+  padding: clamp(1rem, 2.5vh, 2rem) clamp(1rem, 3vw, 2rem);
+  max-width: 78rem; /* 1248px: evita esticar cards em telas Full HD / 4K */
   margin: 0 auto;
   width: 100%;
 }
 
-/* Telas/Passos */
+/* Telas / Passos da Máquina de Estados */
 .totem-passo {
   display: none;
-  animation: fadeIn 0.3s ease-in-out;
+  animation: fadeIn 0.25s ease-out;
 }
 
 .totem-passo.ativo {
@@ -112,27 +139,28 @@ body.totem-body {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Ícones de Destaque */
+/* ---------- Ícones de Destaque e Títulos Escaláveis ---------- */
 .totem-hero-icone {
-  width: 72px;
-  height: 72px;
-  border-radius: 20px;
+  width: clamp(3.5rem, 7vh, 4.5rem);
+  height: clamp(3.5rem, 7vh, 4.5rem);
+  border-radius: 1.125rem;
   background: var(--totem-verde);
-  color: #fff;
+  color: #ffffff;
   display: grid;
   place-items: center;
-  margin: 0 auto 20px;
-  box-shadow: 0 10px 25px -5px rgba(13, 148, 136, 0.25);
+  margin: 0 auto clamp(0.75rem, 1.8vh, 1.25rem);
+  box-shadow: 0 10px 25px -5px rgba(13, 148, 136, 0.28);
 }
 
-.totem-hero-icone svg, .totem-hero-icone i {
-  font-size: 32px;
-  width: 36px;
-  height: 36px;
+.totem-hero-icone svg,
+.totem-hero-icone i {
+  font-size: clamp(1.5rem, 3vh, 2rem);
+  width: clamp(1.625rem, 3.2vh, 2.25rem);
+  height: clamp(1.625rem, 3.2vh, 2.25rem);
 }
 
 .totem-hero-icone--lock {
@@ -142,30 +170,30 @@ body.totem-body {
   box-shadow: none;
 }
 
-/* Títulos */
 .totem-titulo {
   font-weight: 700;
-  font-size: 32px;
+  font-size: clamp(1.5rem, 2vw + 0.75rem, 2rem);
   text-align: center;
   color: var(--totem-texto);
-  margin-bottom: 8px;
+  margin-bottom: 0.375rem;
+  letter-spacing: -0.02em;
 }
 
 .totem-subtitulo {
-  font-size: 16px;
+  font-size: clamp(0.90625rem, 0.4vw + 0.8rem, 1rem);
   color: var(--totem-suave);
   text-align: center;
-  max-width: 600px;
-  margin: 0 auto 36px;
+  max-width: 36rem;
+  margin: 0 auto clamp(1.25rem, 3vh, 2.125rem);
   line-height: 1.5;
 }
 
-/* Cartões de Seleção (Passo 1 — elementos nativos <button>) */
+/* ---------- Cartões de Seleção (Passo 1 — Botões Nativos) ---------- */
 .totem-opcoes-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 20px;
-  max-width: 680px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15.5rem), 1fr));
+  gap: clamp(0.875rem, 2vw, 1.25rem);
+  max-width: 42.5rem;
   margin: 0 auto;
 }
 
@@ -175,37 +203,37 @@ body.totem-body {
   color: inherit;
   background: var(--totem-card-bg);
   border: 2px solid var(--totem-borda);
-  border-radius: 16px;
-  padding: 36px 24px;
+  border-radius: 1rem;
+  padding: clamp(1.5rem, 3.5vh, 2.25rem) 1.5rem;
   text-align: center;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: var(--totem-sombra-card);
 }
 
 .totem-card-opcao:hover:not(.desabilitado):not(:disabled) {
   border-color: var(--totem-verde);
-  transform: translateY(-4px);
-  box-shadow: 0 12px 20px -5px rgba(13, 148, 136, 0.15);
+  transform: translateY(-3px);
+  box-shadow: 0 12px 24px -6px rgba(13, 148, 136, 0.18);
 }
 
 .totem-card-opcao.desabilitado,
 .totem-card-opcao:disabled {
-  opacity: 0.55;
+  opacity: 0.58;
   cursor: not-allowed;
   background: #f8fafc;
 }
 
 .totem-card-opcao__icone {
-  width: 56px;
-  height: 56px;
-  border-radius: 12px;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.75rem;
   background: #f0fdfa;
   color: var(--totem-verde);
   display: grid;
   place-items: center;
-  margin: 0 auto 16px;
-  font-size: 26px;
+  margin: 0 auto 0.875rem;
+  font-size: 1.625rem;
 }
 
 .totem-card-opcao.desabilitado .totem-card-opcao__icone,
@@ -216,33 +244,34 @@ body.totem-body {
 
 .totem-card-opcao__titulo {
   font-weight: 700;
-  font-size: 19px;
-  margin-bottom: 6px;
+  font-size: 1.1875rem;
+  margin-bottom: 0.375rem;
 }
 
 .totem-card-opcao__sub {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--totem-suave);
 }
 
-/* Teclado Virtual Numérico */
+/* ---------- Teclado Virtual Numérico (Responsivo em Altura e Largura) ---------- */
 .totem-teclado-container {
-  max-width: 380px;
+  width: 100%;
+  max-width: 23.75rem;
   margin: 0 auto;
 }
 
 .totem-display-input {
   background: #ffffff;
   border: 2px solid var(--totem-borda);
-  border-radius: 12px;
-  padding: 14px 18px;
-  font-size: 26px;
+  border-radius: 0.75rem;
+  padding: clamp(0.625rem, 1.5vh, 0.875rem) 1.125rem;
+  font-size: clamp(1.35rem, 2.5vh, 1.625rem);
   font-weight: 700;
   letter-spacing: 2px;
   text-align: center;
   color: var(--totem-texto);
-  margin-bottom: 20px;
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+  margin-bottom: clamp(0.875rem, 2vh, 1.25rem);
+  box-shadow: inset 0 2px 4px rgba(15, 23, 42, 0.03);
 }
 
 .totem-display-input:focus {
@@ -252,23 +281,28 @@ body.totem-body {
 
 .totem-teclado {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(0.5rem, 1.2vh, 0.75rem);
 }
 
 .btn-tecla {
-  height: 64px;
+  height: clamp(3.125rem, 7.2vh, 4rem);
   background: #ffffff;
   border: 1px solid var(--totem-borda);
-  border-radius: 12px;
-  font-size: 24px;
+  border-radius: 0.75rem;
+  font-size: clamp(1.25rem, 2.4vh, 1.5rem);
   font-weight: 600;
   color: var(--totem-texto);
   display: grid;
   place-items: center;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
-  transition: all 0.1s;
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.04);
+  transition: transform 0.1s ease, background-color 0.12s ease;
   cursor: pointer;
+}
+
+.btn-tecla:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
 }
 
 .btn-tecla:active {
@@ -277,18 +311,20 @@ body.totem-body {
 }
 
 .btn-tecla--acao {
-  font-size: 16px;
+  font-size: 0.9375rem;
   font-weight: 600;
 }
 
 .btn-tecla--verde {
   background: var(--totem-verde);
-  color: #fff;
+  color: #ffffff;
   border-color: var(--totem-verde);
 }
 
 .btn-tecla--verde:hover {
   background: var(--totem-verde-hover);
+  border-color: var(--totem-verde-hover);
+  color: #ffffff;
 }
 
 .btn-tecla--apagar {
@@ -299,13 +335,13 @@ body.totem-body {
 .totem-pin-dots {
   display: flex;
   justify-content: center;
-  gap: 16px;
-  margin-bottom: 28px;
+  gap: 1rem;
+  margin-bottom: clamp(1rem, 2.5vh, 1.75rem);
 }
 
 .pin-dot {
-  width: 18px;
-  height: 18px;
+  width: 1.125rem;
+  height: 1.125rem;
   border-radius: 50%;
   border: 2px solid #cbd5e1;
   background: #ffffff;
@@ -319,131 +355,104 @@ body.totem-body {
   box-shadow: 0 0 10px rgba(13, 148, 136, 0.4);
 }
 
-/* Dicas e Chips */
-.totem-dica {
-  background: #f1f5f9;
-  border-radius: 8px;
-  padding: 10px 14px;
-  font-size: 13px;
-  color: var(--totem-suave);
-  text-align: center;
-  margin-top: 20px;
-}
-
-.totem-chips {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  flex-wrap: wrap;
-  margin-top: 14px;
-}
-
-.totem-chip {
-  background: #e0f2fe;
-  color: #0369a1;
-  border: 1px solid #bae6fd;
-  border-radius: 20px;
-  padding: 4px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.totem-chip:hover {
-  background: #bae6fd;
-}
-
-/* Vitrine de Produtos (Passo 4) */
+/* ---------- Vitrine de Produtos (Passo 4) ---------- */
 .totem-vitrine-topo {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: flex-end;
-  margin-bottom: 24px;
+  gap: 1rem;
+  margin-bottom: clamp(1rem, 2.2vh, 1.5rem);
   border-bottom: 1px solid var(--totem-borda);
-  padding-bottom: 16px;
+  padding-bottom: 1rem;
 }
 
 .totem-vitrine-usuario h2 {
-  font-size: 26px;
+  font-size: clamp(1.35rem, 1.5vw + 0.8rem, 1.625rem);
   font-weight: 700;
-  margin-bottom: 4px;
+  margin-bottom: 0.25rem;
 }
 
 .totem-vitrine-usuario p {
   color: var(--totem-suave);
   margin-bottom: 0;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .btn-minhas-sols {
   background: #ffffff;
   border: 1px solid var(--totem-borda);
-  border-radius: 10px;
-  padding: 8px 16px;
+  border-radius: 0.625rem;
+  min-height: 2.625rem;
+  padding: 0.5rem 1rem;
   font-weight: 600;
-  font-size: 14px;
-  display: flex;
+  font-size: 0.875rem;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+  gap: 0.5rem;
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.03);
+}
+
+.btn-minhas-sols:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
 }
 
 .badge-sols-count {
   background: var(--totem-verde);
-  color: #fff;
-  border-radius: 10px;
-  padding: 2px 8px;
-  font-size: 12px;
+  color: #ffffff;
+  border-radius: 999px;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
 }
 
 .totem-produtos-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 18.5rem), 1fr));
+  gap: clamp(0.875rem, 1.8vw, 1.25rem);
 }
 
 .totem-card-produto {
   background: #ffffff;
   border: 1px solid var(--totem-borda);
-  border-radius: 16px;
-  padding: 22px;
+  border-radius: 1rem;
+  padding: clamp(1.125rem, 2vw, 1.375rem);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04);
-  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: var(--totem-sombra-card);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .totem-card-produto:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 12px 20px -4px rgba(15, 23, 42, 0.09);
 }
 
 .totem-card-produto__cabecalho {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 14px;
+  margin-bottom: 0.875rem;
 }
 
 .totem-produto-icone {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.75rem;
   background: #eff6ff;
   color: var(--totem-azul);
   display: grid;
   place-items: center;
-  font-size: 20px;
+  font-size: 1.25rem;
 }
 
 .totem-badge-tipo {
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
-  padding: 3px 10px;
-  border-radius: 20px;
-  letter-spacing: 0.5px;
+  padding: 0.1875rem 0.625rem;
+  border-radius: 999px;
+  letter-spacing: 0.03em;
 }
 
 .totem-badge-tipo--epi {
@@ -460,29 +469,29 @@ body.totem-body {
 
 .totem-card-produto__nome {
   font-weight: 700;
-  font-size: 18px;
-  margin-bottom: 10px;
+  font-size: 1.0625rem;
+  margin-bottom: 0.625rem;
   color: var(--totem-texto);
 }
 
 .totem-card-produto__info {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--totem-suave);
-  margin-bottom: 16px;
+  margin-bottom: 1rem;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 0.25rem;
 }
 
 .totem-status-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-size: 12px;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
   font-weight: 600;
-  margin-bottom: 12px;
+  margin-bottom: 0.75rem;
 }
 
 .totem-status-badge--disponivel {
@@ -500,57 +509,56 @@ body.totem-body {
   color: #991b1b;
 }
 
-.btn-solicitar-retirada {
-  background: var(--totem-verde);
-  color: #fff;
+.btn-solicitar-retirada,
+.btn-solicitar-substituicao {
+  color: #ffffff;
   border: none;
   font-weight: 600;
-  padding: 12px;
-  border-radius: 10px;
-  transition: background 0.15s;
+  min-height: 2.875rem;
+  padding: 0.6875rem 1rem;
+  border-radius: 0.625rem;
+  transition: background-color 0.15s ease;
+}
+
+.btn-solicitar-retirada {
+  background: var(--totem-verde);
 }
 
 .btn-solicitar-retirada:hover {
   background: var(--totem-verde-hover);
-  color: #fff;
+  color: #ffffff;
 }
 
 .btn-solicitar-substituicao {
   background: var(--totem-amber);
-  color: #fff;
-  border: none;
-  font-weight: 600;
-  padding: 12px;
-  border-radius: 10px;
-  transition: background 0.15s;
 }
 
 .btn-solicitar-substituicao:hover {
   background: #b45309;
-  color: #fff;
+  color: #ffffff;
 }
 
-/* Tela de Justificativa (Passo 5) */
+/* ---------- Tela de Justificativa (Passo 5) ---------- */
 .totem-alerta-substituicao {
   background: #fffbeb;
   border: 1px solid #fcd34d;
-  border-radius: 12px;
-  padding: 18px 24px;
-  margin-bottom: 24px;
+  border-radius: 0.75rem;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.25rem;
 }
 
 .totem-alerta-substituicao__titulo {
   font-weight: 700;
   color: #92400e;
-  font-size: 16px;
+  font-size: 1rem;
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
 }
 
 .totem-alerta-substituicao__texto {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: #b45309;
   margin-bottom: 0;
 }
@@ -558,23 +566,24 @@ body.totem-body {
 .totem-card-resumo-produto {
   background: #ffffff;
   border: 1px solid var(--totem-borda);
-  border-radius: 14px;
-  padding: 22px;
-  margin-bottom: 24px;
+  border-radius: 0.875rem;
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+  box-shadow: var(--totem-sombra-card);
 }
 
 .totem-textarea-justificativa {
   border: 2px solid var(--totem-borda);
-  border-radius: 12px;
-  padding: 14px;
-  font-size: 15px;
+  border-radius: 0.75rem;
+  padding: 0.875rem;
+  font-size: 0.9375rem;
   resize: vertical;
-  min-height: 120px;
+  min-height: 7rem;
 }
 
 .totem-textarea-justificativa:focus {
   border-color: var(--totem-verde);
-  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15);
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.18);
 }
 
 .btn-voltar-totem {
@@ -582,11 +591,12 @@ body.totem-body {
   border: none;
   color: var(--totem-suave);
   font-weight: 600;
-  font-size: 15px;
+  font-size: 0.9375rem;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 20px;
+  gap: 0.375rem;
+  margin-bottom: 1rem;
+  padding: 0.25rem 0;
   cursor: pointer;
 }
 
@@ -594,19 +604,43 @@ body.totem-body {
   color: var(--totem-texto);
 }
 
-/* Topo no celular: só ícones (o nome continua disponível para leitores de tela) */
-.totem-header { gap: 12px; }
-.totem-header__acoes { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
-.totem-marca { min-width: 0; }
-.totem-marca__sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* ---------- Adaptações Mobile Compacto (360px a 575px) ---------- */
 @media (max-width: 575.98px) {
-  .totem-header { padding: 10px 14px; }
-  .totem-header__texto { display: none; }
-  .totem-marca__icone { width: 38px; height: 38px; }
-  .totem-marca__titulo { font-size: 15px; }
+  .totem-header {
+    padding: 0.625rem 0.875rem;
+  }
+  .totem-header__texto {
+    display: none;
+  }
+  .totem-vitrine-topo .btn-minhas-sols {
+    width: 100%;
+    justify-content: center;
+  }
 }
+
+/* ---------- Adaptação HD / Laptops / POS com baixa altura (<= 780px) ---------- */
+@media (max-height: 780px) {
+  .totem-main {
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+  .totem-hero-icone {
+    width: 3.125rem;
+    height: 3.125rem;
+    margin-bottom: 0.5rem;
+  }
+  .totem-subtitulo {
+    margin-bottom: 1rem;
+  }
+  .btn-tecla {
+    height: 2.95rem;
+  }
+}
+
 /* Foco visível em todos os controles do totem */
-.totem-card-opcao:focus-visible, .btn-tecla:focus-visible, .btn-reiniciar:focus-visible {
-  outline: 3px solid #0d9488;
+.totem-card-opcao:focus-visible,
+.btn-tecla:focus-visible,
+.btn-reiniciar:focus-visible {
+  outline: 3px solid var(--totem-verde);
   outline-offset: 2px;
 }

@@ -56,7 +56,7 @@
 
         <!-- Tabela de Funcionários -->
         <section class="cartao" aria-label="Lista de funcionários">
-          <div class="table-responsive">
+          <div class="table-responsive" tabindex="0" role="region" aria-label="Tabela de funcionários">
             <table class="tabela-solicitacoes">
               <thead>
                 <tr>
@@ -98,11 +98,11 @@
             </div>
 
             <div class="row g-2 mb-3">
-              <div class="col-6">
+              <div class="col-12 col-sm-6">
                 <label for="func-matricula" class="form-label small fw-semibold">Matrícula *</label>
                 <input type="text" id="func-matricula" class="form-control" required placeholder="Ex.: MAT-2004">
               </div>
-              <div class="col-6">
+              <div class="col-12 col-sm-6">
                 <label for="func-pin" class="form-label small fw-semibold">PIN do totem (4 a 6 números)</label>
                 <input type="password" id="func-pin" class="form-control" inputmode="numeric" maxlength="6" autocomplete="new-password" aria-describedby="ajuda-pin">
                 <div class="form-text" id="ajuda-pin">Obrigatório no cadastro. Ao editar, deixe em branco para manter.</div>
@@ -121,13 +121,13 @@
             </div>
 
             <div class="row g-2">
-              <div class="col-6">
+              <div class="col-12 col-sm-6">
                 <label for="func-setor" class="form-label small fw-semibold">Setor / Centro Custo</label>
                 <select id="func-setor" class="form-select">
                   <option value="">Selecione...</option>
                 </select>
               </div>
-              <div class="col-6">
+              <div class="col-12 col-sm-6">
                 <label for="func-perfil" class="form-label small fw-semibold">Perfil de Acesso</label>
                 <select id="func-perfil" class="form-select">
                   <option value="COLABORADOR">Colaborador (Totem)</option>

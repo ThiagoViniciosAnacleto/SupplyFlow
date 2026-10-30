@@ -25,24 +25,26 @@
         <h1 class="pagina-titulo">Auditoria</h1>
         <p class="pagina-descricao">Registro das operações críticas: quem fez, o quê, quando e de onde. Os registros não podem ser editados nem apagados pelo sistema.</p>
 
-        <form class="cartao mb-3 p-3 d-flex flex-wrap gap-3 align-items-end" id="form-filtro" aria-label="Filtrar auditoria">
+        <form class="cartao filtros mb-3" id="form-filtro" aria-label="Filtrar auditoria">
           <div>
-            <label for="filtro-acao" class="form-label small fw-semibold">Ação</label>
+            <label for="filtro-acao" class="form-label">Ação</label>
             <select id="filtro-acao" class="form-select"><option value="">Todas</option></select>
           </div>
           <div>
-            <label for="filtro-termo" class="form-label small fw-semibold">Usuário ou descrição</label>
+            <label for="filtro-termo" class="form-label">Usuário ou descrição</label>
             <input type="search" id="filtro-termo" class="form-control">
           </div>
           <div>
-            <label for="filtro-de" class="form-label small fw-semibold">De</label>
+            <label for="filtro-de" class="form-label">De</label>
             <input type="date" id="filtro-de" class="form-control">
           </div>
           <div>
-            <label for="filtro-ate" class="form-label small fw-semibold">Até</label>
+            <label for="filtro-ate" class="form-label">Até</label>
             <input type="date" id="filtro-ate" class="form-control">
           </div>
-          <button type="submit" class="btn btn-primary"><i class="bi bi-funnel" aria-hidden="true"></i> Filtrar</button>
+          <div class="filtros__acoes">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-funnel" aria-hidden="true"></i> Filtrar</button>
+          </div>
         </form>
 
         <section class="cartao" aria-labelledby="titulo-eventos">
