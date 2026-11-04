@@ -29,7 +29,7 @@ def _consulta_solicitacoes():
 
 
 # ============================================================================
-# USUÁRIOS DO BACKOFFICE
+# DOMÍNIO 2: USUÁRIOS ADMINISTRATIVOS DO BACKOFFICE (RBAC)
 # ============================================================================
 @require_GET
 @api_backoffice("pessoas")
@@ -56,9 +56,12 @@ def api_listar_usuarios(request):
             "iniciais": gerar_iniciais(u.nome),
             "email": u.email,
             "matricula": u.codigo_matricula,
+            "cargo": u.cargo or PERFIS.get(u.perfil, u.perfil),
             "perfil_codigo": u.perfil,
             "perfil": PERFIS.get(u.perfil, u.perfil),
+            "setor_id": str(u.setor_id) if u.setor_id else None,
             "setor": u.setor.nome if u.setor else None,
+            "ativo": u.ativo,
             "situacao": situacao,
             "ultimo_acesso": fmt(u.ultimo_acesso, "%d/%m/%Y %H:%M") if u.ultimo_acesso else None,
         })

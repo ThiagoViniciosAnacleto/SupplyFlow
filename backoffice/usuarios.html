@@ -22,18 +22,27 @@
       <header class="topbar" id="topbar"></header>
 
       <main class="conteudo">
-        <h1 class="pagina-titulo">Usuários e permissões</h1>
-        <p class="pagina-descricao">
-          Quem acessa o backoffice e o que cada perfil pode fazer. Para criar um usuário, cadastre-o em
-          <a href="funcionarios.html">Funcionários</a> com um perfil administrativo e e-mail: o sistema envia o link
-          para a própria pessoa criar a senha.
-        </p>
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+          <div>
+            <h1 class="pagina-titulo mb-1">Usuários Administrativos e Permissões (RBAC)</h1>
+            <p class="pagina-descricao mb-0">
+              Governança de contas gerenciais do backoffice (Almoxarife, Técnico de Segurança, Comprador, Gestor e Administrador),
+              isoladas das credenciais operacionais do chão de fábrica (<a href="funcionarios.html">Funcionários / Totem</a>).
+            </p>
+          </div>
+          <div>
+            <button type="button" class="btn btn-primary" id="btn-novo-usuario">
+              <i class="bi bi-shield-plus" aria-hidden="true"></i> Novo Usuário Administrativo
+            </button>
+          </div>
+        </div>
 
         <div class="alert d-none" role="status" id="aviso-usuarios"></div>
 
         <section class="cartao mb-4" aria-labelledby="titulo-acessos">
           <div class="cartao__cabecalho">
             <h2 class="cartao__titulo" id="titulo-acessos">Acessos ao backoffice</h2>
+            <span class="cartao__meta">Autenticação via e-mail corporativo + senha pessoal (PBKDF2)</span>
           </div>
           <div class="table-responsive" tabindex="0" role="region" aria-labelledby="titulo-acessos">
             <table class="tabela-solicitacoes">
@@ -73,6 +82,69 @@
       </main>
     </div>
 
+  </div>
+
+  <!-- Modal de Cadastro / Edição de Usuário Administrativo (Domínio 2 / RBAC) -->
+  <div class="modal fade" id="modal-usuario" tabindex="-1" aria-labelledby="modalUsuarioTitulo" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content rounded-4 border-0 shadow">
+        <form id="form-usuario">
+          <div class="modal-header border-bottom">
+            <h5 class="modal-title fw-bold" id="modalUsuarioTitulo">Novo Usuário Administrativo</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+          </div>
+          <div class="modal-body p-4">
+            <input type="hidden" id="usu-id">
+
+            <div class="mb-3">
+              <label for="usu-nome" class="form-label small fw-semibold">Nome Completo *</label>
+              <input type="text" id="usu-nome" class="form-control" required placeholder="Ex.: Mariana Costa">
+            </div>
+
+            <div class="mb-3">
+              <label for="usu-email" class="form-label small fw-semibold">E-mail Corporativo *</label>
+              <input type="email" id="usu-email" class="form-control" required autocomplete="off" aria-describedby="ajuda-usu-email" placeholder="mariana.costa@empresa.com.br">
+              <div class="form-text" id="ajuda-usu-email">O titular receberá neste endereço o link único para criar sua senha pessoal.</div>
+            </div>
+
+            <div class="row g-2 mb-3">
+              <div class="col-12 col-sm-6">
+                <label for="usu-perfil" class="form-label small fw-semibold">Papel RBAC (Backoffice) *</label>
+                <select id="usu-perfil" class="form-select" required>
+                  <option value="OPERADOR">Almoxarife</option>
+                  <option value="TECNICO_SEGURANCA">Técnico de Segurança</option>
+                  <option value="COMPRADOR">Comprador</option>
+                  <option value="GESTOR">Gestor / Supervisor</option>
+                  <option value="ADMIN">Administrador</option>
+                </select>
+              </div>
+              <div class="col-12 col-sm-6">
+                <label for="usu-matricula" class="form-label small fw-semibold">ID Funcional / Matrícula</label>
+                <input type="text" id="usu-matricula" class="form-control" aria-describedby="ajuda-usu-matricula" placeholder="Automático (ex.: ADM-0001)">
+                <div class="form-text" id="ajuda-usu-matricula">Opcional: gerado automaticamente se deixado em branco.</div>
+              </div>
+            </div>
+
+            <div class="row g-2">
+              <div class="col-12 col-sm-6">
+                <label for="usu-cargo" class="form-label small fw-semibold">Cargo / Função</label>
+                <input type="text" id="usu-cargo" class="form-control" placeholder="Ex.: Engenheira de Segurança">
+              </div>
+              <div class="col-12 col-sm-6">
+                <label for="usu-setor" class="form-label small fw-semibold">Setor / Centro de Custo</label>
+                <select id="usu-setor" class="form-select">
+                  <option value="">Selecione...</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer border-top">
+            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-primary px-4 fw-bold">Salvar Acesso</button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 
   <script src="../static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
