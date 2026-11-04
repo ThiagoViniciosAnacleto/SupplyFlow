@@ -19,6 +19,33 @@ class Setor(models.Model):
 
 
 class Usuario(models.Model):
+    """Entidade de pessoas do SupplyFlow com separação explícita em dois domínios:
+
+    1. Domínio Operacional (Funcionários / Totem de Autoatendimento — RF-01, RF-10, RF-11):
+       - Destinado aos trabalhadores do chão de fábrica (`perfil="COLABORADOR"`).
+       - Gerencia dados estritamente operacionais (RNF-05 / LGPD): `nome`,
+         `codigo_matricula`, `setor` (Centro de Custo), `cargo` (Função) e
+         `pin_hash` (hash PBKDF2-SHA256 de 4 a 6 dígitos para autenticação no totem).
+       - Não requer e-mail corporativo nem possui conta em `auth_user` (`conta=None`),
+         impedindo estruturalmente qualquer login no painel administrativo.
+
+    2. Domínio Administrativo (Usuários de Gestão / Backoffice / RBAC — RF-08, RF-09):
+       - Destinado aos operadores de governança (`ADMIN`, `GESTOR`,
+         `TECNICO_SEGURANCA`, `OPERADOR`, `COMPRADOR`).
+       - Exige `email` corporativo e vincula-se via `OneToOneField` (`conta`) ao
+         modelo de autenticação `django.contrib.auth` (`settings.AUTH_USER_MODEL`),
+         com senha criada pelo próprio titular via link tokenizado e permissões
+         validadas no servidor por papel (`core/permissoes.py`).
+    """
+
+    PERFIS_ADMINISTRATIVOS = frozenset({
+        "ADMIN",
+        "GESTOR",
+        "TECNICO_SEGURANCA",
+        "OPERADOR",
+        "COMPRADOR",
+    })
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     setor = models.ForeignKey(
         Setor, on_delete=models.SET_NULL, null=True, db_column="setor_id"
@@ -48,6 +75,33 @@ class Usuario(models.Model):
 
     class Meta:
         db_table = "usuarios"
+
+    @property
+    def eh_operacional(self):
+        """Indica se o registro pertence exclusivamente ao domínio operacional (Totem)."""
+        return (self.perfil or "COLABORADOR").upper() == "COLABORADOR"
+
+    @property
+    def eh_administrativo(self):
+        """Indica se o registro possui perfil de governança/gestão do Backoffice (RBAC)."""
+        return (self.perfil or "").upper() in self.PERFIS_ADMINISTRATIVOS
+
+    @property
+    def possui_pin_totem(self):
+        """Indica se o colaborador possui PIN criptografado configurado para o totem."""
+        return bool(self.pin_hash)
+
+    @property
+    def possui_acesso_backoffice(self):
+        """Indica se possui credencial administrativa ativa no Backoffice."""
+        return bool(
+            self.ativo
+            and self.eh_administrativo
+            and self.conta_id
+            and self.conta is not None
+            and self.conta.is_active
+            and self.conta.has_usable_password()
+        )
 
     def __str__(self):
         return f"{self.codigo_matricula} - {self.nome}"
@@ -306,6 +360,7 @@ class RegistroAuditoria(models.Model):
 
     def __str__(self):
         return f"{self.data:%d/%m/%Y %H:%M} {self.acao} {self.usuario_nome}"
+
 
 class RegraFornecimento(models.Model):
     """Política de fornecimento (RF-12 a RF-14): sobrepõe o limite e a periodicidade

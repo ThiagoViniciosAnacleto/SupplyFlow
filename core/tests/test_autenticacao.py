@@ -103,6 +103,33 @@ class CadastroDeUsuarioTeste(BaseTeste):
         nova = Usuario.objects.get(codigo_matricula="G-777")
         self.assertFalse(nova.conta.has_usable_password())  # ninguém definiu a senha por ela
 
+    def test_separacao_dominios_operacional_e_administrativo(self):
+        self.assertTrue(self.colaborador.eh_operacional)
+        self.assertFalse(self.colaborador.eh_administrativo)
+        self.assertTrue(self.colaborador.possui_pin_totem)
+        self.assertFalse(self.colaborador.possui_acesso_backoffice)
+
+        self.assertFalse(self.admin.eh_operacional)
+        self.assertTrue(self.admin.eh_administrativo)
+        self.assertTrue(self.admin.possui_acesso_backoffice)
+
+        self.entrar(self.admin)
+        resposta = self.post("/api/usuarios/salvar/", {
+            "nome": "Mariana Segurança",
+            "email": "mariana.sst@teste.local",
+            "perfil": "TECNICO_SEGURANCA",
+            "cargo": "Engenheira de Segurança",
+        })
+        self.assertEqual(resposta.status_code, 200, resposta.content)
+        self.assertTrue(resposta.json()["convite_enviado"])
+        mariana = Usuario.objects.get(email="mariana.sst@teste.local")
+        self.assertTrue(mariana.eh_administrativo)
+        self.assertTrue(mariana.codigo_matricula.startswith("ADM-"))
+        self.assertFalse(mariana.possui_pin_totem)
+
+        operacionais = self.client.get("/api/funcionarios/?dominio=operacional").json()["funcionarios"]
+        self.assertTrue(all(f["dominio"] == "OPERACIONAL" for f in operacionais))
+
     def test_pin_obrigatorio_e_nao_obvio(self):
         self.entrar(self.admin)
         sem_pin = self.post("/api/funcionarios/salvar/", {"nome": "A", "matricula": "P-1"})

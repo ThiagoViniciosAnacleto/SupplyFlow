@@ -92,6 +92,7 @@ urlpatterns = [
     # =========================================================================
     path("api/dashboard/", views.api_dashboard_kpis, name="api_dashboard"),
     path("api/usuarios/", views.api_listar_usuarios, name="api_usuarios"),
+    path("api/usuarios/salvar/", views.api_salvar_usuario_backoffice, name="api_salvar_usuario"),
     path("api/solicitacoes/", views.api_listar_solicitacoes, name="api_solicitacoes"),
     path("api/solicitacoes/<uuid:solicitacao_id>/", views.api_detalhe_solicitacao, name="api_solicitacao_detalhe"),
     path("api/solicitacoes/<uuid:solicitacao_id>/decidir/", views.api_decidir_solicitacao, name="api_decidir_solicitacao"),

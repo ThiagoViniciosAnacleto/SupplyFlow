@@ -22,8 +22,11 @@
       <main class="conteudo">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
           <div>
-            <h1 class="pagina-titulo mb-1">Funcionários</h1>
-            <p class="pagina-descricao mb-0">Gestão do quadro de colaboradores, matrículas, funções e controle de acesso.</p>
+            <h1 class="pagina-titulo mb-1">Funcionários (Operacional / Totem)</h1>
+            <p class="pagina-descricao mb-0">
+              Gestão do quadro operacional de colaboradores do chão de fábrica, matrículas, funções, centros de custo e PIN de autoatendimento.
+              Para gerenciar acessos gerenciais e papéis RBAC do painel, acesse <a href="usuarios.html">Usuários e permissões</a>.
+            </p>
           </div>
           <div>
             <button type="button" class="btn btn-primary" id="btn-novo-funcionario">
@@ -35,17 +38,25 @@
         <!-- Filtros e Busca -->
         <div class="cartao p-3 mb-4" role="search" aria-label="Filtrar funcionários">
           <div class="row g-3">
-            <div class="col-md-6">
-              <label for="filtro-termo" class="visually-hidden">Buscar por nome, matrícula ou e-mail</label>
+            <div class="col-md-5">
+              <label for="filtro-termo" class="visually-hidden">Buscar por nome, matrícula ou cargo</label>
               <div class="input-group">
                 <span class="input-group-text bg-white border-end-0" aria-hidden="true"><i class="bi bi-search text-muted"></i></span>
-                <input type="text" id="filtro-termo" class="form-control border-start-0" placeholder="Buscar por nome, matrícula ou e-mail...">
+                <input type="text" id="filtro-termo" class="form-control border-start-0" placeholder="Buscar por nome ou matrícula...">
               </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
               <label for="filtro-setor" class="visually-hidden">Filtrar por setor</label>
               <select id="filtro-setor" class="form-select">
                 <option value="">Todos os setores</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label for="filtro-dominio" class="visually-hidden">Filtrar por domínio</label>
+              <select id="filtro-dominio" class="form-select">
+                <option value="">Todos os domínios</option>
+                <option value="operacional">Operacional (Totem)</option>
+                <option value="administrativo">Gestão (Backoffice)</option>
               </select>
             </div>
             <div class="col-md-2 d-grid">
@@ -64,7 +75,7 @@
                   <th scope="col">Matrícula</th>
                   <th scope="col">Cargo / Função</th>
                   <th scope="col">Centro de Custo</th>
-                  <th scope="col">Perfil de Acesso</th>
+                  <th scope="col">Domínio / Acesso</th>
                   <th scope="col">Status</th>
                   <th scope="col" class="text-end">Ações</th>
                 </tr>
@@ -86,60 +97,70 @@
       <div class="modal-content rounded-4 border-0 shadow">
         <form id="form-funcionario">
           <div class="modal-header border-bottom">
-            <h5 class="modal-title fw-bold" id="modalFuncTitulo">Novo Funcionário</h5>
+            <h5 class="modal-title fw-bold" id="modalFuncTitulo">Novo Funcionário Operacional</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
           </div>
           <div class="modal-body p-4">
             <input type="hidden" id="func-id">
 
-            <div class="mb-3">
-              <label for="func-nome" class="form-label small fw-semibold">Nome Completo *</label>
-              <input type="text" id="func-nome" class="form-control" required placeholder="Ex.: Lucas Moreira">
-            </div>
+            <fieldset class="mb-3">
+              <legend class="fs-6 fw-bold text-secondary mb-2">1. Dados Operacionais e Autoatendimento (Totem)</legend>
 
-            <div class="row g-2 mb-3">
-              <div class="col-12 col-sm-6">
-                <label for="func-matricula" class="form-label small fw-semibold">Matrícula *</label>
-                <input type="text" id="func-matricula" class="form-control" required placeholder="Ex.: MAT-2004">
+              <div class="mb-3">
+                <label for="func-nome" class="form-label small fw-semibold">Nome Completo *</label>
+                <input type="text" id="func-nome" class="form-control" required placeholder="Ex.: Lucas Moreira">
               </div>
-              <div class="col-12 col-sm-6">
-                <label for="func-pin" class="form-label small fw-semibold">PIN do totem (4 a 6 números)</label>
-                <input type="password" id="func-pin" class="form-control" inputmode="numeric" maxlength="6" autocomplete="new-password" aria-describedby="ajuda-pin">
-                <div class="form-text" id="ajuda-pin">Obrigatório no cadastro. Ao editar, deixe em branco para manter.</div>
-              </div>
-            </div>
 
-            <div class="mb-3">
-              <label for="func-email" class="form-label small fw-semibold">E-mail corporativo</label>
-              <input type="email" id="func-email" class="form-control" autocomplete="off" aria-describedby="ajuda-email">
-              <div class="form-text" id="ajuda-email">Obrigatório para perfis com acesso ao backoffice: a pessoa recebe nele o link para criar a senha.</div>
-            </div>
-
-            <div class="mb-3">
-              <label for="func-cargo" class="form-label small fw-semibold">Cargo / Função *</label>
-              <input type="text" id="func-cargo" class="form-control" list="lista-cargos-func" required placeholder="Ex.: Operador de Caldeira">
-              <datalist id="lista-cargos-func"></datalist>
-            </div>
-
-            <div class="row g-2">
-              <div class="col-12 col-sm-6">
-                <label for="func-setor" class="form-label small fw-semibold">Setor / Centro Custo</label>
-                <select id="func-setor" class="form-select">
-                  <option value="">Selecione...</option>
-                </select>
+              <div class="row g-2 mb-3">
+                <div class="col-12 col-sm-6">
+                  <label for="func-matricula" class="form-label small fw-semibold">Matrícula *</label>
+                  <input type="text" id="func-matricula" class="form-control" required placeholder="Ex.: MAT-2004">
+                </div>
+                <div class="col-12 col-sm-6">
+                  <label for="func-pin" class="form-label small fw-semibold">PIN do totem (4 a 6 números)</label>
+                  <input type="password" id="func-pin" class="form-control" inputmode="numeric" maxlength="6" autocomplete="new-password" aria-describedby="ajuda-pin">
+                  <div class="form-text" id="ajuda-pin">Hash PBKDF2. Obrigatório no cadastro; em branco mantém o atual.</div>
+                </div>
               </div>
-              <div class="col-12 col-sm-6">
-                <label for="func-perfil" class="form-label small fw-semibold">Perfil de Acesso</label>
-                <select id="func-perfil" class="form-select">
-                  <option value="COLABORADOR">Colaborador (Totem)</option>
-                  <option value="OPERADOR">Almoxarife</option>
-                  <option value="TECNICO_SEGURANCA">Técnico de Segurança</option>
-                  <option value="COMPRADOR">Comprador</option>
-                  <option value="GESTOR">Gestor / Supervisor</option>
-                  <option value="ADMIN">Administrador</option>
-                </select>
+
+              <div class="row g-2">
+                <div class="col-12 col-sm-6">
+                  <label for="func-cargo" class="form-label small fw-semibold">Cargo / Função *</label>
+                  <input type="text" id="func-cargo" class="form-control" list="lista-cargos-func" required placeholder="Ex.: Operador de Caldeira">
+                  <datalist id="lista-cargos-func"></datalist>
+                </div>
+                <div class="col-12 col-sm-6">
+                  <label for="func-setor" class="form-label small fw-semibold">Setor / Centro Custo</label>
+                  <select id="func-setor" class="form-select">
+                    <option value="">Selecione...</option>
+                  </select>
+                </div>
               </div>
-            </div>
+            </fieldset>
+
+            <fieldset class="border-top pt-3 mt-3">
+              <legend class="fs-6 fw-bold text-secondary mb-2">2. Domínio de Acesso (Isolamento Operacional vs. Backoffice)</legend>
+              <div class="row g-2">
+                <div class="col-12 col-sm-6">
+                  <label for="func-perfil" class="form-label small fw-semibold">Domínio / Papel</label>
+                  <select id="func-perfil" class="form-select">
+                    <option value="COLABORADOR">Colaborador — Somente Totem (Operacional)</option>
+                    <option value="OPERADOR">Almoxarife (Backoffice)</option>
+                    <option value="TECNICO_SEGURANCA">Técnico de Segurança (Backoffice)</option>
+                    <option value="COMPRADOR">Comprador (Backoffice)</option>
+                    <option value="GESTOR">Gestor / Supervisor (Backoffice)</option>
+                    <option value="ADMIN">Administrador (Backoffice)</option>
+                  </select>
+                </div>
+                <div class="col-12 col-sm-6" id="bloco-email-backoffice">
+                  <label for="func-email" class="form-label small fw-semibold">E-mail corporativo (Backoffice)</label>
+                  <input type="email" id="func-email" class="form-control" autocomplete="off" aria-describedby="ajuda-email" placeholder="Dispensado para chão de fábrica">
+                </div>
+              </div>
+              <div class="form-text mt-1" id="ajuda-email">
+                Colaboradores operacionais do chão de fábrica usam exclusivamente Matrícula + PIN no totem e não precisam de e-mail nem senha.
+              </div>
+            </fieldset>
           </div>
           <div class="modal-footer border-top">
             <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>

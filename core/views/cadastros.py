@@ -29,18 +29,24 @@ from .util import EntradaInvalida, decimal, erro, fmt, gerar_iniciais, inteiro, 
 
 
 # ============================================================================
-# GESTÃO DE FUNCIONÁRIOS / USUÁRIOS
+# DOMÍNIO 1: GESTÃO DE FUNCIONÁRIOS OPERACIONAIS (TOTEM)
+# DOMÍNIO 2: GESTÃO DE USUÁRIOS ADMINISTRATIVOS (BACKOFFICE / RBAC)
 # ============================================================================
 @require_GET
 @api_backoffice("pessoas")
 def api_listar_funcionarios(request):
-    """Lista todos os funcionários cadastrados com paginação ou filtros."""
+    """Lista os funcionários cadastrados com filtros por setor, busca textual e domínio."""
     setor_filtro = request.GET.get("setor")
+    dominio_filtro = (request.GET.get("dominio") or "").strip().lower()
     termo = request.GET.get("q", "").strip()
 
-    qs = Usuario.objects.select_related("setor").all().order_by("nome")
+    qs = Usuario.objects.select_related("setor", "conta").all().order_by("nome")
     if setor_filtro:
         qs = qs.filter(setor_id=setor_filtro)
+    if dominio_filtro == "operacional":
+        qs = qs.filter(perfil="COLABORADOR")
+    elif dominio_filtro == "administrativo":
+        qs = qs.filter(perfil__in=PERFIS_BACKOFFICE)
     if termo:
         qs = qs.filter(Q(nome__icontains=termo) | Q(codigo_matricula__icontains=termo) | Q(email__icontains=termo))
 
@@ -53,6 +59,10 @@ def api_listar_funcionarios(request):
             "email": u.email or "—",
             "cargo": u.cargo or "Colaborador",
             "perfil": u.perfil,
+            "perfil_rotulo": PERFIS.get(u.perfil, u.perfil),
+            "dominio": "OPERACIONAL" if u.eh_operacional else "ADMINISTRATIVO",
+            "possui_pin": u.possui_pin_totem,
+            "possui_acesso_backoffice": u.possui_acesso_backoffice,
             "setor_id": str(u.setor.id) if u.setor else None,
             "setor_nome": u.setor.nome if u.setor else "Sem setor",
             "centro_custo": u.setor.centro_custo if u.setor else "—",
@@ -183,6 +193,108 @@ def api_enviar_link_senha(request, funcionario_id):
         return erro("Não foi possível enviar o e-mail. Verifique o cadastro.")
     registrar(request, "LINK_SENHA_ENVIADO", func, f"Link de senha enviado para {func.email}")
     return JsonResponse({"sucesso": True, "mensagem": f"Link enviado para {func.email}."})
+
+
+def _gerar_matricula_administrativa():
+    """Gera um código funcional único ADM-XXXX quando o usuário é estritamente administrativo."""
+    sequencia = Usuario.objects.filter(codigo_matricula__startswith="ADM-").count() + 1
+    while True:
+        candidato = f"ADM-{sequencia:04d}"
+        if not Usuario.objects.filter(codigo_matricula=candidato).exists():
+            return candidato
+        sequencia += 1
+
+
+@require_POST
+@api_backoffice("pessoas")
+def api_salvar_usuario_backoffice(request):
+    """Cadastra ou atualiza um usuário administrativo do Backoffice / RBAC (RF-08, RF-09).
+
+    Isola o Domínio 2 (Governança / Backoffice):
+    - Exige perfil administrativo (`PERFIS_BACKOFFICE`) e e-mail corporativo válido.
+    - Não exige PIN de totem (pois operadores puramente administrativos autenticam-se
+      exclusivamente via e-mail + senha pessoal criada por link tokenizado).
+    """
+    dados, erro_json = ler_json(request)
+    if erro_json:
+        return erro_json
+
+    try:
+        nome = texto(dados.get("nome"), "Nome", obrigatorio=True, maximo=150)
+        email = texto(dados.get("email"), "E-mail corporativo", obrigatorio=True, maximo=150).lower()
+        perfil = texto(dados.get("perfil"), "Perfil administrativo", obrigatorio=True).upper()
+        matricula = texto(dados.get("matricula"), "Matrícula / ID funcional", maximo=30).upper()
+        cargo = texto(dados.get("cargo"), "Cargo / função", maximo=100)
+        pin = texto(dados.get("pin"), "PIN")
+    except EntradaInvalida as e:
+        return erro(str(e))
+
+    if perfil not in PERFIS_BACKOFFICE:
+        return erro("Selecione um perfil administrativo válido do backoffice (RBAC).")
+    try:
+        validate_email(email)
+    except ValidationError:
+        return erro("E-mail corporativo inválido.")
+    if pin:
+        problema = validar_novo_pin(pin)
+        if problema:
+            return erro(problema)
+
+    usu_id = dados.get("id")
+    if usu_id:
+        usu = Usuario.objects.filter(id=usu_id).first()
+        if usu is None:
+            return erro("Usuário administrativo não encontrado.", status=404)
+        if not matricula:
+            matricula = usu.codigo_matricula
+    else:
+        usu = Usuario(ativo=True)
+        if not matricula:
+            matricula = _gerar_matricula_administrativa()
+
+    if not re.fullmatch(r"[A-Z0-9-]+", matricula):
+        return erro("Matrícula / ID funcional: use apenas letras, números e hífen.")
+    if Usuario.objects.filter(codigo_matricula=matricula).exclude(pk=usu.pk).exists():
+        return erro("Já existe registro com esta matrícula / ID funcional.")
+    if Usuario.objects.filter(email__iexact=email).exclude(pk=usu.pk).exists():
+        return erro("Já existe usuário cadastrado com este e-mail corporativo.")
+    if usu.pk == request.usuario.pk and perfil != "ADMIN":
+        return erro("Você não pode remover o seu próprio perfil de Administrador.")
+
+    setor_id = dados.get("setor_id")
+    setor = Setor.objects.filter(id=setor_id).first() if setor_id else usu.setor
+
+    perfil_anterior = usu.perfil if usu.pk else None
+    tinha_acesso = bool(usu.pk and usu.conta_id and usu.conta.has_usable_password())
+    usu.nome = nome
+    usu.codigo_matricula = matricula
+    usu.email = email
+    usu.perfil = perfil
+    usu.cargo = cargo or PERFIS.get(perfil, perfil)
+    usu.setor = setor
+    if pin:
+        definir_pin(usu, pin)
+    usu.save()
+
+    conta = garantir_conta(usu)
+    convite_enviado = False
+    if conta is not None and not tinha_acesso and not conta.has_usable_password():
+        convite_enviado = enviar_link_de_senha(request, usu)
+
+    registrar(
+        request,
+        "USUARIO_ADMIN_ATUALIZADO" if usu_id else "USUARIO_ADMIN_CADASTRADO",
+        usu,
+        f"{'Atualizou' if usu_id else 'Cadastrou'} usuário administrativo {usu.nome} ({PERFIS.get(perfil, perfil)})",
+        perfil=perfil,
+        perfil_anterior=perfil_anterior,
+        convite_enviado=convite_enviado,
+    )
+
+    msg = "Usuário administrativo atualizado com sucesso." if usu_id else "Usuário administrativo cadastrado com sucesso."
+    if convite_enviado:
+        msg += f" Enviamos para {email} o link para criação da senha pessoal."
+    return JsonResponse({"sucesso": True, "mensagem": msg, "id": str(usu.id), "convite_enviado": convite_enviado})
 
 
 # ============================================================================

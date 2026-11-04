@@ -1,10 +1,10 @@
 /* =====================================================================
-   SupplyFlow — Gestão de Funcionários (/api/funcionarios/)
+   SupplyFlow — Gestão de Funcionários Operacionais (/api/funcionarios/)
    ---------------------------------------------------------------------
-   Permite listar, filtrar, cadastrar, editar e ativar/inativar
-   colaboradores. Quando um funcionário recebe perfil de acesso ao
-   backoffice e possui e-mail, o servidor envia automaticamente o link
-   de primeiro acesso para criação da senha pessoal.
+   Gerencia o Domínio 1 (Funcionários Operacionais / Totem): nome,
+   matrícula, função/cargo, setor/centro de custo e PIN criptografado
+   (PBKDF2) para autoatendimento, mantendo isolamento em relação às
+   credenciais administrativas do Backoffice (Domínio 2 / RBAC).
    ===================================================================== */
 
 (function () {
@@ -12,13 +12,30 @@
   var tabelaCorpo = document.getElementById("tabela-funcionarios-corpo");
   var filtroTermo = document.getElementById("filtro-termo");
   var filtroSetor = document.getElementById("filtro-setor");
+  var filtroDominio = document.getElementById("filtro-dominio");
   var btnFiltrar = document.getElementById("btn-filtrar");
   var btnNovoFunc = document.getElementById("btn-novo-funcionario");
   var modalEl = document.getElementById("modal-funcionario");
   var formFunc = document.getElementById("form-funcionario");
+  var selectPerfil = document.getElementById("func-perfil");
+  var campoEmail = document.getElementById("func-email");
   var modalBs = modalEl ? new bootstrap.Modal(modalEl) : null;
 
   var funcionariosCache = [];
+
+  /* Ajusta o estado do campo de e-mail conforme o domínio escolhido (Operacional vs Backoffice) */
+  function atualizarEstadoDominioNoModal() {
+    if (!selectPerfil || !campoEmail) {
+      return;
+    }
+    var ehOperacional = selectPerfil.value === "COLABORADOR";
+    campoEmail.required = !ehOperacional;
+    if (ehOperacional) {
+      campoEmail.placeholder = "Dispensado para chão de fábrica";
+    } else {
+      campoEmail.placeholder = "usuario@empresa.com.br (obrigatório)";
+    }
+  }
 
   /* Carrega a lista de setores para o filtro da página e para o seletor do modal */
   function carregarSetores() {
@@ -63,11 +80,15 @@
       });
   }
 
-  /* Busca os funcionários aplicando os filtros de texto e setor */
+  /* Busca os funcionários aplicando os filtros de texto, setor e domínio */
   function carregarFuncionarios() {
     var termo = filtroTermo ? filtroTermo.value.trim() : "";
     var setor = filtroSetor ? filtroSetor.value : "";
-    var url = "/api/funcionarios/?q=" + encodeURIComponent(termo) + "&setor=" + encodeURIComponent(setor);
+    var dominio = filtroDominio ? filtroDominio.value : "";
+    var url =
+      "/api/funcionarios/?q=" + encodeURIComponent(termo) +
+      "&setor=" + encodeURIComponent(setor) +
+      "&dominio=" + encodeURIComponent(dominio);
 
     tabelaCorpo.innerHTML =
       '<tr><td colspan="7" class="text-center py-4 text-muted">' +
@@ -101,7 +122,17 @@
       iconeAlternar = "slash-circle";
     }
 
-    var badgePerfil = '<span class="badge bg-light text-dark border">' + escapar(funcionario.perfil) + "</span>";
+    var badgeDominio = '<span class="badge bg-light text-dark border">Operacional · Totem (PIN)</span>';
+    if (funcionario.dominio === "ADMINISTRATIVO") {
+      badgeDominio =
+        '<span class="badge bg-primary-subtle text-primary border border-primary-subtle">' +
+          escapar(funcionario.perfil_rotulo || funcionario.perfil) + " · Backoffice" +
+        "</span>";
+    }
+
+    var subtitulo = funcionario.dominio === "OPERACIONAL"
+      ? "Autoatendimento via Matrícula + PIN"
+      : (funcionario.email || "—");
 
     return (
       "<tr>" +
@@ -112,14 +143,14 @@
             "</span>" +
             "<div>" +
               '<div class="fw-semibold">' + escapar(funcionario.nome) + "</div>" +
-              '<small class="text-muted">' + escapar(funcionario.email) + "</small>" +
+              '<small class="text-muted">' + escapar(subtitulo) + "</small>" +
             "</div>" +
           "</div>" +
         "</td>" +
         '<td><span class="numero">' + escapar(funcionario.matricula) + "</span></td>" +
         "<td>" + escapar(funcionario.cargo) + "</td>" +
         "<td>" + escapar(funcionario.setor_nome) + "</td>" +
-        "<td>" + badgePerfil + "</td>" +
+        "<td>" + badgeDominio + "</td>" +
         "<td>" + badgeStatus + "</td>" +
         '<td class="text-end text-nowrap">' +
           '<a class="btn btn-sm btn-outline-primary me-1" href="ficha-epi.html?id=' + encodeURIComponent(funcionario.id) + '"' +
@@ -149,6 +180,7 @@
     document.getElementById("func-setor").value = funcionario.setor_id || "";
     document.getElementById("func-perfil").value = funcionario.perfil || "COLABORADOR";
     document.getElementById("func-pin").value = "";
+    atualizarEstadoDominioNoModal();
 
     if (modalBs) {
       modalBs.show();
@@ -189,11 +221,17 @@
     });
   }
 
+  if (selectPerfil) {
+    selectPerfil.addEventListener("change", atualizarEstadoDominioNoModal);
+  }
+
   if (btnNovoFunc) {
     btnNovoFunc.addEventListener("click", function () {
       formFunc.reset();
-      document.getElementById("modalFuncTitulo").textContent = "Novo Funcionário";
+      document.getElementById("modalFuncTitulo").textContent = "Novo Funcionário Operacional";
       document.getElementById("func-id").value = "";
+      document.getElementById("func-perfil").value = "COLABORADOR";
+      atualizarEstadoDominioNoModal();
       if (modalBs) {
         modalBs.show();
       }
@@ -237,6 +275,9 @@
   if (btnFiltrar) {
     btnFiltrar.addEventListener("click", carregarFuncionarios);
   }
+  if (filtroDominio) {
+    filtroDominio.addEventListener("change", carregarFuncionarios);
+  }
   if (filtroTermo) {
     filtroTermo.addEventListener("keydown", function (evento) {
       if (evento.key === "Enter") {
@@ -245,6 +286,7 @@
     });
   }
 
+  atualizarEstadoDominioNoModal();
   carregarSetores();
   carregarCargosSugeridos();
   carregarFuncionarios();
