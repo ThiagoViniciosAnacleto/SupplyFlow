@@ -11,16 +11,19 @@ from django.db.models import Q
 from django.utils import timezone
 
 from ..models import Entrega, RegraFornecimento, SolicitacaoItem
+from . import rh
 from .estados import ESTADOS_AGUARDANDO, ESTADOS_APROVADOS
 
 ANTECIPADA = "antecipada"
 ACIMA_DA_COTA = "acima_da_cota"
 EXIGE_JUSTIFICATIVA = "exige_justificativa"
+TAMANHO_DIFERENTE = "tamanho_diferente"
 
 DESCRICAO_MOTIVO = {
     ANTECIPADA: "Substituição antecipada",
     ACIMA_DA_COTA: "Limite mensal excedido",
     EXIGE_JUSTIFICATIVA: "Produto exige justificativa",
+    TAMANHO_DIFERENTE: "Tamanho inadequado",
 }
 
 PREFIXO_FUNCIONARIO = "MAT:"
@@ -44,6 +47,8 @@ class Avaliacao:
     saldo_livre_totem: int = 0
     tem_pendente: bool = False
     motivos: list = field(default_factory=list)
+    tamanho_recomendado: bool = False
+    tamanho_esperado: str = ""
 
     @property
     def excepcional(self):
@@ -138,6 +143,16 @@ def avaliar(colaborador, produto, quantidade=1, estoque=None, agora=None):
             av.proxima_regular = entrega.data + timedelta(days=regra.periodicidade_dias)
             if agora < av.proxima_regular:
                 av.motivos.insert(0, ANTECIPADA)
+
+    if produto.eh_epi and (produto.tamanho or "").strip():
+        ficha_rh = rh.obter_ficha_rh(colaborador)
+        _, esperado = rh.tamanho_esperado_para_produto(ficha_rh, produto)
+        if esperado:
+            av.tamanho_esperado = esperado
+            if produto.tamanho.strip().upper() == esperado.strip().upper():
+                av.tamanho_recomendado = True
+            else:
+                av.motivos.append(TAMANHO_DIFERENTE)
 
     if produto.requer_justificativa:
         av.motivos.append(EXIGE_JUSTIFICATIVA)

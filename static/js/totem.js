@@ -1,14 +1,16 @@
 /* =====================================================================
    SupplyFlow — Lógica do Totem de Autoatendimento
    ---------------------------------------------------------------------
-   Fluxo em 5 passos (máquina de estados visual):
+   Fluxo em passos (máquina de estados visual):
    1. Boas-vindas: escolha do método de identificação (Matrícula).
    2. Matrícula: digitação e validação em /api/totem/identificar/.
    3. PIN: digitação de 4 dígitos e autenticação em /api/totem/login/.
+   3.5. Troca de PIN (1º acesso): criação obrigatória de PIN pessoal quando
+        o colaborador ainda estiver com PIN provisório (/api/totem/trocar-pin/).
    4. Vitrine: exibição dos EPIs e consumíveis calculados pelo servidor
-      (/api/totem/produtos/), respeitando estoque, cota e periodicidade.
+      (/api/totem/produtos/), respeitando estoque, cota, periodicidade e tamanho.
    5. Justificativa: obrigatória quando o pedido é uma substituição
-      antecipada ou fora da cota mensal (/api/totem/solicitar/).
+      antecipada, fora da cota mensal ou tamanho diferente (/api/totem/solicitar/).
    ===================================================================== */
 
 (function () {
@@ -27,6 +29,9 @@
 
   /* Elementos principais do DOM */
   var inputMatricula = document.getElementById("input-matricula");
+  var inputNovoPin = document.getElementById("input-novo-pin");
+  var inputConfirmaPin = document.getElementById("input-confirma-pin");
+  var campoNovoPinAtivo = inputNovoPin;
   var gridProdutos = document.getElementById("grid-produtos-totem");
   var modalMinhasSolsEl = document.getElementById("modal-minhas-sols");
   var modalSucessoEl = document.getElementById("modal-sucesso");
@@ -82,6 +87,12 @@
 
     if (inputMatricula) {
       inputMatricula.value = "";
+    }
+    if (inputNovoPin) {
+      inputNovoPin.value = "";
+    }
+    if (inputConfirmaPin) {
+      inputConfirmaPin.value = "";
     }
     atualizarPinDots();
     mostrarPasso("passo-boas-vindas");
@@ -207,6 +218,11 @@
     SF.api.post("/api/totem/login/", { matricula: estado.matricula, pin: estado.pin }, { semRedirecionar: true })
       .then(function (dados) {
         estado.colaborador = dados.colaborador;
+        if (dados.colaborador && dados.colaborador.exige_troca_pin) {
+          prepararPassoTrocarPin();
+          mostrarPasso("passo-trocar-pin");
+          return;
+        }
         carregarVitrineProdutos();
       })
       .catch(function (erro) {
@@ -214,6 +230,118 @@
         estado.pin = "";
         atualizarPinDots();
       });
+  }
+
+  /* ---------- Passo 3.5: Troca Obrigatória de PIN Provisório no 1º Acesso ---------- */
+  function prepararPassoTrocarPin() {
+    if (inputNovoPin) {
+      inputNovoPin.value = "";
+    }
+    if (inputConfirmaPin) {
+      inputConfirmaPin.value = "";
+    }
+    campoNovoPinAtivo = inputNovoPin;
+    if (inputNovoPin) {
+      inputNovoPin.focus();
+    }
+  }
+
+  if (inputNovoPin) {
+    inputNovoPin.addEventListener("focus", function () {
+      campoNovoPinAtivo = inputNovoPin;
+    });
+  }
+  if (inputConfirmaPin) {
+    inputConfirmaPin.addEventListener("focus", function () {
+      campoNovoPinAtivo = inputConfirmaPin;
+    });
+  }
+
+  document.querySelectorAll(".tecla-novo-pin").forEach(function (botaoTecla) {
+    botaoTecla.addEventListener("click", function () {
+      if (!inputNovoPin || !inputConfirmaPin) {
+        return;
+      }
+      var digito = this.dataset.val;
+      var alvo = campoNovoPinAtivo || inputNovoPin;
+      if (alvo === inputNovoPin && inputNovoPin.value.length >= 4 && inputConfirmaPin.value.length < 4) {
+        alvo = inputConfirmaPin;
+        campoNovoPinAtivo = inputConfirmaPin;
+      }
+      if (alvo.value.length < 4) {
+        alvo.value += digito;
+        if (alvo === inputNovoPin && inputNovoPin.value.length === 4) {
+          campoNovoPinAtivo = inputConfirmaPin;
+        }
+      }
+    });
+  });
+
+  var btnNovoPinLimpar = document.getElementById("btn-novo-pin-limpar");
+  if (btnNovoPinLimpar) {
+    btnNovoPinLimpar.addEventListener("click", function () {
+      prepararPassoTrocarPin();
+    });
+  }
+
+  var btnNovoPinApagar = document.getElementById("btn-novo-pin-apagar");
+  if (btnNovoPinApagar) {
+    btnNovoPinApagar.addEventListener("click", function () {
+      if (!inputNovoPin || !inputConfirmaPin) {
+        return;
+      }
+      var alvo = campoNovoPinAtivo || inputNovoPin;
+      if (alvo === inputConfirmaPin && inputConfirmaPin.value.length === 0 && inputNovoPin.value.length > 0) {
+        campoNovoPinAtivo = inputNovoPin;
+        alvo = inputNovoPin;
+      }
+      alvo.value = alvo.value.slice(0, -1);
+    });
+  }
+
+  function confirmarNovoPinPessoal() {
+    var novoPin = inputNovoPin ? inputNovoPin.value.trim() : "";
+    var confirmacaoPin = inputConfirmaPin ? inputConfirmaPin.value.trim() : "";
+    if (!novoPin || !confirmacaoPin) {
+      alert("Digite e confirme seu novo PIN pessoal de 4 dígitos.");
+      return;
+    }
+    if (novoPin !== confirmacaoPin) {
+      alert("Os dois PINs digitados não conferem.");
+      return;
+    }
+
+    SF.api.post(
+      "/api/totem/trocar-pin/",
+      { novo_pin: novoPin, confirmacao_pin: confirmacaoPin },
+      { semRedirecionar: true }
+    )
+      .then(function () {
+        if (estado.colaborador) {
+          estado.colaborador.exige_troca_pin = false;
+        }
+        if (inputNovoPin) {
+          inputNovoPin.value = "";
+        }
+        if (inputConfirmaPin) {
+          inputConfirmaPin.value = "";
+        }
+        carregarVitrineProdutos();
+      })
+      .catch(function (erro) {
+        if (erro && erro.status === 401) {
+          tratarErro(erro);
+          return;
+        }
+        alert((erro && erro.message) ? erro.message : "Não foi possível salvar o novo PIN. Tente outro número.");
+      });
+  }
+
+  var btnConfirmarNovoPin = document.getElementById("btn-confirmar-novo-pin");
+  if (btnConfirmarNovoPin) {
+    btnConfirmarNovoPin.addEventListener("click", function () {
+      confirmarNovoPinPessoal();
+    });
   }
 
   /* ---------- Passo 4: Vitrine de Produtos ---------- */
@@ -224,11 +352,37 @@
     sem_estoque: { classe: "totem-status-badge--fora",       icone: "bi-exclamation-circle" }
   };
 
+  function atualizarResumoTamanhosVitrine() {
+    var elTamanhos = document.getElementById("vitrine-tamanhos");
+    if (!elTamanhos) {
+      return;
+    }
+    var tamanhos = (estado.colaborador && estado.colaborador.tamanhos) || {};
+    var partes = [];
+    if (tamanhos.calcado) {
+      partes.push("Calçado " + tamanhos.calcado);
+    }
+    if (tamanhos.luva) {
+      partes.push("Luva " + tamanhos.luva);
+    }
+    if (tamanhos.vestimenta) {
+      partes.push("Uniforme " + tamanhos.vestimenta);
+    }
+    if (partes.length > 0) {
+      elTamanhos.textContent = "Seus tamanhos: " + partes.join(" · ");
+      elTamanhos.classList.remove("d-none");
+    } else {
+      elTamanhos.textContent = "";
+      elTamanhos.classList.add("d-none");
+    }
+  }
+
   function carregarVitrineProdutos() {
     var nomeExibicao = estado.colaborador.primeiro_nome || estado.colaborador.nome;
     document.getElementById("vitrine-nome").textContent = nomeExibicao;
     document.getElementById("vitrine-cargo").textContent = estado.colaborador.cargo;
     document.getElementById("vitrine-setor").textContent = estado.colaborador.setor;
+    atualizarResumoTamanhosVitrine();
 
     gridProdutos.innerHTML =
       '<div class="text-center py-5 w-100 text-muted">' +
@@ -270,6 +424,8 @@
       var rotuloBotaoExcecao = "Solicitar com justificativa";
       if (produto.motivo_excecao === "Substituição antecipada") {
         rotuloBotaoExcecao = "Solicitar substituição antecipada";
+      } else if (produto.motivo_excecao === "Tamanho inadequado") {
+        rotuloBotaoExcecao = "Solicitar outro tamanho (justificar)";
       }
       return (
         '<button type="button" class="btn-solicitar-substituicao w-100" data-acao="justificar" data-id="' + escapar(produto.id) + '">' +
@@ -296,6 +452,18 @@
     var iconeProduto = ehEpi ? "bi-shield-check" : "bi-box-seam";
     var classeBadgeTipo = ehEpi ? "totem-badge-tipo--epi" : "totem-badge-tipo--consumivel";
 
+    var htmlTamanho = "";
+    if (produto.tamanho) {
+      var seloRecomendado = produto.tamanho_recomendado
+        ? '<span class="badge bg-success-subtle text-success border border-success-subtle ms-1"><i class="bi bi-check2-circle" aria-hidden="true"></i> Seu tamanho</span>'
+        : "";
+      htmlTamanho =
+        '<span><i class="bi bi-rulers me-1" aria-hidden="true"></i> Tamanho: ' +
+        escapar(produto.tamanho) +
+        seloRecomendado +
+        "</span>";
+    }
+
     var linhasInfo = [];
     if (produto.limite_mensal != null) {
       linhasInfo.push(
@@ -311,7 +479,7 @@
       }
     }
 
-    var htmlInfos = linhasInfo.map(function (textoLinha) {
+    var htmlInfos = htmlTamanho + linhasInfo.map(function (textoLinha) {
       return '<span><i class="bi bi-info-circle me-1" aria-hidden="true"></i> ' + escapar(textoLinha) + "</span>";
     }).join("");
 
@@ -353,7 +521,7 @@
     }
   });
 
-  /* ---------- Passo 5: Justificativa de Substituição Antecipada ---------- */
+  /* ---------- Passo 5: Justificativa de Substituição Antecipada / Exceção ---------- */
   function abrirTelaJustificativa(produtoId) {
     var produto = estado.produtos.find(function (item) {
       return item.id === produtoId;
@@ -364,6 +532,9 @@
     estado.produtoSelecionado = produto;
 
     var textoDetalhes = produto.tipo;
+    if (produto.tamanho) {
+      textoDetalhes += " · Tamanho " + produto.tamanho;
+    }
     if (produto.motivo_excecao) {
       textoDetalhes += " · " + produto.motivo_excecao;
     }
@@ -604,6 +775,11 @@
           estado.pin = estado.pin.slice(0, -1);
           atualizarPinDots();
         }
+      }
+    } else if (passoAtual.id === "passo-trocar-pin") {
+      if (evento.key === "Enter") {
+        evento.preventDefault();
+        confirmarNovoPinPessoal();
       }
     }
   });

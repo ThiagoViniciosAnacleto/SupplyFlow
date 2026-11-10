@@ -14,10 +14,24 @@ from django.views.decorators.http import require_GET, require_POST
 
 from ..auditoria import registrar
 from ..models import EstoqueTotem, Produto, Solicitacao, Totem, Usuario
-from ..seguranca import bloqueado, limpar_falhas, registrar_falha, verificar_pin
+from ..seguranca import (
+    bloqueado,
+    definir_pin,
+    limpar_falhas,
+    registrar_falha,
+    validar_novo_pin,
+    verificar_pin,
+)
 from ..servicos import RegraViolada, estados
+from ..servicos import rh as servico_rh
 from ..servicos import solicitacoes as servico_solicitacoes
-from ..servicos.elegibilidade import ACIMA_DA_COTA, ANTECIPADA, EXIGE_JUSTIFICATIVA, avaliar
+from ..servicos.elegibilidade import (
+    ACIMA_DA_COTA,
+    ANTECIPADA,
+    EXIGE_JUSTIFICATIVA,
+    TAMANHO_DIFERENTE,
+    avaliar,
+)
 from .util import EntradaInvalida, erro, fmt, inteiro, ler_json
 
 CHAVE_SESSAO = "totem_colaborador_id"
@@ -124,6 +138,8 @@ def api_totem_login(request):
     colaborador.save(update_fields=["ultimo_acesso"])
     registrar(request, "TOTEM_LOGIN", colaborador, "Entrou no totem", usuario=colaborador)
 
+    ficha_rh = servico_rh.obter_ficha_rh(colaborador)
+
     return JsonResponse({
         "sucesso": True,
         "colaborador": {
@@ -133,8 +149,41 @@ def api_totem_login(request):
             "cargo": colaborador.cargo or "Colaborador",
             "setor": colaborador.setor.nome if colaborador.setor else "Sem setor",
             "centro_custo": colaborador.setor.centro_custo if colaborador.setor else "",
+            "exige_troca_pin": bool(ficha_rh.get("pin_provisorio")),
+            "tamanhos": ficha_rh.get("tamanhos") or {"calcado": "", "luva": "", "vestimenta": ""},
         },
     })
+
+
+@require_POST
+@api_totem
+def api_totem_trocar_pin(request):
+    """Permite ao colaborador definir seu PIN pessoal definitivo no 1º acesso no totem."""
+    dados, erro_json = ler_json(request)
+    if erro_json:
+        return erro_json
+    colaborador = request.colaborador
+    novo_pin = str(dados.get("novo_pin") or "").strip()
+    confirmacao_pin = str(dados.get("confirmacao_pin") or "").strip()
+    if not novo_pin or not confirmacao_pin or novo_pin != confirmacao_pin:
+        return erro("Os dois PINs digitados não conferem.")
+    problema = validar_novo_pin(novo_pin)
+    if problema:
+        return erro(problema)
+    if verificar_pin(colaborador, novo_pin):
+        return erro("O novo PIN pessoal deve ser diferente do PIN provisório.")
+
+    definir_pin(colaborador, novo_pin)
+    colaborador.save(update_fields=["pin_hash", "updated_at"])
+    servico_rh.salvar_metadados_rh(request, colaborador, pin_provisorio=False)
+    registrar(
+        request,
+        "TOTEM_PIN_ALTERADO",
+        colaborador,
+        "Definiu PIN pessoal no primeiro acesso ao totem",
+        usuario=colaborador,
+    )
+    return JsonResponse({"sucesso": True, "mensagem": "PIN pessoal cadastrado com sucesso!"})
 
 
 @require_POST
@@ -175,8 +224,12 @@ def api_totem_produtos(request):
                             + ". Pode pedir com justificativa.",
                 ACIMA_DA_COTA: f"Limite do mês atingido ({av.consumido_mes}/{av.regra.limite_mensal}). "
                                "Pode pedir com justificativa.",
+                TAMANHO_DIFERENTE: (
+                    f"Tamanho {p.tamanho} diferente do seu tamanho cadastrado ({av.tamanho_esperado}). "
+                    "Pode pedir com justificativa."
+                ),
                 EXIGE_JUSTIFICATIVA: "Este item exige justificativa.",
-            }[av.motivos[0]]
+            }.get(av.motivos[0], "Este item exige justificativa.")
         else:
             situacao, acao = "disponivel", "Disponível para retirada."
 
@@ -186,6 +239,9 @@ def api_totem_produtos(request):
             "nome": p.nome,
             "descricao": p.descricao or "",
             "tipo": "EPI" if p.eh_epi else "Consumível",
+            "tamanho": p.tamanho or "",
+            "tamanho_recomendado": getattr(av, "tamanho_recomendado", False),
+            "tamanho_esperado": getattr(av, "tamanho_esperado", ""),
             "unidade_medida": p.unidade_medida,
             "limite_mensal": av.regra.limite_mensal,
             "consumido_mes": av.consumido_mes,

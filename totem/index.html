@@ -157,6 +157,53 @@
       </div>
     </section>
 
+    <!-- PASSO 3.5: TROCA OBRIGATÓRIA DE PIN PROVISÓRIO NO 1º ACESSO -->
+    <section class="totem-passo" id="passo-trocar-pin" aria-labelledby="titulo-passo-trocar-pin">
+      <div class="totem-hero-icone totem-hero-icone--lock" aria-hidden="true">
+        <i class="bi bi-shield-lock"></i>
+      </div>
+      <h2 class="totem-titulo" id="titulo-passo-trocar-pin">Crie seu PIN Pessoal</h2>
+      <p class="totem-subtitulo">
+        Primeiro acesso: crie seu PIN pessoal secreto (4 dígitos). Ele substituirá o PIN provisório entregue pelo RH.
+      </p>
+
+      <div class="totem-teclado-container">
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <label for="input-novo-pin" class="form-label small fw-semibold mb-1">Novo PIN (4 dígitos)</label>
+            <input type="password" id="input-novo-pin" class="form-control text-center fw-bold fs-4"
+                   inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="off">
+          </div>
+          <div class="col-6">
+            <label for="input-confirma-pin" class="form-label small fw-semibold mb-1">Confirmar novo PIN</label>
+            <input type="password" id="input-confirma-pin" class="form-control text-center fw-bold fs-4"
+                   inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="off">
+          </div>
+        </div>
+
+        <div class="totem-teclado mb-3" role="group" aria-label="Teclado numérico para criação do novo PIN">
+          <button type="button" class="btn-tecla tecla-novo-pin" data-val="1">1</button>
+          <button type="button" class="btn-tecla tecla-novo-pin" data-val="2">2</button>
+          <button type="button" class="btn-tecla tecla-novo-pin" data-val="3">3</button>
+          <button type="button" class="btn-tecla tecla-novo-pin" data-val="4">4</button>
+          <button type="button" class="btn-tecla tecla-novo-pin" data-val="5">5</button>
+          <button type="button" class="btn-tecla tecla-novo-pin" data-val="6">6</button>
+          <button type="button" class="btn-tecla tecla-novo-pin" data-val="7">7</button>
+          <button type="button" class="btn-tecla tecla-novo-pin" data-val="8">8</button>
+          <button type="button" class="btn-tecla tecla-novo-pin" data-val="9">9</button>
+          <button type="button" class="btn-tecla btn-tecla--acao text-secondary" id="btn-novo-pin-limpar">Limpar</button>
+          <button type="button" class="btn-tecla tecla-novo-pin" data-val="0">0</button>
+          <button type="button" class="btn-tecla btn-tecla--acao btn-tecla--apagar" id="btn-novo-pin-apagar" aria-label="Apagar último dígito do novo PIN">
+            <i class="bi bi-backspace" aria-hidden="true"></i>
+          </button>
+        </div>
+
+        <button type="button" class="btn-solicitar-retirada w-100" id="btn-confirmar-novo-pin">
+          <i class="bi bi-check2-circle me-1" aria-hidden="true"></i> Salvar meu PIN pessoal e continuar
+        </button>
+      </div>
+    </section>
+
     <!-- PASSO 4: VITRINE DE PRODUTOS DISPONÍVEIS -->
     <section class="totem-passo" id="passo-vitrine" aria-label="Vitrine de produtos disponíveis">
       <div class="totem-vitrine-topo">
@@ -165,6 +212,7 @@
           <p>
             Função: <strong id="vitrine-cargo">Soldador</strong> · Setor: <strong id="vitrine-setor">Produção Industrial</strong>
           </p>
+          <p class="small text-success fw-semibold mt-1 mb-0 d-none" id="vitrine-tamanhos"></p>
         </div>
 
         <div>
@@ -234,6 +282,9 @@
           </button>
           <button type="button" class="btn btn-outline-secondary btn-sm chip-sugestao" data-texto="Manutenção corretiva emergencial consumiu mais unidades que a cota padrão.">
             Demanda emergencial
+          </button>
+          <button type="button" class="btn btn-outline-secondary btn-sm chip-sugestao" data-texto="Solicito outro tamanho pois a modelagem deste lote ficou inadequada para o uso seguro.">
+            Outro tamanho / modelagem
           </button>
         </div>
 

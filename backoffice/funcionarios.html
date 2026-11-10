@@ -24,15 +24,23 @@
           <div>
             <h1 class="pagina-titulo mb-1">Funcionários (Operacional / Totem)</h1>
             <p class="pagina-descricao mb-0">
-              Gestão do quadro operacional de colaboradores do chão de fábrica, matrículas, funções, centros de custo e PIN de autoatendimento.
+              Gestão do quadro operacional de colaboradores do chão de fábrica, matrículas, funções, grade de tamanhos de EPI, centros de custo e PIN de autoatendimento.
               Para gerenciar acessos gerenciais e papéis RBAC do painel, acesse <a href="usuarios.html">Usuários e permissões</a>.
             </p>
           </div>
-          <div>
+          <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-outline-primary" id="btn-importar-csv">
+              <i class="bi bi-file-earmark-spreadsheet" aria-hidden="true"></i> Importar CSV
+            </button>
             <button type="button" class="btn btn-primary" id="btn-novo-funcionario">
               <i class="bi bi-person-plus" aria-hidden="true"></i> Novo Funcionário
             </button>
           </div>
+        </div>
+
+        <div class="alert alert-success alert-dismissible fade show d-none mb-4" role="status" id="alerta-feedback-rh">
+          <div id="alerta-feedback-rh-texto"></div>
+          <button type="button" class="btn-close" id="btn-fechar-alerta-rh" aria-label="Fechar aviso"></button>
         </div>
 
         <!-- Filtros e Busca -->
@@ -91,9 +99,9 @@
 
   </div>
 
-  <!-- Modal de Cadastro / Edição -->
+  <!-- Modal de Cadastro / Edição de Funcionário -->
   <div class="modal fade" id="modal-funcionario" tabindex="-1" aria-labelledby="modalFuncTitulo" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
       <div class="modal-content rounded-4 border-0 shadow">
         <form id="form-funcionario">
           <div class="modal-header border-bottom">
@@ -123,7 +131,7 @@
                 </div>
               </div>
 
-              <div class="row g-2">
+              <div class="row g-2 mb-3">
                 <div class="col-12 col-sm-6">
                   <label for="func-cargo" class="form-label small fw-semibold">Cargo / Função *</label>
                   <input type="text" id="func-cargo" class="form-control" list="lista-cargos-func" required placeholder="Ex.: Operador de Caldeira">
@@ -136,10 +144,56 @@
                   </select>
                 </div>
               </div>
+
+              <div class="p-3 rounded-3 bg-light border">
+                <div class="form-check mb-2">
+                  <input class="form-check-input" type="checkbox" id="func-exigir-troca-pin" checked>
+                  <label class="form-check-label small fw-medium" for="func-exigir-troca-pin">
+                    PIN provisório (exigir que o funcionário troque o PIN no 1º acesso ao Totem)
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="func-gerar-kit" checked>
+                  <label class="form-check-label small fw-medium" for="func-gerar-kit">
+                    Gerar automaticamente o Kit Admissional de EPIs (cria entrega aprovada para o almoxarifado)
+                  </label>
+                </div>
+              </div>
             </fieldset>
 
             <fieldset class="border-top pt-3 mt-3">
-              <legend class="fs-6 fw-bold text-secondary mb-2">2. Domínio de Acesso (Isolamento Operacional vs. Backoffice)</legend>
+              <legend class="fs-6 fw-bold text-secondary mb-2">2. Grade de Tamanhos (Perfil Antropométrico de EPI)</legend>
+              <div class="row g-2">
+                <div class="col-12 col-sm-4">
+                  <label for="func-tam-calcado" class="form-label small fw-semibold">Calçado</label>
+                  <input type="text" id="func-tam-calcado" class="form-control" maxlength="10" placeholder="Ex.: 38, 40, 41, 42">
+                </div>
+                <div class="col-12 col-sm-4">
+                  <label for="func-tam-luva" class="form-label small fw-semibold">Luva</label>
+                  <select id="func-tam-luva" class="form-select">
+                    <option value="">Não informado</option>
+                    <option value="P">P</option>
+                    <option value="M">M</option>
+                    <option value="G">G</option>
+                    <option value="GG">GG</option>
+                  </select>
+                </div>
+                <div class="col-12 col-sm-4">
+                  <label for="func-tam-vestimenta" class="form-label small fw-semibold">Vestimenta / Uniforme</label>
+                  <select id="func-tam-vestimenta" class="form-select">
+                    <option value="">Não informado</option>
+                    <option value="P">P</option>
+                    <option value="M">M</option>
+                    <option value="G">G</option>
+                    <option value="GG">GG</option>
+                    <option value="XG">XG</option>
+                  </select>
+                </div>
+              </div>
+            </fieldset>
+
+            <fieldset class="border-top pt-3 mt-3">
+              <legend class="fs-6 fw-bold text-secondary mb-2">3. Domínio de Acesso (Isolamento Operacional vs. Backoffice)</legend>
               <div class="row g-2">
                 <div class="col-12 col-sm-6">
                   <label for="func-perfil" class="form-label small fw-semibold">Domínio / Papel</label>
@@ -165,6 +219,169 @@
           <div class="modal-footer border-top">
             <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
             <button type="submit" class="btn btn-primary px-4 fw-bold">Salvar Funcionário</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Mudança de Função / Transferência de Setor -->
+  <div class="modal fade" id="modal-mudar-funcao" tabindex="-1" aria-labelledby="modalMudarFuncaoTitulo" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content rounded-4 border-0 shadow">
+        <form id="form-mudar-funcao">
+          <div class="modal-header border-bottom">
+            <h5 class="modal-title fw-bold" id="modalMudarFuncaoTitulo">Mudar Função / Transferir Setor</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+          </div>
+          <div class="modal-body p-4">
+            <input type="hidden" id="mudanca-func-id">
+
+            <div class="p-3 rounded-3 bg-light border mb-3" id="mudanca-resumo-atual">
+              <div class="small text-muted">Colaborador selecionado</div>
+              <div class="fw-bold" id="mudanca-nome-colaborador">—</div>
+              <div class="small text-secondary mt-1" id="mudanca-situacao-atual">Cargo atual: — · Setor atual: —</div>
+            </div>
+
+            <div class="mb-3">
+              <label for="mudanca-novo-cargo" class="form-label small fw-semibold">Novo Cargo / Função *</label>
+              <input type="text" id="mudanca-novo-cargo" class="form-control" list="lista-cargos-func" required placeholder="Ex.: Operador de Empilhadeira">
+            </div>
+
+            <div class="mb-3">
+              <label for="mudanca-novo-setor" class="form-label small fw-semibold">Novo Setor / Centro de Custo</label>
+              <select id="mudanca-novo-setor" class="form-select">
+                <option value="">Selecione...</option>
+              </select>
+            </div>
+
+            <div class="mb-3">
+              <label for="mudanca-observacao" class="form-label small fw-semibold">Motivo / Observação da transição</label>
+              <input type="text" id="mudanca-observacao" class="form-control" maxlength="255" placeholder="Ex.: Promoção, Transferência de linha">
+            </div>
+
+            <div class="p-3 rounded-3 bg-light border">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="mudanca-gerar-kit" checked>
+                <label class="form-check-label small fw-medium" for="mudanca-gerar-kit">
+                  Gerar Kit de EPIs da nova função na fila do almoxarifado
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer border-top">
+            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-primary px-4 fw-bold">Confirmar Transição</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Checklist de Desligamento e Termo "Nada Consta" -->
+  <div class="modal fade" id="modal-desligamento" tabindex="-1" aria-labelledby="modalDesligamentoTitulo" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content rounded-4 border-0 shadow">
+        <div class="modal-header border-bottom">
+          <h5 class="modal-title fw-bold" id="modalDesligamentoTitulo">Checklist de Desligamento e Nada Consta</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body p-4">
+          <input type="hidden" id="desligamento-func-id">
+
+          <div id="desligamento-carregando" class="text-center py-4 text-muted d-none">
+            <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+            Verificando solicitações em aberto e EPIs em posse do colaborador...
+          </div>
+
+          <div id="desligamento-conteudo">
+            <div class="p-3 rounded-3 bg-light border mb-3" id="desligamento-resumo-colaborador">
+              <div class="fw-bold" id="desligamento-nome-colaborador">—</div>
+              <div class="small text-secondary" id="desligamento-detalhe-colaborador">—</div>
+            </div>
+
+            <div class="alert alert-warning d-flex align-items-start gap-2 mb-3" id="desligamento-solicitacoes-abertas">
+              <i class="bi bi-exclamation-triangle-fill mt-1" aria-hidden="true"></i>
+              <div id="desligamento-solicitacoes-texto">
+                Solicitações e reservas em aberto serão canceladas automaticamente ao confirmar o desligamento.
+              </div>
+            </div>
+
+            <div class="mb-3" id="desligamento-status-devolucoes"></div>
+
+            <div>
+              <h6 class="fw-bold small text-uppercase text-secondary mb-2">EPIs em posse do colaborador</h6>
+              <div id="desligamento-lista-epis" class="border rounded-3 p-3 bg-white">
+                <p class="text-muted small mb-0">Nenhum EPI pendente listado.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer border-top d-flex flex-wrap justify-content-between gap-2">
+          <a class="btn btn-outline-dark" id="link-nada-consta-desligamento" href="ficha-epi.html?nada_consta=1" target="_blank" rel="noopener">
+            <i class="bi bi-printer" aria-hidden="true"></i> Emitir Termo de Nada Consta / Ficha de EPI
+          </a>
+          <div class="d-flex gap-2 ms-auto">
+            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+            <button type="button" class="btn btn-danger px-4 fw-bold" id="btn-confirmar-desligamento">
+              Confirmar desligamento e inativar acesso
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Importação em Lote via CSV -->
+  <div class="modal fade" id="modal-importar-csv" tabindex="-1" aria-labelledby="modalImportarCsvTitulo" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content rounded-4 border-0 shadow">
+        <form id="form-importar-csv">
+          <div class="modal-header border-bottom">
+            <h5 class="modal-title fw-bold" id="modalImportarCsvTitulo">Importar Funcionários em Lote (CSV)</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+          </div>
+          <div class="modal-body p-4">
+            <div class="p-3 rounded-3 bg-light border mb-3">
+              <div class="small fw-bold text-secondary mb-1">Formato das colunas (separadas por ponto e vírgula <code>;</code> ou vírgula <code>,</code>):</div>
+              <code class="d-block small text-dark user-select-all">matricula;nome;cargo;setor;pin_inicial;calcado;luva;vestimenta</code>
+              <div class="small text-muted mt-1">
+                Exemplo: <code>MAT-3010;Carlos Almeida;Soldador;Manutenção;1234;41;G;G</code>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label for="csv-arquivo" class="form-label small fw-semibold">Carregar arquivo (.csv ou .txt)</label>
+              <input type="file" id="csv-arquivo" class="form-control" accept=".csv,.txt">
+            </div>
+
+            <div class="mb-3">
+              <label for="csv-texto" class="form-label small fw-semibold">Conteúdo CSV (ou cole diretamente da planilha) *</label>
+              <textarea id="csv-texto" class="form-control font-monospace small" rows="6" required placeholder="matricula;nome;cargo;setor;pin_inicial;calcado;luva;vestimenta&#10;MAT-3010;Carlos Almeida;Soldador;Manutenção;1234;41;G;G"></textarea>
+            </div>
+
+            <div class="p-3 rounded-3 bg-light border mb-3">
+              <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="csv-exigir-troca-pin" checked>
+                <label class="form-check-label small fw-medium" for="csv-exigir-troca-pin">
+                  PIN provisório (exigir que os funcionários importados troquem o PIN no 1º acesso ao Totem)
+                </label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="csv-gerar-kit">
+                <label class="form-check-label small fw-medium" for="csv-gerar-kit">
+                  Gerar automaticamente o Kit Admissional de EPIs para os novos funcionários importados
+                </label>
+              </div>
+            </div>
+
+            <div id="csv-resultado" class="d-none"></div>
+          </div>
+          <div class="modal-footer border-top">
+            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
+            <button type="submit" class="btn btn-primary px-4 fw-bold" id="btn-processar-csv">
+              <i class="bi bi-cloud-upload" aria-hidden="true"></i> Processar Importação
+            </button>
           </div>
         </form>
       </div>

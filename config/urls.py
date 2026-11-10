@@ -5,6 +5,11 @@ from django.urls import path
 from core import views
 from core.contas import FormularioRedefinicao
 
+
+def _api_totem_trocar_pin(request, *args, **kwargs):
+    return views.api_totem_trocar_pin(request, *args, **kwargs)
+
+
 urlpatterns = [
     path("admin/", admin.site.urls),
 
@@ -74,6 +79,7 @@ urlpatterns = [
     # =========================================================================
     path("api/totem/identificar/", views.api_totem_identificar, name="api_totem_identificar"),
     path("api/totem/login/", views.api_totem_login, name="api_totem_login"),
+    path("api/totem/trocar-pin/", _api_totem_trocar_pin, name="api_totem_trocar_pin"),
     path("api/totem/sair/", views.api_totem_sair, name="api_totem_sair"),
     path("api/totem/produtos/", views.api_totem_produtos, name="api_totem_produtos"),
     path("api/totem/solicitar/", views.api_totem_solicitar, name="api_totem_solicitar"),
@@ -102,6 +108,9 @@ urlpatterns = [
     path("api/produtos/<uuid:produto_id>/toggle/", views.api_toggle_produto, name="api_toggle_produto"),
     path("api/funcionarios/", views.api_listar_funcionarios, name="api_funcionarios"),
     path("api/funcionarios/salvar/", views.api_salvar_funcionario, name="api_salvar_funcionario"),
+    path("api/funcionarios/importar-csv/", views.api_importar_funcionarios_csv, name="api_importar_funcionarios_csv"),
+    path("api/funcionarios/<uuid:funcionario_id>/mudar-funcao/", views.api_mudar_funcao_funcionario, name="api_mudar_funcao_funcionario"),
+    path("api/funcionarios/<uuid:funcionario_id>/desligamento/", views.api_resumo_desligamento, name="api_resumo_desligamento"),
     path("api/funcionarios/<uuid:funcionario_id>/toggle/", views.api_toggle_funcionario, name="api_toggle_funcionario"),
     path("api/funcionarios/<uuid:funcionario_id>/enviar-link-senha/", views.api_enviar_link_senha, name="api_enviar_link_senha"),
     path("api/setores/", views.api_listar_setores, name="api_setores"),

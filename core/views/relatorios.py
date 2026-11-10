@@ -19,7 +19,7 @@ from ..ia import CATEGORIAS
 from ..models import (DecisaoSolicitacao, Devolucao, Entrega, MovimentacaoEstoque, Produto, Setor, Solicitacao,
                       Usuario)
 from ..permissoes import api_backoffice
-from ..servicos import estados
+from ..servicos import estados, rh
 from .cadastros import _catalogo_cargos
 from .util import erro, fmt
 
@@ -258,6 +258,9 @@ def api_ficha_epi(request, funcionario_id):
                       l["almoxarife"], l["devolvido_em"], l["condicao_devolucao"]] for l in linhas],
                     f"Exportou a ficha de EPI de {colaborador.nome}")
 
+    ficha_rh = rh.obter_ficha_rh(colaborador)
+    desligamento = rh.resumo_desligamento(colaborador)
+
     registrar(request, "FICHA_EPI_CONSULTADA", colaborador, f"Consultou a ficha de EPI de {colaborador.nome}")
     return JsonResponse({
         "funcionario": {
@@ -267,8 +270,11 @@ def api_ficha_epi(request, funcionario_id):
             "setor": colaborador.setor.nome if colaborador.setor else "",
             "centro_custo": colaborador.setor.centro_custo if colaborador.setor else "",
             "ativo": colaborador.ativo,
+            "tamanhos": ficha_rh["tamanhos"],
         },
         "entregas": linhas,
+        "historico_funcional": ficha_rh["historico_funcional"],
+        "nada_consta": desligamento,
         "emitida_em": fmt(timezone.now(), "%d/%m/%Y %H:%M"),
     })
 

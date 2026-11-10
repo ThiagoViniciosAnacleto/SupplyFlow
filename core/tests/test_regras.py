@@ -6,7 +6,9 @@ from django.test import Client
 from django.utils import timezone
 
 from core.models import (AnaliseIA, Devolucao, Entrega, EstoqueTotem, MovimentacaoEstoque, Produto, RegraFornecimento,
-                         Solicitacao)
+                         Solicitacao, Usuario)
+from core.servicos import rh
+from core.servicos.elegibilidade import TAMANHO_DIFERENTE, avaliar
 from core.servicos.solicitacoes import _proximo_codigo
 
 from .base import BaseTeste
@@ -106,7 +108,7 @@ class DecisaoEntregaTeste(BaseTeste):
         self.entrar_no_totem(cliente=totem)
         produto = produto or self.luva
         resposta = self.post("/api/totem/solicitar/", {"produto_id": str(produto.id), "quantidade": quantidade,
-                                                      "tipo": tipo, "justificativa": justificativa}, totem)
+                                                       "tipo": tipo, "justificativa": justificativa}, totem)
         self.assertEqual(resposta.status_code, 200, resposta.content)
         return Solicitacao.objects.get(codigo=resposta.json()["codigo"])
 
@@ -294,3 +296,118 @@ class CadastrosValidacaoTeste(BaseTeste):
     def test_painel_sem_numeros_fixos(self):
         dados = self.client.get("/api/dashboard/").json()
         self.assertEqual(dados["entregasPorMes"]["valores"], [0, 0, 0, 0, 0, 0])
+
+    def test_grade_de_tamanhos_recomenda_ou_exige_justificativa(self):
+        """Grade de tamanhos: recomenda tamanho compatível e exige justificativa como Tamanho inadequado quando diverge."""
+        rh.salvar_metadados_rh(None, self.colaborador, tamanhos={"luva": "M", "calcado": "42"})
+        self.luva.tamanho = "M"
+        self.luva.save()
+
+        av_ok = avaliar(self.colaborador, self.luva, 1, self.estoque_luva)
+        self.assertTrue(av_ok.tamanho_recomendado)
+        self.assertEqual(av_ok.tamanho_esperado, "M")
+        self.assertNotIn(TAMANHO_DIFERENTE, av_ok.motivos)
+
+        luva_g = Produto.objects.create(
+            sku="EPI-LUVA-G",
+            nome="Luva anticorte G",
+            categoria=self.luva.categoria,
+            custo_unitario=self.luva.custo_unitario,
+            limite_padrao_mensal=2,
+            tamanho="G",
+            ca="CA-1234",
+        )
+        est_luva_g = EstoqueTotem.objects.create(totem=self.totem, produto=luva_g, quantidade_disponivel=5)
+        av_div = avaliar(self.colaborador, luva_g, 1, est_luva_g)
+        self.assertFalse(av_div.tamanho_recomendado)
+        self.assertEqual(av_div.tamanho_esperado, "M")
+        self.assertIn(TAMANHO_DIFERENTE, av_div.motivos)
+        self.assertEqual(av_div.motivo_principal, "Tamanho inadequado")
+
+    def test_admissao_com_kit_admissional_cria_solicitacao_aprovada_e_reserva_estoque(self):
+        """Admissão com gerar_kit=True cria solicitação já APROVADA e reserva saldo no estoque do totem."""
+        r = self.post("/api/funcionarios/salvar/", {
+            "nome": "Carlos Admissao",
+            "matricula": "009911",
+            "cargo": "Soldador",
+            "setor_id": str(self.setor.id),
+            "pin": "5924",
+            "tamanhos": {"calcado": "41", "luva": "M", "vestimenta": "G"},
+            "exigir_troca_pin": True,
+            "gerar_kit": True,
+        })
+        self.assertEqual(r.status_code, 200, r.content)
+        dados = r.json()
+        self.assertTrue(dados["kit_gerado"]["gerado"])
+        self.assertGreaterEqual(dados["kit_gerado"]["quantidade_itens"], 1)
+
+        novo_func = Usuario.objects.get(codigo_matricula="009911")
+        ficha = rh.obter_ficha_rh(novo_func)
+        self.assertTrue(ficha["pin_provisorio"])
+        self.assertEqual(ficha["tamanhos"]["calcado"], "41")
+        self.assertTrue(any(h["acao"] == "ADMISSAO" for h in ficha["historico_funcional"]))
+
+        sol_kit = Solicitacao.objects.filter(solicitante=novo_func, status="APROVADA").first()
+        self.assertIsNotNone(sol_kit)
+        self.assertEqual(sol_kit.motivo_categoria, "Kit Admissional")
+        self.estoque_luva.refresh_from_db()
+        self.assertEqual(self.estoque_luva.quantidade_reservada, 1)
+
+    def test_mudanca_de_funcao_registra_historico_na_ficha_epi(self):
+        """Mudança de função atualiza cargo/setor e registra a transição no histórico funcional da Ficha de EPI."""
+        r = self.post(f"/api/funcionarios/{self.colaborador.id}/mudar-funcao/", {
+            "novo_cargo": "Líder de Solda",
+            "novo_setor_id": str(self.setor.id),
+            "observacao": "Promoção semestral",
+            "gerar_kit": False,
+        })
+        self.assertEqual(r.status_code, 200, r.content)
+        self.colaborador.refresh_from_db()
+        self.assertEqual(self.colaborador.cargo, "Líder de Solda")
+
+        ficha_api = self.client.get(f"/api/funcionarios/{self.colaborador.id}/ficha/").json()
+        historico = ficha_api["historico_funcional"]
+        self.assertTrue(any(h["acao"] == "MUDANCA_FUNCAO" and h["cargo_novo"] == "Líder de Solda" for h in historico))
+
+    def test_desligamento_cancela_reservas_pendentes_e_retorna_nada_consta(self):
+        """Inativar colaborador cancela solicitações/reservas abertas e retorna o resumo de Nada Consta."""
+        kit = rh.gerar_kit_admissional(self.colaborador, self.admin)
+        self.assertTrue(kit["gerado"])
+        self.estoque_luva.refresh_from_db()
+        self.assertEqual(self.estoque_luva.quantidade_reservada, 1)
+
+        r = self.post(f"/api/funcionarios/{self.colaborador.id}/toggle/")
+        self.assertEqual(r.status_code, 200, r.content)
+        dados = r.json()
+        self.assertFalse(dados["ativo"])
+        self.assertEqual(dados["reservas_canceladas"], 1)
+        self.assertIn("resumo_desligamento", dados)
+        self.assertTrue(dados["resumo_desligamento"]["nada_consta_apto"])
+
+        self.estoque_luva.refresh_from_db()
+        self.assertEqual(self.estoque_luva.quantidade_reservada, 0)
+
+    def test_importacao_funcionarios_csv_cria_e_atualiza_em_lote(self):
+        """Importação via CSV cria novos colaboradores e atualiza existentes com tamanhos e setor."""
+        csv_conteudo = (
+            "matricula;nome;cargo;setor;pin_inicial;calcado;luva;vestimenta\n"
+            "001245;João da Silva;Soldador Sênior;Produção Industrial;7391;42;G;G\n"
+            "008877;Marina Costa;Eletricista;Manutenção Elétrica;5184;38;P;M\n"
+        )
+        r = self.post("/api/funcionarios/importar-csv/", {
+            "csv_texto": csv_conteudo,
+            "exigir_troca_pin": True,
+            "gerar_kit": False,
+        })
+        self.assertEqual(r.status_code, 200, r.content)
+        dados = r.json()
+        self.assertEqual(dados["criados"], 1)
+        self.assertEqual(dados["atualizados"], 1)
+        self.assertEqual(dados["erros"], [])
+
+        marina = Usuario.objects.get(codigo_matricula="008877")
+        self.assertEqual(marina.cargo, "Eletricista")
+        self.assertEqual(marina.setor.nome, "Manutenção Elétrica")
+        ficha_marina = rh.obter_ficha_rh(marina)
+        self.assertEqual(ficha_marina["tamanhos"], {"calcado": "38", "luva": "P", "vestimenta": "M"})
+        self.assertTrue(ficha_marina["pin_provisorio"])
