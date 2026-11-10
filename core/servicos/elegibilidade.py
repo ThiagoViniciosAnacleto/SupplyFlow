@@ -18,22 +18,27 @@ ANTECIPADA = "antecipada"
 ACIMA_DA_COTA = "acima_da_cota"
 EXIGE_JUSTIFICATIVA = "exige_justificativa"
 TAMANHO_DIFERENTE = "tamanho_diferente"
+HABILITACAO_VENCIDA = "habilitacao_vencida"
 
 DESCRICAO_MOTIVO = {
     ANTECIPADA: "Substituição antecipada",
     ACIMA_DA_COTA: "Limite mensal excedido",
     EXIGE_JUSTIFICATIVA: "Produto exige justificativa",
     TAMANHO_DIFERENTE: "Tamanho inadequado",
+    HABILITACAO_VENCIDA: "Habilitação/credencial vencida",
 }
 
 PREFIXO_FUNCIONARIO = "MAT:"
+PREFIXO_FUNCAO = "FUNC:"
+PREFIXO_HABILITACAO = "HAB:"
 
 
 @dataclass
 class Regra:
     limite_mensal: int | None
     periodicidade_dias: int | None
-    origem: str  # texto para a tela: "Funcionário: ...", "Função: Soldador", "Setor: Manutenção", "Padrão do produto"
+    origem: str  # texto para a tela: "Funcionário: ...", "Habilitação: NR-35", "Função: Soldagem", "Cargo: Eletricista", "Setor: Manutenção", "Padrão do produto"
+    habilitacao_vencida: str = ""
 
 
 @dataclass
@@ -59,44 +64,97 @@ class Avaliacao:
         return DESCRICAO_MOTIVO[self.motivos[0]] if self.motivos else "Retirada regular"
 
 
-def regra_para(colaborador, produto):
-    """Regra mais específica: funcionário > setor+cargo > cargo > setor > padrão do produto."""
+def regra_para(colaborador, produto, ficha_rh=None):
+    """Regra mais específica:
+    Funcionário (MAT: = 8) > Habilitação/NR (HAB: = 6) > Função (FUNC: = 4) > Cargo (2) > Setor (1) > Padrão do produto.
+    Soma +1 ao peso quando a regra também restringe pelo setor do colaborador."""
+    ficha_rh = ficha_rh if isinstance(ficha_rh, dict) else rh.obter_ficha_rh(colaborador)
     cargo = (colaborador.cargo or "").strip()
+    funcao = (ficha_rh.get("funcao") or "").strip()
+    habilitacoes = ficha_rh.get("habilitacoes") or []
+    mapa_hab = {
+        (h.get("nome") or "").strip().lower(): h
+        for h in habilitacoes
+        if (h.get("nome") or "").strip()
+    }
     marcador_matricula = f"{PREFIXO_FUNCIONARIO}{(colaborador.codigo_matricula or '').strip()}"
 
-    filtro_cargo_ou_func = Q(cargo="") | Q(cargo__iexact=marcador_matricula)
-    if cargo:
-        filtro_cargo_ou_func |= Q(cargo__iexact=cargo)
-
-    candidatas = RegraFornecimento.objects.filter(produto=produto, ativo=True).filter(
-        Q(setor__isnull=True) | Q(setor_id=colaborador.setor_id)
-    ).filter(filtro_cargo_ou_func)
+    candidatas = (
+        RegraFornecimento.objects.select_related("setor")
+        .filter(produto=produto, ativo=True)
+        .filter(Q(setor__isnull=True) | Q(setor_id=colaborador.setor_id))
+    )
 
     melhor = None
+    hab_vencida_detectada = ""
+
     for r in candidatas:
-        eh_regra_funcionario = r.cargo.upper() == marcador_matricula.upper()
-        if eh_regra_funcionario:
-            peso = 4 + (1 if r.setor_id else 0)
-        else:
-            peso = (2 if r.cargo else 0) + (1 if r.setor_id else 0)
-        if melhor is None or peso > melhor[0]:
-            melhor = (peso, r, eh_regra_funcionario)
+        alvo = (r.cargo or "").strip()
+        alvo_upper = alvo.upper()
+        bonus_setor = 1 if r.setor_id else 0
+        peso = None
+        rotulo_escopo = ""
+        hab_vencida_regra = ""
+
+        if not alvo:
+            if r.setor_id and r.setor_id == colaborador.setor_id:
+                peso = 1
+                rotulo_escopo = ""
+        elif alvo_upper == marcador_matricula.upper():
+            peso = 8 + bonus_setor
+            rotulo_escopo = f"Funcionário: {colaborador.nome} ({colaborador.codigo_matricula})"
+        elif alvo_upper.startswith(PREFIXO_HABILITACAO):
+            nome_hab = alvo[len(PREFIXO_HABILITACAO):].strip()
+            info_hab = mapa_hab.get(nome_hab.lower())
+            if info_hab is not None:
+                peso = 6 + bonus_setor
+                rotulo_escopo = f"Habilitação: {info_hab['nome']}"
+                if info_hab.get("vencida"):
+                    hab_vencida_regra = info_hab["nome"]
+                    hab_vencida_detectada = info_hab["nome"]
+        elif alvo_upper.startswith(PREFIXO_FUNCAO):
+            nome_func = alvo[len(PREFIXO_FUNCAO):].strip()
+            if funcao and nome_func.lower() == funcao.lower():
+                peso = 4 + bonus_setor
+                rotulo_escopo = f"Função: {funcao}"
+        elif funcao and alvo.lower() == funcao.lower() and (not cargo or funcao.lower() != cargo.lower()):
+            peso = 4 + bonus_setor
+            rotulo_escopo = f"Função: {funcao}"
+        elif cargo and alvo.lower() == cargo.lower():
+            peso = 2 + bonus_setor
+            rotulo_escopo = f"Cargo: {r.cargo}"
+        elif alvo.lower() in mapa_hab:
+            info_hab = mapa_hab[alvo.lower()]
+            peso = 6 + bonus_setor
+            rotulo_escopo = f"Habilitação: {info_hab['nome']}"
+            if info_hab.get("vencida"):
+                hab_vencida_regra = info_hab["nome"]
+                hab_vencida_detectada = info_hab["nome"]
+
+        if peso is not None and (melhor is None or peso > melhor[0]):
+            melhor = (peso, r, rotulo_escopo, hab_vencida_regra)
 
     if melhor:
-        _, r, eh_regra_funcionario = melhor
+        _, r, rotulo_escopo, hab_vencida_regra = melhor
         partes = []
-        if r.setor_id:
+        if r.setor_id and r.setor:
             partes.append(f"Setor: {r.setor.nome}")
-        if eh_regra_funcionario:
-            partes.append(f"Funcionário: {colaborador.nome} ({colaborador.codigo_matricula})")
-        elif r.cargo:
-            partes.append(f"Função: {r.cargo}")
+        if rotulo_escopo:
+            partes.append(rotulo_escopo)
         return Regra(
             limite_mensal=r.limite_mensal if r.limite_mensal is not None else produto.limite_padrao_mensal,
-            periodicidade_dias=r.periodicidade_dias if r.periodicidade_dias is not None else produto.periodicidade_dias,
+            periodicidade_dias=(
+                r.periodicidade_dias if r.periodicidade_dias is not None else produto.periodicidade_dias
+            ),
             origem=" · ".join(partes) or "Política geral",
+            habilitacao_vencida=hab_vencida_regra or hab_vencida_detectada,
         )
-    return Regra(produto.limite_padrao_mensal, produto.periodicidade_dias, "Padrão do produto")
+    return Regra(
+        produto.limite_padrao_mensal,
+        produto.periodicidade_dias,
+        "Padrão do produto",
+        habilitacao_vencida=hab_vencida_detectada,
+    )
 
 
 def consumo_no_mes(colaborador, produto, agora=None):
@@ -121,7 +179,8 @@ def ultima_entrega(colaborador, produto):
 
 def avaliar(colaborador, produto, quantidade=1, estoque=None, agora=None):
     agora = agora or timezone.now()
-    regra = regra_para(colaborador, produto)
+    ficha_rh = rh.obter_ficha_rh(colaborador)
+    regra = regra_para(colaborador, produto, ficha_rh=ficha_rh)
     av = Avaliacao(produto=produto, regra=regra)
 
     av.saldo_livre_totem = max(estoque.livre, 0) if estoque else 0
@@ -144,8 +203,10 @@ def avaliar(colaborador, produto, quantidade=1, estoque=None, agora=None):
             if agora < av.proxima_regular:
                 av.motivos.insert(0, ANTECIPADA)
 
+    if regra.habilitacao_vencida and HABILITACAO_VENCIDA not in av.motivos:
+        av.motivos.append(HABILITACAO_VENCIDA)
+
     if produto.eh_epi and (produto.tamanho or "").strip():
-        ficha_rh = rh.obter_ficha_rh(colaborador)
         _, esperado = rh.tamanho_esperado_para_produto(ficha_rh, produto)
         if esperado:
             av.tamanho_esperado = esperado

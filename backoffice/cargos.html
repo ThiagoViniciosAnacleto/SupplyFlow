@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Cargos e Funções · SupplyFlow</title>
+  <title>Cargos, Funções e Habilitações · SupplyFlow</title>
   <link rel="icon" href="../static/img/logo.svg" type="image/svg+xml">
   <link rel="stylesheet" href="../static/vendor/bootstrap/bootstrap.min.css">
   <link rel="stylesheet" href="../static/vendor/bootstrap-icons/bootstrap-icons.min.css">
@@ -22,59 +22,152 @@
       <main class="conteudo">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
           <div>
-            <h1 class="pagina-titulo mb-1">Cargos e Funções</h1>
-            <p class="pagina-descricao mb-0">Catálogo de cargos e funções da organização, colaboradores ativos vinculados e <a href="politicas.html">políticas de fornecimento</a> associadas (RF-03, RF-04).</p>
+            <h1 class="pagina-titulo mb-1">Cargos, Funções e Habilitações</h1>
+            <p class="pagina-descricao mb-0">
+              Catálogo das 3 categorias ocupacionais da organização — <strong>Cargos (RH — RF-03)</strong>,
+              <strong>Funções / Atividades (SST — RF-04)</strong> e <strong>Habilitações &amp; Credenciais de Risco (NRs)</strong> —
+              com colaboradores vinculados e <a href="politicas.html">políticas de fornecimento</a> associadas.
+            </p>
           </div>
-          <div>
+          <div class="d-flex flex-wrap gap-2">
             <button type="button" class="btn btn-primary" id="btn-novo-cargo">
-              <i class="bi bi-briefcase" aria-hidden="true"></i> Novo Cargo / Função
+              <i class="bi bi-briefcase" aria-hidden="true"></i> Novo Cargo (RH)
+            </button>
+            <button type="button" class="btn btn-outline-primary" id="btn-nova-funcao">
+              <i class="bi bi-tools" aria-hidden="true"></i> Nova Função / Atividade
+            </button>
+            <button type="button" class="btn btn-outline-dark" id="btn-nova-habilitacao">
+              <i class="bi bi-shield-check" aria-hidden="true"></i> Nova Habilitação / NR
             </button>
           </div>
         </div>
 
-        <section class="cartao" aria-label="Lista de cargos">
-          <div class="table-responsive" tabindex="0" role="region" aria-label="Tabela de cargos e funções">
-            <table class="tabela-solicitacoes tabela-solicitacoes--compacta">
-              <thead>
-                <tr>
-                  <th scope="col">Cargo / Função</th>
-                  <th scope="col">Setores</th>
-                  <th scope="col">Funcionários ativos</th>
-                  <th scope="col">Produtos com política para o cargo</th>
-                  <th scope="col" class="text-end">Ações</th>
-                </tr>
-              </thead>
-              <tbody id="tabela-cargos-corpo">
-                <tr><td colspan="5" class="text-center py-4 text-muted">Carregando cargos...</td></tr>
-              </tbody>
-            </table>
+        <!-- Navegação das 3 Abas Ocupacionais -->
+        <ul class="nav nav-tabs mb-3" id="abas-ocupacionais" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active fw-semibold" id="tab-btn-cargos" data-bs-toggle="tab" data-bs-target="#aba-cargos" type="button" role="tab" aria-controls="aba-cargos" aria-selected="true">
+              <i class="bi bi-briefcase me-1" aria-hidden="true"></i> 1. Cargos (RH — RF-03)
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link fw-semibold" id="tab-btn-funcoes" data-bs-toggle="tab" data-bs-target="#aba-funcoes" type="button" role="tab" aria-controls="aba-funcoes" aria-selected="false">
+              <i class="bi bi-tools me-1" aria-hidden="true"></i> 2. Funções / Atividades (SST — RF-04)
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link fw-semibold" id="tab-btn-habilitacoes" data-bs-toggle="tab" data-bs-target="#aba-habilitacoes" type="button" role="tab" aria-controls="aba-habilitacoes" aria-selected="false">
+              <i class="bi bi-shield-check me-1" aria-hidden="true"></i> 3. Habilitações &amp; Credenciais de Risco (NRs)
+            </button>
+          </li>
+        </ul>
+
+        <div class="tab-content" id="conteudo-abas-ocupacionais">
+          <!-- ABA 1: CARGOS (RH — RF-03) -->
+          <div class="tab-pane fade show active" id="aba-cargos" role="tabpanel" aria-labelledby="tab-btn-cargos">
+            <section class="cartao" aria-label="Lista de cargos">
+              <div class="table-responsive" tabindex="0" role="region" aria-label="Tabela de cargos e funções">
+                <table class="tabela-solicitacoes tabela-solicitacoes--compacta">
+                  <thead>
+                    <tr>
+                      <th scope="col">Cargo (RH)</th>
+                      <th scope="col">Setores</th>
+                      <th scope="col">Funcionários ativos</th>
+                      <th scope="col">Produtos com política para o cargo</th>
+                      <th scope="col" class="text-end">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tabela-cargos-corpo">
+                    <tr><td colspan="5" class="text-center py-4 text-muted">Carregando cargos...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
           </div>
-        </section>
+
+          <!-- ABA 2: FUNÇÕES / ATIVIDADES (SST — RF-04) -->
+          <div class="tab-pane fade" id="aba-funcoes" role="tabpanel" aria-labelledby="tab-btn-funcoes">
+            <section class="cartao" aria-label="Lista de funções e atividades">
+              <div class="table-responsive" tabindex="0" role="region" aria-label="Tabela de funções e atividades">
+                <table class="tabela-solicitacoes tabela-solicitacoes--compacta">
+                  <thead>
+                    <tr>
+                      <th scope="col">Função / Atividade</th>
+                      <th scope="col">Setores</th>
+                      <th scope="col">Funcionários ativos</th>
+                      <th scope="col">Produtos com política para a função</th>
+                      <th scope="col" class="text-end">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tabela-funcoes-corpo">
+                    <tr><td colspan="5" class="text-center py-4 text-muted">Carregando funções e atividades...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+
+          <!-- ABA 3: HABILITAÇÕES & CREDENCIAIS DE RISCO (NRs) -->
+          <div class="tab-pane fade" id="aba-habilitacoes" role="tabpanel" aria-labelledby="tab-btn-habilitacoes">
+            <section class="cartao" aria-label="Lista de habilitações e NRs">
+              <div class="table-responsive" tabindex="0" role="region" aria-label="Tabela de habilitações e credenciais de risco">
+                <table class="tabela-solicitacoes tabela-solicitacoes--compacta">
+                  <thead>
+                    <tr>
+                      <th scope="col">Habilitação / NR</th>
+                      <th scope="col">Descrição / Validade</th>
+                      <th scope="col">Funcionários Habilitados</th>
+                      <th scope="col">Produtos com política para a NR</th>
+                      <th scope="col" class="text-end">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tabela-habilitacoes-corpo">
+                    <tr><td colspan="5" class="text-center py-4 text-muted">Carregando habilitações e credenciais...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        </div>
       </main>
     </div>
 
   </div>
 
-  <!-- Modal Cargo / Função -->
+  <!-- Modal Unificado: Cargo / Função / Habilitação -->
   <div class="modal fade" id="modal-cargo" tabindex="-1" aria-labelledby="modalCargoTitulo" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content rounded-4 border-0 shadow">
         <form id="form-cargo">
           <div class="modal-header border-bottom">
-            <h5 class="modal-title fw-bold" id="modalCargoTitulo">Novo Cargo / Função</h5>
+            <h5 class="modal-title fw-bold" id="modalCargoTitulo">Novo Cargo (RH)</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
           </div>
           <div class="modal-body p-4">
+            <input type="hidden" id="cargo-tipo" value="CARGO">
             <input type="hidden" id="cargo-original">
-            <div class="mb-2">
-              <label for="cargo-nome" class="form-label small fw-semibold">Nome do Cargo / Função *</label>
+
+            <div class="mb-3">
+              <label for="cargo-nome" id="label-cargo-nome" class="form-label small fw-semibold">Nome do Cargo / Função *</label>
               <input type="text" id="cargo-nome" class="form-control" required maxlength="100" placeholder="Ex.: Operador de Caldeira" aria-describedby="ajuda-cargo">
-              <div class="form-text" id="ajuda-cargo">Ao renomear um cargo existente, os funcionários e políticas vinculados são atualizados automaticamente.</div>
+              <div class="form-text" id="ajuda-cargo">Ao renomear um registro existente, os funcionários e políticas vinculados são atualizados automaticamente.</div>
+            </div>
+
+            <div id="bloco-campos-habilitacao" class="d-none border-top pt-3 mt-3">
+              <div class="mb-3">
+                <label for="hab-descricao" class="form-label small fw-semibold">Descrição / Escopo da NR ou Credencial</label>
+                <input type="text" id="hab-descricao" class="form-control" maxlength="200" placeholder="Ex.: Trabalho em Altura acima de 2 metros">
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="hab-exige-validade" checked>
+                <label class="form-check-label small fw-medium" for="hab-exige-validade">
+                  Exige controle de data de validade / reciclagem periódica
+                </label>
+              </div>
             </div>
           </div>
           <div class="modal-footer border-top">
             <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
-            <button type="submit" class="btn btn-primary px-4 fw-bold">Salvar Cargo / Função</button>
+            <button type="submit" class="btn btn-primary px-4 fw-bold" id="btn-salvar-modal-cargo">Salvar</button>
           </div>
         </form>
       </div>
@@ -88,27 +181,79 @@
   <script src="../static/js/backoffice.js"></script>
   <script>
     (function () {
-      var corpo = document.getElementById("tabela-cargos-corpo");
+      var corpoCargos = document.getElementById("tabela-cargos-corpo");
+      var corpoFuncoes = document.getElementById("tabela-funcoes-corpo");
+      var corpoHabilitacoes = document.getElementById("tabela-habilitacoes-corpo");
       var escapar = SF.escapar;
       var modalEl = document.getElementById("modal-cargo");
       var modalBs = modalEl ? new bootstrap.Modal(modalEl) : null;
       var form = document.getElementById("form-cargo");
-      var btnNovo = document.getElementById("btn-novo-cargo");
+      var btnNovoCargo = document.getElementById("btn-novo-cargo");
+      var btnNovaFuncao = document.getElementById("btn-nova-funcao");
+      var btnNovaHabilitacao = document.getElementById("btn-nova-habilitacao");
       var podeGerenciar = SF.sessao.pode("pessoas");
 
-      if (btnNovo && !podeGerenciar) {
-        btnNovo.classList.add("d-none");
+      if (!podeGerenciar) {
+        if (btnNovoCargo) btnNovoCargo.classList.add("d-none");
+        if (btnNovaFuncao) btnNovaFuncao.classList.add("d-none");
+        if (btnNovaHabilitacao) btnNovaHabilitacao.classList.add("d-none");
+      }
+
+      function abrirModalOcupacional(tipo, dadosEdicao) {
+        form.reset();
+        document.getElementById("cargo-tipo").value = tipo;
+        var blocoHab = document.getElementById("bloco-campos-habilitacao");
+        var labelNome = document.getElementById("label-cargo-nome");
+        var inputNome = document.getElementById("cargo-nome");
+        var tituloModal = document.getElementById("modalCargoTitulo");
+        var ajuda = document.getElementById("ajuda-cargo");
+
+        if (tipo === "FUNCAO") {
+          blocoHab.classList.add("d-none");
+          var nomeFuncao = dadosEdicao ? (dadosEdicao.funcao || dadosEdicao.nome || "") : "";
+          tituloModal.textContent = nomeFuncao ? "Editar Função / Atividade (SST)" : "Nova Função / Atividade (SST)";
+          labelNome.textContent = "Nome da Função / Atividade (SST) *";
+          inputNome.placeholder = "Ex.: Soldagem MIG/MAG, Manutenção Elétrica";
+          ajuda.textContent = "Define a atividade operacional exercida para vínculo com EPIs e regras de SST (RF-04).";
+          document.getElementById("cargo-original").value = nomeFuncao;
+          inputNome.value = nomeFuncao;
+        } else if (tipo === "HABILITACAO") {
+          blocoHab.classList.remove("d-none");
+          var nomeHab = dadosEdicao ? (dadosEdicao.habilitacao || dadosEdicao.nome || "") : "";
+          tituloModal.textContent = nomeHab ? "Editar Habilitação / NR" : "Nova Habilitação / NR";
+          labelNome.textContent = "Código / Nome da Habilitação ou NR *";
+          inputNome.placeholder = "Ex.: NR-35 Trabalho em Altura, NR-10";
+          ajuda.textContent = "Credencial normativa ou licença exigida para liberação de EPIs de risco específico.";
+          document.getElementById("cargo-original").value = nomeHab;
+          inputNome.value = nomeHab;
+          document.getElementById("hab-descricao").value = (dadosEdicao && dadosEdicao.descricao) ? dadosEdicao.descricao : "";
+          document.getElementById("hab-exige-validade").checked = dadosEdicao ? (dadosEdicao.exige_validade !== false) : true;
+        } else {
+          blocoHab.classList.add("d-none");
+          var nomeCargo = dadosEdicao ? (dadosEdicao.cargo || dadosEdicao.nome || "") : "";
+          tituloModal.textContent = nomeCargo ? "Editar Cargo (RH)" : "Novo Cargo (RH)";
+          labelNome.textContent = "Nome do Cargo (RH) *";
+          inputNome.placeholder = "Ex.: Operador de Caldeira";
+          ajuda.textContent = "Ao renomear um cargo existente, os funcionários e políticas vinculados são atualizados automaticamente.";
+          document.getElementById("cargo-original").value = nomeCargo;
+          inputNome.value = nomeCargo;
+        }
+
+        if (modalBs) {
+          modalBs.show();
+        }
+      }
+
+      function formatarProdutosVinculados(lista) {
+        if (lista && lista.length > 0) {
+          return escapar(lista.join(", "));
+        }
+        return '<span class="text-muted">Nenhuma política específica — vale o padrão de cada produto</span>';
       }
 
       function criarLinhaCargoHtml(itemCargo) {
-        var textoSetores = itemCargo.setores.join(", ") || "—";
-        var htmlProdutosVinculados;
-
-        if (itemCargo.produtos_vinculados && itemCargo.produtos_vinculados.length > 0) {
-          htmlProdutosVinculados = escapar(itemCargo.produtos_vinculados.join(", "));
-        } else {
-          htmlProdutosVinculados = '<span class="text-muted">Nenhuma política específica — vale o padrão de cada produto</span>';
-        }
+        var textoSetores = (itemCargo.setores || []).join(", ") || "—";
+        var htmlProdutosVinculados = formatarProdutosVinculados(itemCargo.produtos_vinculados);
 
         var htmlAcoes = "—";
         if (podeGerenciar) {
@@ -138,64 +283,217 @@
         );
       }
 
+      function criarLinhaFuncaoHtml(itemFuncao) {
+        var nomeFuncao = itemFuncao.funcao || itemFuncao.nome || "";
+        var totalFunc = itemFuncao.total_funcionarios != null ? itemFuncao.total_funcionarios : (itemFuncao.total || 0);
+        var textoSetores = (itemFuncao.setores || []).join(", ") || "—";
+        var htmlProdutosVinculados = formatarProdutosVinculados(itemFuncao.produtos_vinculados);
+
+        var htmlAcoes = "—";
+        if (podeGerenciar) {
+          var desabilitarExclusao = totalFunc > 0 ? " disabled" : "";
+          var tituloExclusao = totalFunc > 0
+            ? "Não é possível remover função com funcionários ativos"
+            : "Remover " + escapar(nomeFuncao);
+          htmlAcoes =
+            '<button type="button" class="btn btn-sm btn-outline-secondary me-1 btn-edit-funcao" data-funcao="' + escapar(nomeFuncao) + '"' +
+                    ' aria-label="Editar função ' + escapar(nomeFuncao) + '">' +
+              '<i class="bi bi-pencil" aria-hidden="true"></i>' +
+            "</button>" +
+            '<button type="button" class="btn btn-sm btn-outline-danger btn-del-funcao" data-funcao="' + escapar(nomeFuncao) + '"' +
+                    ' aria-label="' + tituloExclusao + '" title="' + tituloExclusao + '"' + desabilitarExclusao + ">" +
+              '<i class="bi bi-trash" aria-hidden="true"></i>' +
+            "</button>";
+        }
+
+        return (
+          "<tr>" +
+            "<td><strong>" + escapar(nomeFuncao) + "</strong></td>" +
+            "<td>" + escapar(textoSetores) + "</td>" +
+            "<td>" + escapar(totalFunc) + "</td>" +
+            '<td class="small">' + htmlProdutosVinculados + "</td>" +
+            '<td class="text-end text-nowrap">' + htmlAcoes + "</td>" +
+          "</tr>"
+        );
+      }
+
+      function criarLinhaHabilitacaoHtml(itemHab) {
+        var nomeHab = itemHab.habilitacao || itemHab.nome || "";
+        var descricao = itemHab.descricao || "";
+        var exigeValidade = itemHab.exige_validade !== false;
+        var totalFunc = itemHab.total_funcionarios != null ? itemHab.total_funcionarios : (itemHab.total || 0);
+        var vencidas = itemHab.vencidas || 0;
+        var htmlProdutosVinculados = formatarProdutosVinculados(itemHab.produtos_vinculados);
+
+        var badgeValidade = exigeValidade
+          ? '<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle">Controla validade</span>'
+          : '<span class="badge bg-light text-secondary border">Sem vencimento</span>';
+
+        var htmlDescricao = badgeValidade + (descricao ? '<div class="small text-muted mt-1">' + escapar(descricao) + "</div>" : "");
+
+        var htmlFuncionarios = escapar(totalFunc);
+        if (vencidas > 0) {
+          htmlFuncionarios +=
+            ' <span class="badge bg-danger-subtle text-danger border border-danger-subtle ms-1">' +
+              '<i class="bi bi-exclamation-triangle-fill me-1" aria-hidden="true"></i>' + escapar(vencidas) + " vencida(s)" +
+            "</span>";
+        }
+
+        var htmlAcoes = "—";
+        if (podeGerenciar) {
+          var desabilitarExclusao = totalFunc > 0 ? " disabled" : "";
+          var tituloExclusao = totalFunc > 0
+            ? "Não é possível remover habilitação com funcionários vinculados"
+            : "Remover " + escapar(nomeHab);
+          htmlAcoes =
+            '<button type="button" class="btn btn-sm btn-outline-secondary me-1 btn-edit-hab"' +
+                    ' data-hab="' + escapar(nomeHab) + '"' +
+                    ' data-desc="' + escapar(descricao) + '"' +
+                    ' data-validade="' + (exigeValidade ? "1" : "0") + '"' +
+                    ' aria-label="Editar habilitação ' + escapar(nomeHab) + '">' +
+              '<i class="bi bi-pencil" aria-hidden="true"></i>' +
+            "</button>" +
+            '<button type="button" class="btn btn-sm btn-outline-danger btn-del-hab" data-hab="' + escapar(nomeHab) + '"' +
+                    ' aria-label="' + tituloExclusao + '" title="' + tituloExclusao + '"' + desabilitarExclusao + ">" +
+              '<i class="bi bi-trash" aria-hidden="true"></i>' +
+            "</button>";
+        }
+
+        return (
+          "<tr>" +
+            "<td><strong>" + escapar(nomeHab) + "</strong></td>" +
+            "<td>" + htmlDescricao + "</td>" +
+            "<td>" + htmlFuncionarios + "</td>" +
+            '<td class="small">' + htmlProdutosVinculados + "</td>" +
+            '<td class="text-end text-nowrap">' + htmlAcoes + "</td>" +
+          "</tr>"
+        );
+      }
+
       function carregarCargos() {
         SF.api.get("/api/cargos/")
           .then(function (dados) {
             var listaCargos = dados.cargos || [];
-            if (listaCargos.length === 0) {
-              corpo.innerHTML = '<tr><td colspan="5" class="tabela-solicitacoes__vazio">Nenhum cargo cadastrado.</td></tr>';
-              return;
-            }
-            corpo.innerHTML = listaCargos.map(criarLinhaCargoHtml).join("");
+            var listaFuncoes = dados.funcoes || [];
+            var listaHabilitacoes = dados.habilitacoes || [];
 
+            /* 1. Renderiza Cargos */
+            if (listaCargos.length === 0) {
+              corpoCargos.innerHTML = '<tr><td colspan="5" class="tabela-solicitacoes__vazio">Nenhum cargo cadastrado.</td></tr>';
+            } else {
+              corpoCargos.innerHTML = listaCargos.map(criarLinhaCargoHtml).join("");
+            }
+
+            /* 2. Renderiza Funções / Atividades */
+            if (corpoFuncoes) {
+              if (listaFuncoes.length === 0) {
+                corpoFuncoes.innerHTML = '<tr><td colspan="5" class="tabela-solicitacoes__vazio">Nenhuma função/atividade cadastrada.</td></tr>';
+              } else {
+                corpoFuncoes.innerHTML = listaFuncoes.map(criarLinhaFuncaoHtml).join("");
+              }
+            }
+
+            /* 3. Renderiza Habilitações / NRs */
+            if (corpoHabilitacoes) {
+              if (listaHabilitacoes.length === 0) {
+                corpoHabilitacoes.innerHTML = '<tr><td colspan="5" class="tabela-solicitacoes__vazio">Nenhuma habilitação ou NR cadastrada.</td></tr>';
+              } else {
+                corpoHabilitacoes.innerHTML = listaHabilitacoes.map(criarLinhaHabilitacaoHtml).join("");
+              }
+            }
+
+            /* Eventos Cargos */
             document.querySelectorAll(".btn-edit-cargo").forEach(function (botao) {
               botao.addEventListener("click", function () {
-                var nomeAtual = botao.dataset.cargo;
-                document.getElementById("modalCargoTitulo").textContent = "Editar Cargo / Função";
-                document.getElementById("cargo-original").value = nomeAtual;
-                document.getElementById("cargo-nome").value = nomeAtual;
-                if (modalBs) {
-                  modalBs.show();
-                }
+                abrirModalOcupacional("CARGO", { cargo: botao.dataset.cargo });
+              });
+            });
+            document.querySelectorAll(".btn-del-cargo").forEach(function (botao) {
+              botao.addEventListener("click", function () {
+                SF.api.post("/api/cargos/excluir/", { tipo: "CARGO", cargo: botao.dataset.cargo })
+                  .then(carregarCargos)
+                  .catch(function (erro) { alert(erro.message); });
               });
             });
 
-            document.querySelectorAll(".btn-del-cargo").forEach(function (botao) {
+            /* Eventos Funções */
+            document.querySelectorAll(".btn-edit-funcao").forEach(function (botao) {
               botao.addEventListener("click", function () {
-                var nomeCargo = botao.dataset.cargo;
-                SF.api.post("/api/cargos/excluir/", { cargo: nomeCargo })
-                  .then(function () {
-                    carregarCargos();
-                  })
-                  .catch(function (erro) {
-                    alert(erro.message);
-                  });
+                abrirModalOcupacional("FUNCAO", { funcao: botao.dataset.funcao });
+              });
+            });
+            document.querySelectorAll(".btn-del-funcao").forEach(function (botao) {
+              botao.addEventListener("click", function () {
+                SF.api.post("/api/cargos/excluir/", { tipo: "FUNCAO", funcao: botao.dataset.funcao, cargo: botao.dataset.funcao })
+                  .then(carregarCargos)
+                  .catch(function (erro) { alert(erro.message); });
+              });
+            });
+
+            /* Eventos Habilitações */
+            document.querySelectorAll(".btn-edit-hab").forEach(function (botao) {
+              botao.addEventListener("click", function () {
+                abrirModalOcupacional("HABILITACAO", {
+                  habilitacao: botao.dataset.hab,
+                  descricao: botao.dataset.desc || "",
+                  exige_validade: botao.dataset.validade !== "0"
+                });
+              });
+            });
+            document.querySelectorAll(".btn-del-hab").forEach(function (botao) {
+              botao.addEventListener("click", function () {
+                SF.api.post("/api/cargos/excluir/", { tipo: "HABILITACAO", habilitacao: botao.dataset.hab, cargo: botao.dataset.hab })
+                  .then(carregarCargos)
+                  .catch(function (erro) { alert(erro.message); });
               });
             });
           })
           .catch(function (erro) {
-            corpo.innerHTML = '<tr><td colspan="5" class="tabela-solicitacoes__vazio">' + escapar(erro.message) + "</td></tr>";
+            corpoCargos.innerHTML = '<tr><td colspan="5" class="tabela-solicitacoes__vazio">' + escapar(erro.message) + "</td></tr>";
           });
       }
 
-      if (btnNovo) {
-        btnNovo.addEventListener("click", function () {
-          form.reset();
-          document.getElementById("modalCargoTitulo").textContent = "Novo Cargo / Função";
-          document.getElementById("cargo-original").value = "";
-          if (modalBs) {
-            modalBs.show();
-          }
+      if (btnNovoCargo) {
+        btnNovoCargo.addEventListener("click", function () {
+          abrirModalOcupacional("CARGO", null);
+        });
+      }
+      if (btnNovaFuncao) {
+        btnNovaFuncao.addEventListener("click", function () {
+          var tabFunc = document.getElementById("tab-btn-funcoes");
+          if (tabFunc) bootstrap.Tab.getOrCreateInstance(tabFunc).show();
+          abrirModalOcupacional("FUNCAO", null);
+        });
+      }
+      if (btnNovaHabilitacao) {
+        btnNovaHabilitacao.addEventListener("click", function () {
+          var tabHab = document.getElementById("tab-btn-habilitacoes");
+          if (tabHab) bootstrap.Tab.getOrCreateInstance(tabHab).show();
+          abrirModalOcupacional("HABILITACAO", null);
         });
       }
 
       if (form) {
         form.addEventListener("submit", function (evento) {
           evento.preventDefault();
+          var tipo = document.getElementById("cargo-tipo").value || "CARGO";
+          var nome = document.getElementById("cargo-nome").value.trim();
+          var original = document.getElementById("cargo-original").value.trim();
           var payload = {
-            cargo_original: document.getElementById("cargo-original").value.trim(),
-            cargo: document.getElementById("cargo-nome").value.trim()
+            tipo: tipo,
+            cargo: nome,
+            cargo_original: original
           };
+          if (tipo === "FUNCAO") {
+            payload.funcao = nome;
+            payload.funcao_original = original;
+          } else if (tipo === "HABILITACAO") {
+            payload.habilitacao = nome;
+            payload.habilitacao_original = original;
+            payload.descricao = document.getElementById("hab-descricao").value.trim();
+            payload.exige_validade = document.getElementById("hab-exige-validade").checked;
+          }
+
           SF.api.post("/api/cargos/salvar/", payload)
             .then(function () {
               if (modalBs) {

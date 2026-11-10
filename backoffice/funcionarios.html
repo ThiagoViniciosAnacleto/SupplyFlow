@@ -24,7 +24,7 @@
           <div>
             <h1 class="pagina-titulo mb-1">Funcionários (Operacional / Totem)</h1>
             <p class="pagina-descricao mb-0">
-              Gestão do quadro operacional de colaboradores do chão de fábrica, matrículas, funções, grade de tamanhos de EPI, centros de custo e PIN de autoatendimento.
+              Gestão do quadro operacional de colaboradores do chão de fábrica, matrículas, cargos (RH), funções (SST), habilitações/NRs, grade de tamanhos de EPI, centros de custo e PIN de autoatendimento.
               Para gerenciar acessos gerenciais e papéis RBAC do painel, acesse <a href="usuarios.html">Usuários e permissões</a>.
             </p>
           </div>
@@ -81,7 +81,7 @@
                 <tr>
                   <th scope="col">Colaborador</th>
                   <th scope="col">Matrícula</th>
-                  <th scope="col">Cargo / Função</th>
+                  <th scope="col">Cargo / Função / NRs</th>
                   <th scope="col">Centro de Custo</th>
                   <th scope="col">Domínio / Acesso</th>
                   <th scope="col">Status</th>
@@ -112,7 +112,7 @@
             <input type="hidden" id="func-id">
 
             <fieldset class="mb-3">
-              <legend class="fs-6 fw-bold text-secondary mb-2">1. Dados Operacionais e Autoatendimento (Totem)</legend>
+              <legend class="fs-6 fw-bold text-secondary mb-2">1. Dados Operacionais, Cargo (RH), Função (SST) e Habilitações (NRs)</legend>
 
               <div class="mb-3">
                 <label for="func-nome" class="form-label small fw-semibold">Nome Completo *</label>
@@ -132,17 +132,44 @@
               </div>
 
               <div class="row g-2 mb-3">
-                <div class="col-12 col-sm-6">
-                  <label for="func-cargo" class="form-label small fw-semibold">Cargo / Função *</label>
+                <div class="col-12 col-sm-4">
+                  <label for="func-cargo" class="form-label small fw-semibold">Cargo (RH) *</label>
                   <input type="text" id="func-cargo" class="form-control" list="lista-cargos-func" required placeholder="Ex.: Operador de Caldeira">
                   <datalist id="lista-cargos-func"></datalist>
                 </div>
-                <div class="col-12 col-sm-6">
+                <div class="col-12 col-sm-4">
+                  <label for="func-funcao" class="form-label small fw-semibold">Função / Atividade (SST)</label>
+                  <input type="text" id="func-funcao" class="form-control" list="lista-funcoes-func" maxlength="100" placeholder="Ex.: Manutenção Elétrica">
+                  <datalist id="lista-funcoes-func"></datalist>
+                </div>
+                <div class="col-12 col-sm-4">
                   <label for="func-setor" class="form-label small fw-semibold">Setor / Centro Custo</label>
                   <select id="func-setor" class="form-select">
                     <option value="">Selecione...</option>
                   </select>
                 </div>
+              </div>
+
+              <!-- Habilitações & Credenciais de Risco (NRs com validade) -->
+              <div class="p-3 rounded-3 bg-light border mb-3">
+                <div class="small fw-bold text-secondary mb-2">
+                  <i class="bi bi-shield-check me-1" aria-hidden="true"></i>Habilitações &amp; Credenciais de Risco (NRs com validade)
+                </div>
+                <div class="row g-2 align-items-end">
+                  <div class="col-12 col-sm-6">
+                    <label for="hab-nome-input" class="form-label small fw-semibold mb-1">Habilitação / NR</label>
+                    <input type="text" id="hab-nome-input" class="form-control form-control-sm" list="lista-habs-func" placeholder="Ex.: NR-35 Trabalho em Altura">
+                    <datalist id="lista-habs-func"></datalist>
+                  </div>
+                  <div class="col-8 col-sm-4">
+                    <label for="hab-validade-input" class="form-label small fw-semibold mb-1">Validade (opcional)</label>
+                    <input type="date" id="hab-validade-input" class="form-control form-control-sm">
+                  </div>
+                  <div class="col-4 col-sm-2 d-grid">
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="btn-add-hab">Adicionar</button>
+                  </div>
+                </div>
+                <div id="lista-tags-habilitacoes" class="d-flex flex-wrap gap-1 mt-2"></div>
               </div>
 
               <div class="p-3 rounded-3 bg-light border">
@@ -231,7 +258,7 @@
       <div class="modal-content rounded-4 border-0 shadow">
         <form id="form-mudar-funcao">
           <div class="modal-header border-bottom">
-            <h5 class="modal-title fw-bold" id="modalMudarFuncaoTitulo">Mudar Função / Transferir Setor</h5>
+            <h5 class="modal-title fw-bold" id="modalMudarFuncaoTitulo">Mudar Cargo / Função / Transferir Setor</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
           </div>
           <div class="modal-body p-4">
@@ -244,8 +271,13 @@
             </div>
 
             <div class="mb-3">
-              <label for="mudanca-novo-cargo" class="form-label small fw-semibold">Novo Cargo / Função *</label>
+              <label for="mudanca-novo-cargo" class="form-label small fw-semibold">Novo Cargo (RH) *</label>
               <input type="text" id="mudanca-novo-cargo" class="form-control" list="lista-cargos-func" required placeholder="Ex.: Operador de Empilhadeira">
+            </div>
+
+            <div class="mb-3">
+              <label for="mudar-funcao-atividade" class="form-label small fw-semibold">Nova Função / Atividade (SST)</label>
+              <input type="text" id="mudar-funcao-atividade" class="form-control" list="lista-funcoes-func" maxlength="100" placeholder="Ex.: Movimentação de Cargas">
             </div>
 
             <div class="mb-3">

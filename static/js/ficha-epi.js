@@ -3,9 +3,9 @@
    Termo de Nada Consta do Funcionário (RF-43)
    ---------------------------------------------------------------------
    Exibe o histórico individual de entregas de EPI de um colaborador,
-   grade de tamanhos (Calçado, Luva, Vestimenta), histórico funcional
-   (admissão e mudanças de função/setor) e declaração formal de Nada
-   Consta de EPI para desligamento/auditoria.
+   Cargo (RH), Função (SST), Habilitações/NRs com validade, grade de
+   tamanhos (Calçado, Luva, Vestimenta), histórico funcional e
+   declaração formal de Nada Consta de EPI para desligamento/auditoria.
    ===================================================================== */
 
 (function () {
@@ -37,6 +37,35 @@
     };
   }
 
+  function formatarHabilitacoesFichaHtml(funcionario) {
+    var habs = (funcionario && funcionario.habilitacoes) || [];
+    if (!Array.isArray(habs) || habs.length === 0) {
+      return "—";
+    }
+    return habs.map(function (h) {
+      var nome = typeof h === "string" ? h : (h.nome || h.habilitacao || "");
+      var validade = (typeof h === "object" && h) ? (h.validade || "") : "";
+      var vencida = Boolean(typeof h === "object" && h && h.vencida);
+      if (!nome) {
+        return "";
+      }
+      if (vencida) {
+        return (
+          '<span class="badge bg-danger-subtle text-danger border border-danger-subtle me-1">' +
+            '<i class="bi bi-exclamation-triangle-fill me-1" aria-hidden="true"></i>' +
+            escapar(nome) + (validade ? " (val. " + escapar(validade) + " — VENCIDA)" : " (VENCIDA)") +
+          "</span>"
+        );
+      }
+      return (
+        '<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle me-1">' +
+          '<i class="bi bi-shield-check me-1" aria-hidden="true"></i>' +
+          escapar(nome) + (validade ? " (val. " + escapar(validade) + ")" : "") +
+        "</span>"
+      );
+    }).join(" ");
+  }
+
   function criarLinhaHistoricoFuncionalHtml(item) {
     var dataTxt = item.data || item.criado_em || item.registrado_em || "—";
     var eventoTxt = item.evento || item.tipo_rotulo || item.tipo || item.acao || "Movimentação funcional";
@@ -49,6 +78,19 @@
         '<span class="text-muted text-decoration-line-through me-1">' + escapar(cargoAnterior) + "</span>" +
         '<i class="bi bi-arrow-right mx-1 text-secondary" aria-hidden="true"></i>' +
         "<strong>" + escapar(cargoNovo) + "</strong>";
+    }
+
+    var funcaoAnterior = item.funcao_anterior || "";
+    var funcaoNovo = item.funcao_novo || item.funcao || "";
+    if (funcaoAnterior || funcaoNovo) {
+      var htmlFuncao = escapar(funcaoNovo || funcaoAnterior);
+      if (funcaoAnterior && funcaoNovo && funcaoAnterior !== funcaoNovo) {
+        htmlFuncao =
+          '<span class="text-muted text-decoration-line-through me-1">' + escapar(funcaoAnterior) + "</span>" +
+          '<i class="bi bi-arrow-right mx-1 text-secondary" aria-hidden="true"></i>' +
+          "<strong>" + escapar(funcaoNovo) + "</strong>";
+      }
+      htmlCargo += '<div class="small text-secondary mt-1">Função (SST): ' + htmlFuncao + "</div>";
     }
 
     var setorAnterior = item.setor_anterior || item.de_setor || "";
@@ -118,6 +160,7 @@
 
     var possuiPendencias = Boolean(
       nadaConsta.possui_pendencias ||
+      (nadaConsta.nada_consta_apto === false) ||
       (nadaConsta.apto === false) ||
       (nadaConsta.liberado === false) ||
       qtdPendentes > 0
@@ -140,7 +183,7 @@
           '<div class="small">' +
             "Declaramos, para fins de desligamento, transferência ou auditoria interna, que o(a) colaborador(a) " +
             "<strong>" + escapar(funcionario.nome || "") + "</strong>, matrícula <strong>" + escapar(funcionario.matricula || "") + "</strong>, " +
-            "função <strong>" + escapar(funcionario.cargo || "—") + "</strong>, lotado(a) no setor <strong>" + escapar(formatarSetorFuncionario(funcionario)) + "</strong>, " +
+            "cargo <strong>" + escapar(funcionario.cargo || "—") + "</strong>, lotado(a) no setor <strong>" + escapar(formatarSetorFuncionario(funcionario)) + "</strong>, " +
             "<strong>não possui pendências obrigatórias de devolução de Equipamentos de Proteção Individual (EPI)</strong> registradas no SupplyFlow até " + escapar(emitidaEm) + "." +
           "</div>" +
         "</div>";
@@ -226,18 +269,20 @@
           "Registro individual das entregas de EPI (RF-43). Emitida em " + dados.emitida_em + ".";
 
         var paresDadosFuncionario = [
-          ["Nome", funcionario.nome],
-          ["Matrícula", funcionario.matricula],
-          ["Função", funcionario.cargo || "—"],
-          ["Setor", formatarSetorFuncionario(funcionario)],
-          ["Situação", funcionario.ativo ? "Ativo" : "Inativo"],
-          ["Calçado", tamanhos.calcado || "—"],
-          ["Luva", tamanhos.luva || "—"],
-          ["Vestimenta", tamanhos.vestimenta || "—"]
+          ["Nome", escapar(funcionario.nome)],
+          ["Matrícula", escapar(funcionario.matricula)],
+          ["Cargo (RH)", escapar(funcionario.cargo || "—")],
+          ["Função (SST)", escapar(funcionario.funcao || "—")],
+          ["Habilitações / NRs", formatarHabilitacoesFichaHtml(funcionario)],
+          ["Setor", escapar(formatarSetorFuncionario(funcionario))],
+          ["Situação", escapar(funcionario.ativo ? "Ativo" : "Inativo")],
+          ["Calçado", escapar(tamanhos.calcado || "—")],
+          ["Luva", escapar(tamanhos.luva || "—")],
+          ["Vestimenta", escapar(tamanhos.vestimenta || "—")]
         ];
 
         document.getElementById("dados-funcionario").innerHTML = paresDadosFuncionario.map(function (par) {
-          return "<div><dt>" + escapar(par[0]) + "</dt><dd>" + escapar(par[1]) + "</dd></div>";
+          return "<div><dt>" + escapar(par[0]) + "</dt><dd>" + par[1] + "</dd></div>";
         }).join("");
 
         renderizarHistoricoFuncional(dados);

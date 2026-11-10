@@ -1,9 +1,12 @@
 """Ciclo de vida de RH e governança operacional de colaboradores (Admissão, Grade de
-Tamanhos, Kit Admissional, Mudança de Função e Desligamento/Nada Consta).
+Tamanhos, Kit Admissional, Mudança de Função, Habilitações/NRs e Desligamento/Nada Consta).
 
-Persistência Zero-Migration: metadados de RH e histórico funcional são gravados e
-reconstruídos a partir de `RegistroAuditoria` com `entidade="RH_FUNCIONARIO"`.
+Persistência Zero-Migration: metadados de RH, função operacional, habilitações com
+validade e histórico funcional são gravados e reconstruídos a partir de
+`RegistroAuditoria` com `entidade="RH_FUNCIONARIO"`.
 """
+import re
+
 from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -26,6 +29,8 @@ from .solicitacoes import _proximo_codigo
 
 ENTIDADE_RH = "RH_FUNCIONARIO"
 PREFIXO_FUNCIONARIO = "MAT:"
+PREFIXO_FUNCAO = "FUNC:"
+PREFIXO_HABILITACAO = "HAB:"
 
 TERMOS_CALCADO = ("bota", "botina", "calçado", "calcado", "sapato", "tênis", "tenis")
 TERMOS_LUVA = ("luva", "mangote")
@@ -57,11 +62,68 @@ def _fmt_data(dt, padrao="%d/%m/%Y %H:%M"):
     return timezone.localtime(dt).strftime(padrao)
 
 
+def normalizar_habilitacoes(habilitacoes, hoje_iso=None):
+    """Normaliza uma lista ou texto de habilitações para
+    `[{"nome": str, "validade": "YYYY-MM-DD" | "", "vencida": bool}]`."""
+    if not habilitacoes:
+        return []
+
+    hoje_iso = hoje_iso or timezone.localdate().isoformat()
+    itens_brutos = []
+
+    if isinstance(habilitacoes, str):
+        for parte in re.split(r"[|,;]", habilitacoes):
+            parte = parte.strip()
+            if not parte:
+                continue
+            if ":" in parte:
+                nome_p, val_p = parte.split(":", 1)
+                itens_brutos.append({"nome": nome_p.strip(), "validade": val_p.strip()})
+            else:
+                itens_brutos.append({"nome": parte, "validade": ""})
+    elif isinstance(habilitacoes, (list, tuple)):
+        for item in habilitacoes:
+            if isinstance(item, dict):
+                nome_p = str(item.get("nome") or item.get("habilitacao") or "").strip()
+                val_p = str(item.get("validade") or "").strip()
+                if nome_p:
+                    itens_brutos.append({"nome": nome_p, "validade": val_p})
+            elif isinstance(item, str):
+                parte = item.strip()
+                if not parte:
+                    continue
+                if ":" in parte:
+                    nome_p, val_p = parte.split(":", 1)
+                    itens_brutos.append({"nome": nome_p.strip(), "validade": val_p.strip()})
+                else:
+                    itens_brutos.append({"nome": parte, "validade": ""})
+
+    por_chave = {}
+    for item in itens_brutos:
+        nome = item["nome"][:80].strip()
+        if not nome:
+            continue
+        validade = item["validade"][:10].strip()
+        if validade and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", validade):
+            validade = ""
+        vencida = bool(validade and validade < hoje_iso)
+        por_chave[nome.lower()] = {
+            "nome": nome,
+            "validade": validade,
+            "vencida": vencida,
+        }
+
+    return sorted(por_chave.values(), key=lambda x: x["nome"].lower())
+
+
 def obter_ficha_rh(usuario):
-    """Reconstrói os metadados de RH (tamanhos, PIN provisório e histórico funcional)
-    a partir da trilha imutável de auditoria (`entidade="RH_FUNCIONARIO"`)."""
+    """Reconstrói os metadados de RH (tamanhos, função operacional, habilitações,
+    PIN provisório e histórico funcional) a partir da trilha imutável de auditoria
+    (`entidade="RH_FUNCIONARIO"`)."""
     ficha = {
         "tamanhos": {"calcado": "", "luva": "", "vestimenta": ""},
+        "funcao": "",
+        "habilitacoes": [],
         "pin_provisorio": False,
         "historico_funcional": [],
         "ultimo_desligamento": None,
@@ -69,6 +131,7 @@ def obter_ficha_rh(usuario):
     if usuario is None or not getattr(usuario, "id", None):
         return ficha
 
+    hoje_iso = timezone.localdate().isoformat()
     eventos = RegistroAuditoria.objects.filter(
         entidade=ENTIDADE_RH,
         entidade_id=str(usuario.id),
@@ -86,13 +149,27 @@ def obter_ficha_rh(usuario):
                 if chave in det and det[chave] is not None:
                     ficha["tamanhos"][chave] = str(det[chave]).strip()
 
+        if "funcao" in det and det["funcao"] is not None:
+            ficha["funcao"] = str(det["funcao"]).strip()
+
+        if "habilitacoes" in det and isinstance(det["habilitacoes"], list):
+            ficha["habilitacoes"] = normalizar_habilitacoes(det["habilitacoes"], hoje_iso=hoje_iso)
+
         if "pin_provisorio" in det and det["pin_provisorio"] is not None:
             ficha["pin_provisorio"] = bool(det["pin_provisorio"])
         elif ev.acao in ("TOTEM_PIN_ALTERADO", "TOTEM_TROCA_PIN", "PIN_DEFINITIVO"):
             ficha["pin_provisorio"] = False
 
         tem_campos_funcionais = any(
-            det.get(c) for c in ("cargo_anterior", "cargo_novo", "setor_anterior", "setor_novo")
+            det.get(c)
+            for c in (
+                "cargo_anterior",
+                "cargo_novo",
+                "funcao_anterior",
+                "funcao_novo",
+                "setor_anterior",
+                "setor_novo",
+            )
         )
         if ev.acao in ACOES_HISTORICO_FUNCIONAL or det.get("evento_funcional") or tem_campos_funcionais:
             item_historico = {
@@ -101,6 +178,8 @@ def obter_ficha_rh(usuario):
                 "descricao": ev.descricao,
                 "cargo_anterior": det.get("cargo_anterior") or "",
                 "cargo_novo": det.get("cargo_novo") or "",
+                "funcao_anterior": det.get("funcao_anterior") or "",
+                "funcao_novo": det.get("funcao_novo") or "",
                 "setor_anterior": det.get("setor_anterior") or "",
                 "setor_novo": det.get("setor_novo") or "",
                 "responsavel": ev.usuario_nome or "Sistema",
@@ -112,9 +191,17 @@ def obter_ficha_rh(usuario):
     return ficha
 
 
-def salvar_metadados_rh(request, usuario, tamanhos=None, pin_provisorio=None, evento_funcional=None):
-    """Salva/atualiza tamanhos de EPI, flag de PIN provisório e eventos de movimentação
-    funcional (Admissão, Mudança de Função, Desligamento) para um colaborador."""
+def salvar_metadados_rh(
+    request,
+    usuario,
+    tamanhos=None,
+    pin_provisorio=None,
+    evento_funcional=None,
+    funcao=None,
+    habilitacoes=None,
+):
+    """Salva/atualiza tamanhos de EPI, função operacional, habilitações/NRs, flag de
+    PIN provisório e eventos de movimentação funcional para um colaborador."""
     ficha_atual = obter_ficha_rh(usuario)
     novos_tamanhos = dict(ficha_atual["tamanhos"])
 
@@ -122,6 +209,19 @@ def salvar_metadados_rh(request, usuario, tamanhos=None, pin_provisorio=None, ev
         for chave in ("calcado", "luva", "vestimenta"):
             if chave in tamanhos and tamanhos[chave] is not None:
                 novos_tamanhos[chave] = str(tamanhos[chave]).strip()
+
+    nova_funcao = ficha_atual["funcao"] if funcao is None else str(funcao).strip()
+
+    if habilitacoes is None:
+        novas_habilitacoes = [
+            {"nome": h["nome"], "validade": h.get("validade") or ""}
+            for h in ficha_atual["habilitacoes"]
+        ]
+    else:
+        novas_habilitacoes = [
+            {"nome": h["nome"], "validade": h.get("validade") or ""}
+            for h in normalizar_habilitacoes(habilitacoes)
+        ]
 
     novo_pin_provisorio = (
         ficha_atual["pin_provisorio"] if pin_provisorio is None else bool(pin_provisorio)
@@ -150,12 +250,16 @@ def salvar_metadados_rh(request, usuario, tamanhos=None, pin_provisorio=None, ev
 
     detalhes = {
         "tamanhos": novos_tamanhos,
+        "funcao": nova_funcao,
+        "habilitacoes": novas_habilitacoes,
         "pin_provisorio": novo_pin_provisorio,
     }
     if isinstance(evento_funcional, dict):
         for campo in (
             "cargo_anterior",
             "cargo_novo",
+            "funcao_anterior",
+            "funcao_novo",
             "setor_anterior",
             "setor_novo",
             "observacao",
@@ -212,7 +316,7 @@ def _tamanho_compativel(ficha_rh, produto):
 
 def gerar_kit_admissional(colaborador, responsavel, motivo="Kit Admissional"):
     """Gera solicitações já APROVADAS (com reserva de estoque quando disponível) para os
-    EPIs da função/setor do colaborador na admissão ou mudança de função."""
+    EPIs do cargo, função, habilitações válidas e setor do colaborador."""
     ficha_rh = obter_ficha_rh(colaborador)
     todos_epis = [
         p
@@ -223,11 +327,21 @@ def gerar_kit_admissional(colaborador, responsavel, motivo="Kit Admissional"):
         return {"gerado": False, "quantidade_itens": 0, "codigos": [], "itens": []}
 
     cargo = (colaborador.cargo or "").strip()
+    funcao = (ficha_rh.get("funcao") or "").strip()
+    habilitacoes_ativas = [
+        h["nome"].strip()
+        for h in (ficha_rh.get("habilitacoes") or [])
+        if (h.get("nome") or "").strip() and not h.get("vencida")
+    ]
     marcador_matricula = f"{PREFIXO_FUNCIONARIO}{(colaborador.codigo_matricula or '').strip()}"
 
     condicao_regra = Q(cargo__iexact=marcador_matricula)
     if cargo:
         condicao_regra |= Q(cargo__iexact=cargo)
+    if funcao:
+        condicao_regra |= Q(cargo__iexact=f"{PREFIXO_FUNCAO}{funcao}") | Q(cargo__iexact=funcao)
+    for hab in habilitacoes_ativas:
+        condicao_regra |= Q(cargo__iexact=f"{PREFIXO_HABILITACAO}{hab}") | Q(cargo__iexact=hab)
     if colaborador.setor_id:
         condicao_regra |= Q(setor_id=colaborador.setor_id, cargo="")
 

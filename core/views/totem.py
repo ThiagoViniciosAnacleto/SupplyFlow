@@ -29,6 +29,7 @@ from ..servicos.elegibilidade import (
     ACIMA_DA_COTA,
     ANTECIPADA,
     EXIGE_JUSTIFICATIVA,
+    HABILITACAO_VENCIDA,
     TAMANHO_DIFERENTE,
     avaliar,
 )
@@ -147,6 +148,8 @@ def api_totem_login(request):
             "primeiro_nome": primeiro_nome(colaborador.nome),
             "matricula": colaborador.codigo_matricula,
             "cargo": colaborador.cargo or "Colaborador",
+            "funcao": ficha_rh.get("funcao") or "",
+            "habilitacoes": ficha_rh.get("habilitacoes") or [],
             "setor": colaborador.setor.nome if colaborador.setor else "Sem setor",
             "centro_custo": colaborador.setor.centro_custo if colaborador.setor else "",
             "exige_troca_pin": bool(ficha_rh.get("pin_provisorio")),
@@ -227,6 +230,10 @@ def api_totem_produtos(request):
                 TAMANHO_DIFERENTE: (
                     f"Tamanho {p.tamanho} diferente do seu tamanho cadastrado ({av.tamanho_esperado}). "
                     "Pode pedir com justificativa."
+                ),
+                HABILITACAO_VENCIDA: (
+                    f"Habilitação/credencial ({getattr(av.regra, 'habilitacao_vencida', '') or 'NR'}) vencida. "
+                    "Pode solicitar com justificativa para análise do Gestor/SST."
                 ),
                 EXIGE_JUSTIFICATIVA: "Este item exige justificativa.",
             }.get(av.motivos[0], "Este item exige justificativa.")

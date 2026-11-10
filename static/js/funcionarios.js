@@ -2,9 +2,10 @@
    SupplyFlow — Gestão de Funcionários Operacionais e Ciclo de Vida RH
    ---------------------------------------------------------------------
    Gerencia o Domínio 1 (Funcionários Operacionais / Totem):
-   - Cadastro e edição com Grade de Tamanhos (Calçado, Luva, Vestimenta),
-     PIN provisório de 1º acesso e Kit Admissional automático de EPIs.
-   - Mudança de Função / Transferência de Setor com geração de Kit.
+   - Cadastro e edição com Cargo (RH), Função/Atividade (SST),
+     Habilitações/NRs com validade, Grade de Tamanhos (Calçado, Luva,
+     Vestimenta), PIN provisório de 1º acesso e Kit Admissional de EPIs.
+   - Mudança de Cargo/Função / Transferência de Setor com geração de Kit.
    - Checklist de Desligamento, cancelamento de reservas e Termo Nada Consta.
    - Importação em lote via CSV/planilha.
    ===================================================================== */
@@ -24,6 +25,12 @@
   var selectPerfil = document.getElementById("func-perfil");
   var campoEmail = document.getElementById("func-email");
   var modalBs = modalEl ? new bootstrap.Modal(modalEl) : null;
+
+  var inputHabNome = document.getElementById("hab-nome-input");
+  var inputHabValidade = document.getElementById("hab-validade-input");
+  var btnAddHab = document.getElementById("btn-add-hab");
+  var listaTagsHabs = document.getElementById("lista-tags-habilitacoes");
+  var habilitacoesModal = [];
 
   var modalMudarFuncaoEl = document.getElementById("modal-mudar-funcao");
   var formMudarFuncao = document.getElementById("form-mudar-funcao");
@@ -61,6 +68,80 @@
     }
   }
 
+  /* Gerenciamento de tags de Habilitações / NRs no modal de funcionário */
+  function renderizarTagsHabilitacoesNoModal() {
+    if (!listaTagsHabs) {
+      return;
+    }
+    if (!habilitacoesModal || habilitacoesModal.length === 0) {
+      listaTagsHabs.innerHTML = '<span class="small text-muted">Nenhuma habilitação/NR vinculada.</span>';
+      return;
+    }
+    listaTagsHabs.innerHTML = habilitacoesModal.map(function (hab, idx) {
+      var textoVal = hab.validade ? " (val. " + escapar(hab.validade) + ")" : "";
+      var classeCor = hab.vencida
+        ? "bg-danger-subtle text-danger border-danger-subtle"
+        : "bg-info-subtle text-info-emphasis border-info-subtle";
+      return (
+        '<span class="badge ' + classeCor + ' border d-inline-flex align-items-center gap-1 py-1 px-2">' +
+          "<span>" + escapar(hab.nome) + textoVal + "</span>" +
+          '<button type="button" class="btn-close" style="font-size:0.55rem;" data-rem-hab="' + idx + '"' +
+                  ' aria-label="Remover habilitação ' + escapar(hab.nome) + '"></button>' +
+        "</span>"
+      );
+    }).join("");
+
+    listaTagsHabs.querySelectorAll("[data-rem-hab]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var indice = Number(this.getAttribute("data-rem-hab"));
+        habilitacoesModal.splice(indice, 1);
+        renderizarTagsHabilitacoesNoModal();
+      });
+    });
+  }
+
+  function adicionarHabilitacaoPeloInput() {
+    if (!inputHabNome) {
+      return;
+    }
+    var nome = (inputHabNome.value || "").trim();
+    if (!nome) {
+      return;
+    }
+    var validade = inputHabValidade ? (inputHabValidade.value || "").trim() : "";
+    var existenteIdx = habilitacoesModal.findIndex(function (item) {
+      return (item.nome || "").toLowerCase() === nome.toLowerCase();
+    });
+    var hojeIso = new Date().toISOString().slice(0, 10);
+    var objHab = {
+      nome: nome,
+      validade: validade,
+      vencida: Boolean(validade && validade < hojeIso)
+    };
+    if (existenteIdx >= 0) {
+      habilitacoesModal[existenteIdx] = objHab;
+    } else {
+      habilitacoesModal.push(objHab);
+    }
+    inputHabNome.value = "";
+    if (inputHabValidade) {
+      inputHabValidade.value = "";
+    }
+    renderizarTagsHabilitacoesNoModal();
+  }
+
+  if (btnAddHab) {
+    btnAddHab.addEventListener("click", adicionarHabilitacaoPeloInput);
+  }
+  if (inputHabNome) {
+    inputHabNome.addEventListener("keydown", function (evento) {
+      if (evento.key === "Enter") {
+        evento.preventDefault();
+        adicionarHabilitacaoPeloInput();
+      }
+    });
+  }
+
   /* Extrai descrição legível dos itens/códigos gerados no Kit Admissional ou de Nova Função */
   function formatarResumoKitGerado(kitGerado) {
     if (!kitGerado || !kitGerado.gerado) {
@@ -84,7 +165,7 @@
     if (kitGerado.mensagem) {
       return String(kitGerado.mensagem);
     }
-    var qtd = kitGerado.quantidade || kitGerado.total || 0;
+    var qtd = kitGerado.quantidade_itens || kitGerado.quantidade || kitGerado.total || 0;
     if (qtd > 0) {
       return "Kit de EPIs gerado automaticamente (" + qtd + " solicitação(ões) enviada(s) ao almoxarifado).";
     }
@@ -144,21 +225,35 @@
       });
   }
 
-  /* Carrega o catálogo de cargos e funções para sugerir nos modais de funcionário e transição (RF-04) */
+  /* Carrega o catálogo de cargos (RH), funções (SST) e habilitações (NRs) */
   function carregarCargosSugeridos() {
-    var datalist = document.getElementById("lista-cargos-func");
-    if (!datalist) {
-      return;
-    }
+    var datalistCargos = document.getElementById("lista-cargos-func");
+    var datalistFuncoes = document.getElementById("lista-funcoes-func");
+    var datalistHabs = document.getElementById("lista-habs-func");
+
     SF.api.get("/api/cargos/")
       .then(function (dados) {
-        var lista = dados.cargos || [];
-        datalist.innerHTML = lista.map(function (item) {
-          return '<option value="' + escapar(item.cargo) + '">';
-        }).join("");
+        if (datalistCargos) {
+          datalistCargos.innerHTML = (dados.cargos || []).map(function (item) {
+            var nome = typeof item === "string" ? item : (item.cargo || item.nome || "");
+            return '<option value="' + escapar(nome) + '">';
+          }).join("");
+        }
+        if (datalistFuncoes) {
+          datalistFuncoes.innerHTML = (dados.funcoes || []).map(function (item) {
+            var nome = typeof item === "string" ? item : (item.funcao || item.nome || "");
+            return '<option value="' + escapar(nome) + '">';
+          }).join("");
+        }
+        if (datalistHabs) {
+          datalistHabs.innerHTML = (dados.habilitacoes || []).map(function (item) {
+            var nome = typeof item === "string" ? item : (item.habilitacao || item.nome || "");
+            return '<option value="' + escapar(nome) + '">';
+          }).join("");
+        }
       })
       .catch(function (erro) {
-        console.warn("Erro ao carregar cargos:", erro);
+        console.warn("Erro ao carregar catálogos ocupacionais:", erro);
       });
   }
 
@@ -225,6 +320,37 @@
     );
   }
 
+  /* Monta os pequenos badges de Habilitações / NRs na linha do funcionário */
+  function criarBadgesHabilitacoesHtml(funcionario) {
+    var habs = funcionario.habilitacoes || [];
+    if (!Array.isArray(habs) || habs.length === 0) {
+      return "";
+    }
+    var badges = habs.map(function (h) {
+      var nome = typeof h === "string" ? h : (h.nome || h.habilitacao || "");
+      var validade = (typeof h === "object" && h) ? (h.validade || "") : "";
+      var vencida = Boolean(typeof h === "object" && h && h.vencida);
+      if (!nome) {
+        return "";
+      }
+      if (vencida) {
+        return (
+          '<span class="badge bg-danger-subtle text-danger border border-danger-subtle fw-normal me-1" title="Credencial vencida em ' + escapar(validade) + '">' +
+            '<i class="bi bi-exclamation-triangle-fill me-1" aria-hidden="true"></i>' +
+            escapar(nome) + (validade ? " (venc. " + escapar(validade) + ")" : " (vencida)") +
+          "</span>"
+        );
+      }
+      return (
+        '<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle fw-normal me-1">' +
+          '<i class="bi bi-shield-check me-1" aria-hidden="true"></i>' +
+          escapar(nome) + (validade ? " (" + escapar(validade) + ")" : "") +
+        "</span>"
+      );
+    }).join("");
+    return '<div class="mt-1 d-flex flex-wrap gap-1">' + badges + "</div>";
+  }
+
   /* Monta o HTML de uma linha da tabela de funcionários */
   function criarLinhaFuncionarioHtml(funcionario) {
     var badgeStatus = '<span class="badge bg-danger-subtle text-danger border border-danger-subtle">Inativo</span>';
@@ -248,13 +374,18 @@
     }
 
     var badgePinProvisorio = "";
-    if (funcionario.exigir_troca_pin) {
+    if (funcionario.exigir_troca_pin || funcionario.pin_provisorio) {
       badgePinProvisorio =
         '<div class="mt-1">' +
           '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle fw-normal" title="Colaborador deverá definir novo PIN no 1º acesso ao Totem">' +
             '<i class="bi bi-key me-1" aria-hidden="true"></i>PIN provisório' +
           "</span>" +
         "</div>";
+    }
+
+    var htmlFuncaoSst = "";
+    if (funcionario.funcao) {
+      htmlFuncaoSst = '<div class="small text-secondary">Função: ' + escapar(funcionario.funcao) + "</div>";
     }
 
     var subtitulo = funcionario.dominio === "OPERACIONAL"
@@ -276,7 +407,9 @@
         "</td>" +
         '<td><span class="numero">' + escapar(funcionario.matricula) + "</span></td>" +
         "<td>" +
-          "<div>" + escapar(funcionario.cargo) + "</div>" +
+          '<div class="fw-semibold">' + escapar(funcionario.cargo) + "</div>" +
+          htmlFuncaoSst +
+          criarBadgesHabilitacoesHtml(funcionario) +
           criarBadgeTamanhosHtml(funcionario) +
         "</td>" +
         "<td>" + escapar(funcionario.setor_nome) + "</td>" +
@@ -315,6 +448,10 @@
     document.getElementById("func-matricula").value = funcionario.matricula;
     document.getElementById("func-email").value = (funcionario.email === "—") ? "" : funcionario.email;
     document.getElementById("func-cargo").value = funcionario.cargo;
+    var campoFuncao = document.getElementById("func-funcao");
+    if (campoFuncao) {
+      campoFuncao.value = funcionario.funcao || "";
+    }
     document.getElementById("func-setor").value = funcionario.setor_id || "";
     document.getElementById("func-perfil").value = funcionario.perfil || "COLABORADOR";
     document.getElementById("func-pin").value = "";
@@ -323,9 +460,25 @@
     document.getElementById("func-tam-luva").value = tamanhos.luva || "";
     document.getElementById("func-tam-vestimenta").value = tamanhos.vestimenta || "";
 
+    habilitacoesModal = Array.isArray(funcionario.habilitacoes)
+      ? funcionario.habilitacoes.map(function (h) {
+          if (typeof h === "string") {
+            return { nome: h, validade: "", vencida: false };
+          }
+          return {
+            nome: h.nome || h.habilitacao || "",
+            validade: h.validade || "",
+            vencida: Boolean(h.vencida)
+          };
+        })
+      : [];
+    if (inputHabNome) inputHabNome.value = "";
+    if (inputHabValidade) inputHabValidade.value = "";
+    renderizarTagsHabilitacoesNoModal();
+
     var chkTrocaPin = document.getElementById("func-exigir-troca-pin");
     if (chkTrocaPin) {
-      chkTrocaPin.checked = Boolean(funcionario.exigir_troca_pin);
+      chkTrocaPin.checked = Boolean(funcionario.exigir_troca_pin || funcionario.pin_provisorio);
     }
     var chkGerarKit = document.getElementById("func-gerar-kit");
     if (chkGerarKit) {
@@ -344,8 +497,14 @@
     document.getElementById("mudanca-nome-colaborador").textContent =
       funcionario.nome + " (" + funcionario.matricula + ")";
     document.getElementById("mudanca-situacao-atual").textContent =
-      "Cargo atual: " + (funcionario.cargo || "—") + " · Setor atual: " + (funcionario.setor_nome || "Sem setor");
+      "Cargo atual: " + (funcionario.cargo || "—") +
+      (funcionario.funcao ? " · Função: " + funcionario.funcao : "") +
+      " · Setor atual: " + (funcionario.setor_nome || "Sem setor");
     document.getElementById("mudanca-novo-cargo").value = funcionario.cargo || "";
+    var campoNovaAtividade = document.getElementById("mudar-funcao-atividade");
+    if (campoNovaAtividade) {
+      campoNovaAtividade.value = funcionario.funcao || "";
+    }
     document.getElementById("mudanca-novo-setor").value = funcionario.setor_id || "";
     document.getElementById("mudanca-observacao").value = "";
     var chkKit = document.getElementById("mudanca-gerar-kit");
@@ -362,7 +521,7 @@
     document.getElementById("desligamento-nome-colaborador").textContent =
       (infoFunc.nome || funcionario.nome) + " (" + (infoFunc.matricula || funcionario.matricula) + ")";
     document.getElementById("desligamento-detalhe-colaborador").textContent =
-      "Função: " + (infoFunc.cargo || funcionario.cargo || "—") +
+      "Cargo: " + (infoFunc.cargo || funcionario.cargo || "—") +
       " · Setor: " + (infoFunc.setor || infoFunc.setor_nome || funcionario.setor_nome || "—");
 
     var solAbertasRaw = dados ? (dados.solicitacoes_abertas !== undefined ? dados.solicitacoes_abertas : dados.reservas_abertas) : 0;
@@ -551,9 +710,18 @@
       document.getElementById("modalFuncTitulo").textContent = "Novo Funcionário Operacional";
       document.getElementById("func-id").value = "";
       document.getElementById("func-perfil").value = "COLABORADOR";
+      var campoFuncao = document.getElementById("func-funcao");
+      if (campoFuncao) {
+        campoFuncao.value = "";
+      }
       document.getElementById("func-tam-calcado").value = "";
       document.getElementById("func-tam-luva").value = "";
       document.getElementById("func-tam-vestimenta").value = "";
+      habilitacoesModal = [];
+      if (inputHabNome) inputHabNome.value = "";
+      if (inputHabValidade) inputHabValidade.value = "";
+      renderizarTagsHabilitacoesNoModal();
+
       var chkTrocaPin = document.getElementById("func-exigir-troca-pin");
       if (chkTrocaPin) {
         chkTrocaPin.checked = true;
@@ -572,11 +740,18 @@
   if (formFunc) {
     formFunc.addEventListener("submit", function (evento) {
       evento.preventDefault();
+
+      /* Se o usuário digitou uma habilitação no input e esqueceu de clicar em Adicionar, incorpora */
+      if (inputHabNome && inputHabNome.value.trim()) {
+        adicionarHabilitacaoPeloInput();
+      }
+
       var calcado = (document.getElementById("func-tam-calcado").value || "").trim();
       var luva = (document.getElementById("func-tam-luva").value || "").trim();
       var vestimenta = (document.getElementById("func-tam-vestimenta").value || "").trim();
       var exigirTrocaPin = document.getElementById("func-exigir-troca-pin").checked;
       var gerarKit = document.getElementById("func-gerar-kit").checked;
+      var campoFuncao = document.getElementById("func-funcao");
 
       var payload = {
         id: document.getElementById("func-id").value || null,
@@ -585,6 +760,10 @@
         pin: document.getElementById("func-pin").value.trim(),
         email: document.getElementById("func-email").value.trim(),
         cargo: document.getElementById("func-cargo").value.trim(),
+        funcao: campoFuncao ? campoFuncao.value.trim() : "",
+        habilitacoes: habilitacoesModal.map(function (h) {
+          return { nome: h.nome, validade: h.validade || "" };
+        }),
         setor_id: document.getElementById("func-setor").value || null,
         perfil: document.getElementById("func-perfil").value,
         tamanhos: {
@@ -625,12 +804,14 @@
     });
   }
 
-  /* Submissão do Modal de Mudança de Função / Transferência de Setor */
+  /* Submissão do Modal de Mudança de Cargo / Função / Transferência de Setor */
   if (formMudarFuncao) {
     formMudarFuncao.addEventListener("submit", function (evento) {
       evento.preventDefault();
       var idFuncionario = document.getElementById("mudanca-func-id").value;
       var novoCargo = document.getElementById("mudanca-novo-cargo").value.trim();
+      var campoNovaAtividade = document.getElementById("mudar-funcao-atividade");
+      var novaFuncao = campoNovaAtividade ? campoNovaAtividade.value.trim() : "";
       var novoSetorId = document.getElementById("mudanca-novo-setor").value || null;
       var observacao = document.getElementById("mudanca-observacao").value.trim();
       var gerarKit = document.getElementById("mudanca-gerar-kit").checked;
@@ -638,6 +819,8 @@
       var payload = {
         cargo: novoCargo,
         novo_cargo: novoCargo,
+        funcao: novaFuncao,
+        nova_funcao: novaFuncao,
         setor_id: novoSetorId,
         novo_setor_id: novoSetorId,
         observacao: observacao,
@@ -788,6 +971,7 @@
   }
 
   atualizarEstadoDominioNoModal();
+  renderizarTagsHabilitacoesNoModal();
   carregarSetores();
   carregarCargosSugeridos();
   carregarFuncionarios();

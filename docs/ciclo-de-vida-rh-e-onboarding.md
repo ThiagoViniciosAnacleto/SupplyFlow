@@ -99,10 +99,22 @@ flowchart LR
 - **Funcionamento:**
   1. O modal `#modal-importar-csv` aceita upload de arquivo `.csv`/`.txt` ou colagem direta de texto no padrão:
      ```csv
-     matricula;nome;cargo;setor;pin_inicial;calcado;luva;vestimenta
-     MAT-3001;Carlos Eduardo;Soldador;Produção Industrial;8392;41;M;G
+     matricula;nome;cargo;setor;pin_inicial;calcado;luva;vestimenta;funcao;habilitacoes
+     MAT-3001;Carlos Eduardo;Soldador;Produção Industrial;8392;41;M;G;Soldagem MIG;NR-35 Trabalho em Altura:2027-12-31|Brigadista
      ```
-  2. O endpoint [`POST /api/funcionarios/importar-csv/`](file:///c:/Users/Usuario/Documents/GitHub/SupplyFlow/core/views/cadastros.py#L347-L473) atualiza colaboradores já existentes pela matrícula e cria os novos, associando ou criando o setor correspondente, configurando a grade de tamanhos, marcando o PIN provisório e gerando opcionalmente o Kit Admissional.
+  2. O endpoint [`POST /api/funcionarios/importar-csv/`](file:///c:/Users/Usuario/Documents/GitHub/SupplyFlow/core/views/cadastros.py) atualiza colaboradores já existentes pela matrícula e cria os novos, associando ou criando o setor correspondente, configurando a grade de tamanhos, função operacional, habilitações/NRs, marcando o PIN provisório e gerando opcionalmente o Kit Admissional.
+
+### 2.7. Arquitetura de 3 Categorias Ocupacionais: Cargo (RH) vs. Função (SST) vs. Habilitações & Credenciais de Risco (NRs com Validade) (`RF-03`, `RF-04`, `RF-12`, `RF-15`, `RF-19`)
+- **Problema resolvido:** Em ambientes industriais reais (eSocial, NR-01/PGR e NR-06), o **Cargo contratual** (folha de pagamento) não é suficiente para definir todos os EPIs de um trabalhador. Dois colaboradores com o mesmo cargo (`Eletricista Industrial`) podem exercer **Funções** distintas (`Manutenção de Painéis` vs. `Subestação`) e possuir **Habilitações/Credenciais de Risco (NRs)** com validade controlada (`NR-35 Trabalho em Altura`, `NR-10 Alta Tensão`, `NR-33 Espaço Confinado`, `Brigadista`).
+- **Funcionamento em 3 Camadas:**
+  1. **1ª Categoria — Cargo (RH — `RF-03`):** Posição contratual armazenada em `Usuario.cargo` e gerenciada na 1ª aba de [`backoffice/cargos.html`](file:///c:/Users/Usuario/Documents/GitHub/SupplyFlow/backoffice/cargos.html).
+  2. **2ª Categoria — Função / Atividade Operacional (SST — `RF-04`):** Atividade prática executada no chão de fábrica (`ficha_rh["funcao"]`), gerenciada na 2ª aba de [`backoffice/cargos.html`](file:///c:/Users/Usuario/Documents/GitHub/SupplyFlow/backoffice/cargos.html) (`/api/funcoes/salvar/`, `/api/funcoes/excluir/`).
+  3. **3ª Categoria — Habilitações & Credenciais de Risco (NRs / Licenças com Validade):** Múltiplas etiquetas por colaborador (`ficha_rh["habilitacoes"]`), cada uma com sua própria **Data de Validade** opcional (`YYYY-MM-DD`), gerenciadas na 3ª aba de [`backoffice/cargos.html`](file:///c:/Users/Usuario/Documents/GitHub/SupplyFlow/backoffice/cargos.html) (`/api/habilitacoes/salvar/`, `/api/habilitacoes/excluir/`).
+- **Motor de Elegibilidade e Controle de Vencimento no Totem ([`core/servicos/elegibilidade.py`](file:///c:/Users/Usuario/Documents/GitHub/SupplyFlow/core/servicos/elegibilidade.py)):**
+  - As Políticas de Fornecimento ([`backoffice/politicas.html`](file:///c:/Users/Usuario/Documents/GitHub/SupplyFlow/backoffice/politicas.html)) permitem vincular regras a **Cargo**, **Função (`FUNC:`)** ou **Habilitação/NR (`HAB:`)**, seguindo a hierarquia de especificidade:
+    $$\text{Funcionário} > \text{Habilitação/NR} > \text{Função} > \text{Cargo} > \text{Setor} > \text{Padrão do Produto}$$
+  - **Exceção por Habilitação Vencida (`HABILITACAO_VENCIDA`):** Se o colaborador tentar retirar no Totem um EPI vinculado a uma Habilitação/NR cuja data de validade esteja vencida na sua ficha, o servidor classifica automaticamente o pedido como **Solicitação por Exceção (`"Habilitação/credencial vencida"`)**, exigindo justificativa e aprovação do Gestor/SST antes da liberação!
+  - **Kit Admissional Composto:** Ao admitir ou promover o colaborador, o Kit Admissional soma automaticamente os EPIs do seu **Cargo** + **Função** + **Habilitações vigentes**.
 
 ---
 

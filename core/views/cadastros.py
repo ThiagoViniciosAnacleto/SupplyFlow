@@ -1,4 +1,5 @@
-"""APIs de cadastro: funcionários, produtos, setores, fornecedores, políticas e cargos."""
+"""APIs de cadastro: funcionários, produtos, setores, fornecedores, políticas, cargos,
+funções operacionais e habilitações/NRs."""
 import csv
 import re
 from datetime import datetime
@@ -28,8 +29,46 @@ from ..permissoes import PERFIS, PERFIS_BACKOFFICE, api_backoffice
 from ..seguranca import definir_pin, validar_novo_pin
 from ..servicos import RegraViolada, estados, rh
 from ..servicos import solicitacoes as servico_solicitacoes
-from ..servicos.elegibilidade import PREFIXO_FUNCIONARIO
+from ..servicos.elegibilidade import PREFIXO_FUNCIONARIO, PREFIXO_FUNCAO, PREFIXO_HABILITACAO
 from .util import EntradaInvalida, decimal, erro, fmt, gerar_iniciais, inteiro, ler_json, texto
+
+HABILITACOES_PADRAO = (
+    ("NR-10", True, "Segurança em Instalações e Serviços em Eletricidade"),
+    ("NR-11", True, "Operação de Empilhadeira, Ponte Rolante e Movimentação de Cargas"),
+    ("NR-12", True, "Segurança no Trabalho em Máquinas e Equipamentos"),
+    ("NR-33", True, "Segurança e Saúde nos Trabalhos em Espaços Confinados"),
+    ("NR-35", True, "Trabalho em Altura (acima de 2,0m com risco de queda)"),
+    ("Brigadista", True, "Brigada de Incêndio e Emergência Industrial"),
+)
+
+
+def _func_json(u, ficha_rh=None):
+    ficha = ficha_rh if isinstance(ficha_rh, dict) else rh.obter_ficha_rh(u)
+    habilitacoes = ficha.get("habilitacoes", [])
+    return {
+        "id": str(u.id),
+        "matricula": u.codigo_matricula,
+        "nome": u.nome,
+        "iniciais": gerar_iniciais(u.nome),
+        "email": u.email or "—",
+        "cargo": u.cargo or "Colaborador",
+        "funcao": ficha.get("funcao", ""),
+        "habilitacoes": habilitacoes,
+        "tem_habilitacao_vencida": any(h.get("vencida") for h in habilitacoes),
+        "perfil": u.perfil,
+        "perfil_rotulo": PERFIS.get(u.perfil, u.perfil),
+        "dominio": "OPERACIONAL" if u.eh_operacional else "ADMINISTRATIVO",
+        "possui_pin": u.possui_pin_totem,
+        "possui_acesso_backoffice": u.possui_acesso_backoffice,
+        "setor_id": str(u.setor.id) if u.setor else None,
+        "setor_nome": u.setor.nome if u.setor else "Sem setor",
+        "centro_custo": u.setor.centro_custo if u.setor else "—",
+        "ativo": u.ativo,
+        "created_at": fmt(u.created_at, "%d/%m/%Y") if u.created_at else "—",
+        "tamanhos": ficha["tamanhos"],
+        "pin_provisorio": ficha["pin_provisorio"],
+        "historico_funcional": ficha["historico_funcional"],
+    }
 
 
 # ============================================================================
@@ -54,31 +93,11 @@ def api_listar_funcionarios(request):
     if termo:
         qs = qs.filter(Q(nome__icontains=termo) | Q(codigo_matricula__icontains=termo) | Q(email__icontains=termo))
 
-    resultado = []
-    for u in qs:
-        ficha = rh.obter_ficha_rh(u)
-        resultado.append({
-            "id": str(u.id),
-            "matricula": u.codigo_matricula,
-            "nome": u.nome,
-            "iniciais": gerar_iniciais(u.nome),
-            "email": u.email or "—",
-            "cargo": u.cargo or "Colaborador",
-            "perfil": u.perfil,
-            "perfil_rotulo": PERFIS.get(u.perfil, u.perfil),
-            "dominio": "OPERACIONAL" if u.eh_operacional else "ADMINISTRATIVO",
-            "possui_pin": u.possui_pin_totem,
-            "possui_acesso_backoffice": u.possui_acesso_backoffice,
-            "setor_id": str(u.setor.id) if u.setor else None,
-            "setor_nome": u.setor.nome if u.setor else "Sem setor",
-            "centro_custo": u.setor.centro_custo if u.setor else "—",
-            "ativo": u.ativo,
-            "created_at": fmt(u.created_at, "%d/%m/%Y") if u.created_at else "—",
-            "tamanhos": ficha["tamanhos"],
-            "pin_provisorio": ficha["pin_provisorio"],
-            "historico_funcional": ficha["historico_funcional"],
-        })
-    return JsonResponse({"funcionarios": resultado})
+    return JsonResponse({
+        "funcionarios": [_func_json(u) for u in qs],
+        "funcoes": sorted(_catalogo_funcoes().values()),
+        "habilitacoes_catalogo": _listar_catalogo_habilitacoes(),
+    })
 
 
 def _extrair_tamanhos(dados):
@@ -109,11 +128,15 @@ def api_salvar_funcionario(request):
         matricula = texto(dados.get("matricula"), "Matrícula", obrigatorio=True, maximo=30).upper()
         email = texto(dados.get("email"), "E-mail", maximo=150).lower() or None
         cargo = texto(dados.get("cargo"), "Cargo", maximo=100)
+        funcao_informada = "funcao" in dados
+        funcao = texto(dados.get("funcao"), "Função", maximo=100) if funcao_informada else None
         perfil = texto(dados.get("perfil"), "Perfil").upper() or "COLABORADOR"
         pin = texto(dados.get("pin"), "PIN")
         tamanhos = _extrair_tamanhos(dados)
     except EntradaInvalida as e:
         return erro(str(e))
+
+    habilitacoes = dados.get("habilitacoes") if "habilitacoes" in dados else None
 
     if not re.fullmatch(r"[A-Z0-9-]+", matricula):
         return erro("Matrícula: use apenas letras, números e hífen.")
@@ -151,8 +174,10 @@ def api_salvar_funcionario(request):
     if func.pk == request.usuario.pk and perfil != "ADMIN":
         return erro("Você não pode remover o seu próprio perfil de Administrador.")
 
+    ficha_anterior = rh.obter_ficha_rh(func) if func.pk else {"funcao": "", "habilitacoes": []}
     perfil_anterior = func.perfil if func.pk else None
     cargo_anterior = (func.cargo or "").strip() if func.pk else ""
+    funcao_anterior = (ficha_anterior.get("funcao") or "").strip() if func.pk else ""
     setor_anterior = (func.setor.nome if func.setor else "") if func.pk else ""
     setor_id_anterior = func.setor_id if func.pk else None
     tinha_acesso = bool(func.pk and func.conta_id and func.conta.has_usable_password())
@@ -180,6 +205,7 @@ def api_salvar_funcionario(request):
         pin_provisorio = True if exigir_troca_pin else None
 
     cargo_novo = (func.cargo or "").strip()
+    funcao_nova = funcao if funcao is not None else funcao_anterior
     setor_novo = func.setor.nome if func.setor else ""
     evento_funcional = None
     if not func_id:
@@ -188,26 +214,42 @@ def api_salvar_funcionario(request):
             "descricao": f"Admissão de {func.nome} ({cargo_novo or 'Colaborador'})",
             "cargo_anterior": "",
             "cargo_novo": cargo_novo,
+            "funcao_anterior": "",
+            "funcao_novo": funcao_nova,
             "setor_anterior": "",
             "setor_novo": setor_novo,
         }
-    elif cargo_anterior.lower() != cargo_novo.lower() or setor_id_anterior != func.setor_id:
+    elif (
+        cargo_anterior.lower() != cargo_novo.lower()
+        or funcao_anterior.lower() != funcao_nova.lower()
+        or setor_id_anterior != func.setor_id
+    ):
         evento_funcional = {
             "acao": "MUDANCA_FUNCAO",
             "descricao": f"Mudança funcional: {cargo_anterior or 'Colaborador'} → {cargo_novo or 'Colaborador'}",
             "cargo_anterior": cargo_anterior,
             "cargo_novo": cargo_novo,
+            "funcao_anterior": funcao_anterior,
+            "funcao_novo": funcao_nova,
             "setor_anterior": setor_anterior,
             "setor_novo": setor_novo,
         }
 
-    if evento_funcional is not None or tamanhos or pin_provisorio is not None:
+    if (
+        evento_funcional is not None
+        or tamanhos
+        or pin_provisorio is not None
+        or funcao is not None
+        or habilitacoes is not None
+    ):
         rh.salvar_metadados_rh(
             request,
             func,
             tamanhos=tamanhos or None,
             pin_provisorio=pin_provisorio,
             evento_funcional=evento_funcional,
+            funcao=funcao,
+            habilitacoes=habilitacoes,
         )
 
     kit = None
@@ -249,8 +291,8 @@ def api_salvar_funcionario(request):
 @require_POST
 @api_backoffice("pessoas")
 def api_mudar_funcao_funcionario(request, funcionario_id):
-    """Registra promoção/mudança de função ou transferência de setor, gravando no
-    histórico da Ficha de EPI e opcionalmente gerando o kit da nova função."""
+    """Registra promoção/mudança de cargo, função operacional, habilitações ou transferência
+    de setor, gravando no histórico da Ficha de EPI e opcionalmente gerando o kit."""
     func = Usuario.objects.select_related("setor").filter(id=funcionario_id).first()
     if func is None:
         return erro("Funcionário não encontrado.", status=404)
@@ -259,16 +301,26 @@ def api_mudar_funcao_funcionario(request, funcionario_id):
     if erro_json:
         return erro_json
 
+    cargo_in = dados.get("novo_cargo") if "novo_cargo" in dados else dados.get("cargo")
+    funcao_in = dados.get("nova_funcao") if "nova_funcao" in dados else dados.get("funcao")
+
     try:
-        novo_cargo = texto(
-            dados.get("novo_cargo") if "novo_cargo" in dados else dados.get("cargo"),
-            "Novo cargo / função",
-            obrigatorio=True,
-            maximo=100,
+        novo_cargo = (
+            texto(cargo_in, "Novo cargo", maximo=100)
+            if cargo_in is not None
+            else (func.cargo or "").strip()
+        )
+        nova_funcao = (
+            texto(funcao_in, "Nova função", maximo=100)
+            if funcao_in is not None
+            else None
         )
         observacao = texto(dados.get("observacao"), "Observação", maximo=255)
     except EntradaInvalida as e:
         return erro(str(e))
+
+    if not novo_cargo and not (nova_funcao or ""):
+        return erro("Informe o novo cargo ou a nova função operacional.")
 
     novo_setor_id = dados.get("novo_setor_id") if "novo_setor_id" in dados else dados.get("setor_id")
     if novo_setor_id:
@@ -278,7 +330,10 @@ def api_mudar_funcao_funcionario(request, funcionario_id):
     else:
         novo_setor = func.setor
 
+    ficha_atual = rh.obter_ficha_rh(func)
     cargo_anterior = (func.cargo or "").strip()
+    funcao_anterior = (ficha_atual.get("funcao") or "").strip()
+    funcao_final = nova_funcao if nova_funcao is not None else funcao_anterior
     setor_anterior = func.setor.nome if func.setor else ""
     setor_novo = novo_setor.nome if novo_setor else ""
 
@@ -286,18 +341,29 @@ def api_mudar_funcao_funcionario(request, funcionario_id):
     func.setor = novo_setor
     func.save(update_fields=["cargo", "setor", "updated_at"])
 
-    descricao = f"Mudança de função: {cargo_anterior or 'Colaborador'} → {novo_cargo}"
+    partes_desc = []
+    if cargo_anterior.lower() != novo_cargo.lower() or not nova_funcao:
+        partes_desc.append(f"{cargo_anterior or 'Colaborador'} → {novo_cargo or 'Colaborador'}")
+    if nova_funcao is not None and funcao_anterior.lower() != funcao_final.lower():
+        partes_desc.append(f"Função: {funcao_anterior or '—'} → {funcao_final or '—'}")
+    descricao = "Mudança de função: " + (" · ".join(partes_desc) if partes_desc else novo_cargo)
     if observacao:
         descricao = f"{descricao} ({observacao})"
+
+    habilitacoes_in = dados.get("habilitacoes") if "habilitacoes" in dados else None
 
     rh.salvar_metadados_rh(
         request,
         func,
+        funcao=nova_funcao,
+        habilitacoes=habilitacoes_in,
         evento_funcional={
             "acao": "MUDANCA_FUNCAO",
             "descricao": descricao,
             "cargo_anterior": cargo_anterior,
             "cargo_novo": novo_cargo,
+            "funcao_anterior": funcao_anterior,
+            "funcao_novo": funcao_final,
             "setor_anterior": setor_anterior,
             "setor_novo": setor_novo,
             "observacao": observacao,
@@ -318,11 +384,13 @@ def api_mudar_funcao_funcionario(request, funcionario_id):
         descricao,
         cargo_anterior=cargo_anterior,
         cargo_novo=novo_cargo,
+        funcao_anterior=funcao_anterior,
+        funcao_novo=funcao_final,
         setor_anterior=setor_anterior,
         setor_novo=setor_novo,
     )
 
-    msg = f"Função de {func.nome} atualizada para {novo_cargo}."
+    msg = f"Função de {func.nome} atualizada para {novo_cargo or funcao_final}."
     if kit.get("gerado"):
         msg += f" Kit com {kit['quantidade_itens']} EPI(s) gerado para entrega."
     return JsonResponse({"sucesso": True, "mensagem": msg, "kit_gerado": kit})
@@ -363,6 +431,8 @@ def api_toggle_funcionario(request, funcionario_id):
     inativando = bool(func.ativo)
     resumo = None
     reservas_canceladas = 0
+    ficha_atual = rh.obter_ficha_rh(func)
+    funcao_atual = ficha_atual.get("funcao", "")
 
     with transaction.atomic():
         if inativando:
@@ -400,6 +470,8 @@ def api_toggle_funcionario(request, funcionario_id):
                     ),
                     "cargo_anterior": func.cargo or "",
                     "cargo_novo": func.cargo or "",
+                    "funcao_anterior": funcao_atual,
+                    "funcao_novo": funcao_atual,
                     "setor_anterior": func.setor.nome if func.setor else "",
                     "setor_novo": func.setor.nome if func.setor else "",
                     "resumo_desligamento": resumo,
@@ -414,6 +486,8 @@ def api_toggle_funcionario(request, funcionario_id):
                     "descricao": f"Reativação do cadastro de {func.nome}",
                     "cargo_anterior": func.cargo or "",
                     "cargo_novo": func.cargo or "",
+                    "funcao_anterior": funcao_atual,
+                    "funcao_novo": funcao_atual,
                     "setor_anterior": func.setor.nome if func.setor else "",
                     "setor_novo": func.setor.nome if func.setor else "",
                 },
@@ -441,7 +515,8 @@ def api_toggle_funcionario(request, funcionario_id):
 @require_POST
 @api_backoffice("pessoas")
 def api_importar_funcionarios_csv(request):
-    """Importa colaboradores em lote a partir de linhas CSV (`matricula;nome;cargo;setor;pin_inicial;calcado;luva;vestimenta`)."""
+    """Importa colaboradores em lote a partir de linhas CSV
+    (`matricula;nome;cargo;setor;pin_inicial;calcado;luva;vestimenta;funcao;habilitacoes`)."""
     dados, erro_json = ler_json(request)
     if erro_json:
         return erro_json
@@ -476,12 +551,26 @@ def api_importar_funcionarios_csv(request):
         if primeira in ("matricula", "matrícula", "codigo_matricula"):
             continue
 
-        matricula, nome, cargo, setor_txt, pin_inicial, calcado, luva, vestimenta = (colunas + [""] * 8)[:8]
+        (
+            matricula,
+            nome,
+            cargo,
+            setor_txt,
+            pin_inicial,
+            calcado,
+            luva,
+            vestimenta,
+            funcao_csv,
+            habilitacoes_csv,
+        ) = (colunas + [""] * 10)[:10]
+
         matricula = matricula.strip().upper()
         nome = nome.strip()
         cargo = cargo.strip()
         setor_txt = setor_txt.strip()
         pin_inicial = pin_inicial.strip()
+        funcao_csv = funcao_csv.strip()
+        habilitacoes_csv = habilitacoes_csv.strip()
 
         if not matricula or not nome:
             erros.append(f"Linha {idx}: matrícula e nome são obrigatórios.")
@@ -526,11 +615,15 @@ def api_importar_funcionarios_csv(request):
                 "descricao": f"Admissão via importação CSV ({func.cargo})",
                 "cargo_anterior": "",
                 "cargo_novo": func.cargo or "",
+                "funcao_anterior": "",
+                "funcao_novo": funcao_csv[:100],
                 "setor_anterior": "",
                 "setor_novo": setor.nome if setor else "",
             }
         else:
+            ficha_ant = rh.obter_ficha_rh(func)
             cargo_ant = func.cargo or ""
+            funcao_ant = ficha_ant.get("funcao", "")
             setor_ant = func.setor.nome if func.setor else ""
             func.nome = nome[:150]
             if cargo:
@@ -542,12 +635,18 @@ def api_importar_funcionarios_csv(request):
                 definir_pin(func, pin_para_definir)
             func.save()
             atualizados += 1
-            if (cargo and cargo.lower() != cargo_ant.lower()) or (setor and setor.nome != setor_ant):
+            if (
+                (cargo and cargo.lower() != cargo_ant.lower())
+                or (funcao_csv and funcao_csv.lower() != funcao_ant.lower())
+                or (setor and setor.nome != setor_ant)
+            ):
                 evento = {
                     "acao": "MUDANCA_FUNCAO",
                     "descricao": f"Atualização funcional via CSV: {cargo_ant or '—'} → {func.cargo or '—'}",
                     "cargo_anterior": cargo_ant,
                     "cargo_novo": func.cargo or "",
+                    "funcao_anterior": funcao_ant,
+                    "funcao_novo": funcao_csv[:100] if funcao_csv else funcao_ant,
                     "setor_anterior": setor_ant,
                     "setor_novo": func.setor.nome if func.setor else "",
                 }
@@ -568,6 +667,8 @@ def api_importar_funcionarios_csv(request):
             tamanhos=tamanhos_csv or None,
             pin_provisorio=bool(exigir_troca_pin) if (eh_novo or pin_para_definir) else None,
             evento_funcional=evento,
+            funcao=funcao_csv[:100] if funcao_csv else None,
+            habilitacoes=habilitacoes_csv if habilitacoes_csv else None,
         )
 
         if gerar_kit:
@@ -617,13 +718,7 @@ def _gerar_matricula_administrativa():
 @require_POST
 @api_backoffice("pessoas")
 def api_salvar_usuario_backoffice(request):
-    """Cadastra ou atualiza um usuário administrativo do Backoffice / RBAC (RF-08, RF-09).
-
-    Isola o Domínio 2 (Governança / Backoffice):
-    - Exige perfil administrativo (`PERFIS_BACKOFFICE`) e e-mail corporativo válido.
-    - Não exige PIN de totem (pois operadores puramente administrativos autenticam-se
-      exclusivamente via e-mail + senha pessoal criada por link tokenizado).
-    """
+    """Cadastra ou atualiza um usuário administrativo do Backoffice / RBAC (RF-08, RF-09)."""
     dados, erro_json = ler_json(request)
     if erro_json:
         return erro_json
@@ -959,14 +1054,21 @@ def api_toggle_fornecedor(request, fornecedor_id):
 # ============================================================================
 def _regra_json(r, mapa_funcionarios=None):
     cargo_raw = (r.cargo or "").strip()
-    eh_funcionario = cargo_raw.upper().startswith(PREFIXO_FUNCIONARIO)
+    upper = cargo_raw.upper()
+    eh_funcionario = upper.startswith(PREFIXO_FUNCIONARIO)
+    eh_habilitacao = upper.startswith(PREFIXO_HABILITACAO)
+    eh_funcao = upper.startswith(PREFIXO_FUNCAO)
+
     funcionario_id = None
     funcionario_nome = None
-    cargo_exibicao = cargo_raw or None
+    cargo_exibicao = None
+    funcao_exibicao = None
+    habilitacao_exibicao = None
+    escopo_tipo = "SETOR"
 
     if eh_funcionario:
+        escopo_tipo = "FUNCIONARIO"
         matricula = cargo_raw[len(PREFIXO_FUNCIONARIO):].strip().upper()
-        cargo_exibicao = None
         func = (
             mapa_funcionarios.get(matricula)
             if mapa_funcionarios is not None
@@ -977,6 +1079,15 @@ def _regra_json(r, mapa_funcionarios=None):
             funcionario_nome = f"{func.nome} ({func.codigo_matricula})"
         else:
             funcionario_nome = f"Matrícula {matricula}"
+    elif eh_habilitacao:
+        escopo_tipo = "HABILITACAO"
+        habilitacao_exibicao = cargo_raw[len(PREFIXO_HABILITACAO):].strip()
+    elif eh_funcao:
+        escopo_tipo = "FUNCAO"
+        funcao_exibicao = cargo_raw[len(PREFIXO_FUNCAO):].strip()
+    elif cargo_raw:
+        escopo_tipo = "CARGO"
+        cargo_exibicao = cargo_raw
 
     return {
         "id": str(r.id),
@@ -985,7 +1096,10 @@ def _regra_json(r, mapa_funcionarios=None):
         "tipo": "EPI" if r.produto.eh_epi else "Consumível",
         "setor_id": str(r.setor_id) if r.setor_id else None,
         "setor": r.setor.nome if r.setor else None,
+        "escopo_tipo": escopo_tipo,
         "cargo": cargo_exibicao,
+        "funcao": funcao_exibicao,
+        "habilitacao": habilitacao_exibicao,
         "funcionario_id": funcionario_id,
         "funcionario": funcionario_nome,
         "limite_mensal": r.limite_mensal,
@@ -1002,6 +1116,7 @@ def api_listar_regras(request):
     regras = RegraFornecimento.objects.select_related("produto__categoria", "setor").order_by("produto__nome", "cargo")
     funcionarios_ativos = list(Usuario.objects.filter(ativo=True).order_by("nome"))
     mapa_func = {u.codigo_matricula.upper(): u for u in funcionarios_ativos}
+    hab_catalogo = _listar_catalogo_habilitacoes()
     return JsonResponse({
         "regras": [_regra_json(r, mapa_func) for r in regras],
         "produtos": [{"id": str(p.id), "nome": p.nome} for p in Produto.objects.filter(ativo=True).order_by("nome")],
@@ -1010,6 +1125,9 @@ def api_listar_regras(request):
             for s in Setor.objects.filter(ativo=True).order_by("nome")
         ],
         "cargos": sorted(_catalogo_cargos().values()),
+        "funcoes": sorted(_catalogo_funcoes().values()),
+        "habilitacoes": [h["habilitacao"] for h in hab_catalogo],
+        "habilitacoes_catalogo": hab_catalogo,
         "funcionarios": [
             {"id": str(u.id), "matricula": u.codigo_matricula, "nome": f"{u.nome} ({u.codigo_matricula})"}
             for u in funcionarios_ativos
@@ -1030,6 +1148,8 @@ def api_salvar_regra(request):
     funcionario = Usuario.objects.filter(id=dados.get("funcionario_id")).first() if dados.get("funcionario_id") else None
     try:
         cargo = texto(dados.get("cargo"), "Cargo", maximo=100)
+        funcao = texto(dados.get("funcao"), "Função", maximo=100)
+        habilitacao = texto(dados.get("habilitacao"), "Habilitação", maximo=100)
         limite = inteiro(dados.get("limite_mensal"), "Limite mensal", minimo=0, maximo=10000) \
             if dados.get("limite_mensal") not in (None, "") else None
         periodicidade = inteiro(dados.get("periodicidade_dias"), "Periodicidade", minimo=1, maximo=3650) \
@@ -1038,10 +1158,24 @@ def api_salvar_regra(request):
         return erro(str(e))
 
     if funcionario is not None:
-        cargo = f"{PREFIXO_FUNCIONARIO}{funcionario.codigo_matricula}"
+        alvo_cargo = f"{PREFIXO_FUNCIONARIO}{funcionario.codigo_matricula}"
+    elif habilitacao:
+        alvo_cargo = (
+            habilitacao
+            if habilitacao.upper().startswith(PREFIXO_HABILITACAO)
+            else f"{PREFIXO_HABILITACAO}{habilitacao}"
+        )
+    elif funcao:
+        alvo_cargo = (
+            funcao
+            if funcao.upper().startswith(PREFIXO_FUNCAO)
+            else f"{PREFIXO_FUNCAO}{funcao}"
+        )
+    else:
+        alvo_cargo = cargo
 
-    if not setor and not cargo:
-        return erro("Defina o escopo: um setor, um cargo/função ou um funcionário.")
+    if not setor and not alvo_cargo:
+        return erro("Defina o escopo: um setor, um cargo, uma função, uma habilitação ou um funcionário.")
     if limite is None and periodicidade is None:
         return erro("Informe o limite mensal, a periodicidade ou ambos.")
 
@@ -1049,11 +1183,11 @@ def api_salvar_regra(request):
     regra = RegraFornecimento.objects.filter(id=regra_id).first() if regra_id else RegraFornecimento(ativo=True)
     if regra_id and regra is None:
         return erro("Regra não encontrada.", status=404)
-    duplicada = RegraFornecimento.objects.filter(produto=produto, setor=setor, cargo__iexact=cargo, ativo=True) \
+    duplicada = RegraFornecimento.objects.filter(produto=produto, setor=setor, cargo__iexact=alvo_cargo, ativo=True) \
         .exclude(pk=regra.pk).exists()
     if duplicada:
         return erro("Já existe uma regra ativa para este produto com o mesmo escopo.")
-    regra.produto, regra.setor, regra.cargo = produto, setor, cargo
+    regra.produto, regra.setor, regra.cargo = produto, setor, alvo_cargo
     regra.limite_mensal, regra.periodicidade_dias = limite, periodicidade
     regra.save()
     registrar(request, "REGRA_ATUALIZADA" if regra_id else "REGRA_CADASTRADA", regra, str(regra),
@@ -1074,8 +1208,13 @@ def api_toggle_regra(request, regra_id):
 
 
 # ============================================================================
-# CARGOS E FUNÇÕES (RF-03, RF-04)
+# CARGOS (RF-03), FUNÇÕES (RF-04) E HABILITAÇÕES DE RISCO / NRs
 # ============================================================================
+def _eh_prefixado_especial(valor):
+    upper = (valor or "").strip().upper()
+    return upper.startswith((PREFIXO_FUNCIONARIO, PREFIXO_FUNCAO, PREFIXO_HABILITACAO))
+
+
 def _catalogo_cargos():
     """Devolve um dicionário {chave_lower: nome_exibicao} combinando o catálogo de
     cargos gerenciados, os cargos atribuídos a funcionários e as políticas de fornecimento."""
@@ -1101,50 +1240,216 @@ def _catalogo_cargos():
     for cargo_regra in RegraFornecimento.objects.filter(ativo=True).exclude(cargo="") \
             .values_list("cargo", flat=True):
         limpo = cargo_regra.strip()
-        if limpo and not limpo.upper().startswith(PREFIXO_FUNCIONARIO):
+        if limpo and not _eh_prefixado_especial(limpo):
             catalogo.setdefault(limpo.lower(), limpo)
 
     return catalogo
 
 
-def _registrar_evento_cargo(request, acao, descricao, **detalhes):
+def _catalogo_funcoes(fichas_ativos=None):
+    """Devolve um dicionário {chave_lower: nome_exibicao} com as Funções Operacionais (RF-04)."""
+    catalogo = {}
+
+    for evento in RegistroAuditoria.objects.filter(entidade="Funcao").order_by("data", "id"):
+        detalhes = evento.detalhes if isinstance(evento.detalhes, dict) else {}
+        nome = (detalhes.get("funcao") or "").strip()
+        anterior = (detalhes.get("funcao_anterior") or "").strip()
+        if evento.acao in ("FUNCAO_CADASTRADA", "FUNCAO_ATUALIZADA") and nome:
+            if anterior and anterior.lower() in catalogo:
+                catalogo.pop(anterior.lower(), None)
+            catalogo[nome.lower()] = nome
+        elif evento.acao == "FUNCAO_EXCLUIDA" and nome:
+            catalogo.pop(nome.lower(), None)
+
+    if fichas_ativos is None:
+        fichas_ativos = [rh.obter_ficha_rh(u) for u in Usuario.objects.filter(ativo=True)]
+
+    for ficha in fichas_ativos:
+        fn = (ficha.get("funcao") or "").strip()
+        if fn:
+            catalogo.setdefault(fn.lower(), fn)
+
+    for cargo_regra in RegraFornecimento.objects.filter(ativo=True).exclude(cargo="") \
+            .values_list("cargo", flat=True):
+        limpo = cargo_regra.strip()
+        if limpo.upper().startswith(PREFIXO_FUNCAO):
+            fn = limpo[len(PREFIXO_FUNCAO):].strip()
+            if fn:
+                catalogo.setdefault(fn.lower(), fn)
+
+    return catalogo
+
+
+def _catalogo_habilitacoes(fichas_ativos=None):
+    """Devolve um dicionário {chave_lower: {"habilitacao": nome, "exige_validade": bool, "descricao": str}}."""
+    catalogo = {
+        nome.lower(): {
+            "habilitacao": nome,
+            "exige_validade": exige_val,
+            "descricao": desc,
+        }
+        for nome, exige_val, desc in HABILITACOES_PADRAO
+    }
+
+    for evento in RegistroAuditoria.objects.filter(entidade="Habilitacao").order_by("data", "id"):
+        detalhes = evento.detalhes if isinstance(evento.detalhes, dict) else {}
+        nome = (detalhes.get("habilitacao") or "").strip()
+        anterior = (detalhes.get("habilitacao_anterior") or "").strip()
+        if evento.acao in ("HABILITACAO_CADASTRADA", "HABILITACAO_ATUALIZADA") and nome:
+            if anterior and anterior.lower() in catalogo:
+                catalogo.pop(anterior.lower(), None)
+            catalogo[nome.lower()] = {
+                "habilitacao": nome,
+                "exige_validade": bool(detalhes.get("exige_validade", True)),
+                "descricao": (detalhes.get("descricao") or "").strip(),
+            }
+        elif evento.acao == "HABILITACAO_EXCLUIDA" and nome:
+            catalogo.pop(nome.lower(), None)
+
+    if fichas_ativos is None:
+        fichas_ativos = [rh.obter_ficha_rh(u) for u in Usuario.objects.filter(ativo=True)]
+
+    for ficha in fichas_ativos:
+        for h in ficha.get("habilitacoes") or []:
+            nome = (h.get("nome") or "").strip()
+            if nome:
+                catalogo.setdefault(
+                    nome.lower(),
+                    {"habilitacao": nome, "exige_validade": True, "descricao": ""},
+                )
+
+    for cargo_regra in RegraFornecimento.objects.filter(ativo=True).exclude(cargo="") \
+            .values_list("cargo", flat=True):
+        limpo = cargo_regra.strip()
+        if limpo.upper().startswith(PREFIXO_HABILITACAO):
+            nome = limpo[len(PREFIXO_HABILITACAO):].strip()
+            if nome:
+                catalogo.setdefault(
+                    nome.lower(),
+                    {"habilitacao": nome, "exige_validade": True, "descricao": ""},
+                )
+
+    return catalogo
+
+
+def _listar_catalogo_habilitacoes(fichas_ativos=None):
+    cat = _catalogo_habilitacoes(fichas_ativos=fichas_ativos)
+    return sorted(cat.values(), key=lambda x: x["habilitacao"].lower())
+
+
+def _registrar_evento_catalogo(request, entidade, acao, identificador, descricao, **detalhes):
     usuario = getattr(request, "usuario", None)
     RegistroAuditoria.objects.create(
         usuario=usuario,
         usuario_nome=usuario.nome if usuario else "",
         acao=acao,
-        entidade="Cargo",
-        entidade_id=(detalhes.get("cargo") or "")[:64],
+        entidade=entidade,
+        entidade_id=(identificador or "")[:64],
         descricao=descricao[:255],
         detalhes=detalhes,
         ip=ip_da_requisicao(request) if request is not None else None,
     )
 
 
+def _registrar_evento_cargo(request, acao, descricao, **detalhes):
+    _registrar_evento_catalogo(
+        request, "Cargo", acao, detalhes.get("cargo") or "", descricao, **detalhes
+    )
+
+
 @require_GET
 @api_backoffice("ver")
 def api_listar_cargos(request):
-    """Lista todos os cargos/funções da organização, quantos funcionários ativos têm
-    e quais EPIs/consumíveis as políticas vinculam a cada um (RF-03, RF-04)."""
-    catalogo = _catalogo_cargos()
-    contagem = {
+    """Lista as 3 categorias ocupacionais da organização:
+    1. Cargos contratuais (RF-03)
+    2. Funções / Atividades operacionais (RF-04)
+    3. Habilitações & Credenciais de Risco / NRs com validade."""
+    usuarios_ativos = list(Usuario.objects.select_related("setor").filter(ativo=True))
+    fichas_por_id = {u.id: rh.obter_ficha_rh(u) for u in usuarios_ativos}
+    lista_fichas = list(fichas_por_id.values())
+
+    catalogo_cargos = _catalogo_cargos()
+    catalogo_funcoes = _catalogo_funcoes(fichas_ativos=lista_fichas)
+    catalogo_hab = _catalogo_habilitacoes(fichas_ativos=lista_fichas)
+
+    contagem_cargos = {
         chave: {"cargo": nome, "total": 0, "setores": set()}
-        for chave, nome in catalogo.items()
+        for chave, nome in catalogo_cargos.items()
+    }
+    contagem_funcoes = {
+        chave: {"funcao": nome, "total": 0, "setores": set()}
+        for chave, nome in catalogo_funcoes.items()
+    }
+    contagem_hab = {
+        chave: {
+            "habilitacao": info["habilitacao"],
+            "exige_validade": info["exige_validade"],
+            "descricao": info["descricao"],
+            "total": 0,
+            "vencidas": 0,
+            "setores": set(),
+        }
+        for chave, info in catalogo_hab.items()
     }
 
-    for cargo, setor in Usuario.objects.filter(ativo=True).exclude(cargo__isnull=True).exclude(cargo="") \
-            .values_list("cargo", "setor__nome"):
-        chave = cargo.strip().lower()
-        item = contagem.setdefault(chave, {"cargo": cargo.strip(), "total": 0, "setores": set()})
-        item["total"] += 1
-        if setor:
-            item["setores"].add(setor)
+    for u in usuarios_ativos:
+        setor_nome = u.setor.nome if u.setor else None
+        cargo_u = (u.cargo or "").strip()
+        if cargo_u:
+            ch_c = cargo_u.lower()
+            item_c = contagem_cargos.setdefault(ch_c, {"cargo": cargo_u, "total": 0, "setores": set()})
+            item_c["total"] += 1
+            if setor_nome:
+                item_c["setores"].add(setor_nome)
+
+        ficha = fichas_por_id[u.id]
+        funcao_u = (ficha.get("funcao") or "").strip()
+        if funcao_u:
+            ch_f = funcao_u.lower()
+            item_f = contagem_funcoes.setdefault(ch_f, {"funcao": funcao_u, "total": 0, "setores": set()})
+            item_f["total"] += 1
+            if setor_nome:
+                item_f["setores"].add(setor_nome)
+
+        for h in ficha.get("habilitacoes") or []:
+            nome_h = (h.get("nome") or "").strip()
+            if not nome_h:
+                continue
+            ch_h = nome_h.lower()
+            item_h = contagem_hab.setdefault(
+                ch_h,
+                {
+                    "habilitacao": nome_h,
+                    "exige_validade": True,
+                    "descricao": "",
+                    "total": 0,
+                    "vencidas": 0,
+                    "setores": set(),
+                },
+            )
+            item_h["total"] += 1
+            if h.get("vencida"):
+                item_h["vencidas"] += 1
+            if setor_nome:
+                item_h["setores"].add(setor_nome)
 
     regras = RegraFornecimento.objects.filter(ativo=True).exclude(cargo="").select_related("produto")
-    epis = {}
+    epis_cargo = {}
+    epis_funcao = {}
+    epis_hab = {}
     for r in regras:
-        if not r.cargo.upper().startswith(PREFIXO_FUNCIONARIO):
-            epis.setdefault(r.cargo.strip().lower(), set()).add(r.produto.nome)
+        raw = (r.cargo or "").strip()
+        up = raw.upper()
+        if up.startswith(PREFIXO_FUNCIONARIO):
+            continue
+        if up.startswith(PREFIXO_HABILITACAO):
+            chave = raw[len(PREFIXO_HABILITACAO):].strip().lower()
+            epis_hab.setdefault(chave, set()).add(r.produto.nome)
+        elif up.startswith(PREFIXO_FUNCAO):
+            chave = raw[len(PREFIXO_FUNCAO):].strip().lower()
+            epis_funcao.setdefault(chave, set()).add(r.produto.nome)
+        else:
+            epis_cargo.setdefault(raw.lower(), set()).add(r.produto.nome)
 
     return JsonResponse({
         "cargos": [
@@ -1152,27 +1457,285 @@ def api_listar_cargos(request):
                 "cargo": c["cargo"],
                 "total_funcionarios": c["total"],
                 "setores": sorted(c["setores"]),
-                "produtos_vinculados": sorted(epis.get(c["cargo"].lower(), set())),
+                "produtos_vinculados": sorted(epis_cargo.get(c["cargo"].lower(), set())),
             }
-            for c in sorted(contagem.values(), key=lambda x: x["cargo"].lower())
-        ]
+            for c in sorted(contagem_cargos.values(), key=lambda x: x["cargo"].lower())
+        ],
+        "funcoes": [
+            {
+                "funcao": f["funcao"],
+                "total_funcionarios": f["total"],
+                "setores": sorted(f["setores"]),
+                "produtos_vinculados": sorted(epis_funcao.get(f["funcao"].lower(), set())),
+            }
+            for f in sorted(contagem_funcoes.values(), key=lambda x: x["funcao"].lower())
+        ],
+        "habilitacoes": [
+            {
+                "habilitacao": h["habilitacao"],
+                "exige_validade": h["exige_validade"],
+                "descricao": h["descricao"],
+                "total_funcionarios": h["total"],
+                "vencidas": h["vencidas"],
+                "setores": sorted(h["setores"]),
+                "produtos_vinculados": sorted(epis_hab.get(h["habilitacao"].lower(), set())),
+            }
+            for h in sorted(contagem_hab.values(), key=lambda x: x["habilitacao"].lower())
+        ],
     })
 
 
 @require_POST
 @api_backoffice("pessoas")
-def api_salvar_cargo(request):
-    """Cadastra um novo cargo/função ou renomeia um existente atualizando funcionários e políticas (RF-03, RF-04)."""
+def api_salvar_funcao(request):
+    """Cadastra uma nova função operacional (RF-04) ou renomeia uma existente."""
     dados, erro_json = ler_json(request)
     if erro_json:
         return erro_json
+    try:
+        nome = texto(
+            dados.get("funcao") or dados.get("nome") or dados.get("cargo"),
+            "Nome da função operacional",
+            obrigatorio=True,
+            maximo=100,
+        )
+        original = texto(
+            dados.get("funcao_original") or dados.get("cargo_original") or dados.get("original"),
+            "Função original",
+            maximo=100,
+        )
+    except EntradaInvalida as e:
+        return erro(str(e))
+
+    if _eh_prefixado_especial(nome):
+        return erro("Nome de função reservado pelo sistema.")
+
+    catalogo = _catalogo_funcoes()
+    chave_nova = nome.lower()
+    chave_original = original.lower() if original else ""
+
+    if not original:
+        if chave_nova in catalogo:
+            return erro("Já existe uma função operacional cadastrada com este nome.")
+        _registrar_evento_catalogo(
+            request,
+            "Funcao",
+            "FUNCAO_CADASTRADA",
+            nome,
+            f"Cadastrou a função operacional '{nome}'",
+            funcao=nome,
+        )
+        return JsonResponse({"sucesso": True, "mensagem": "Função operacional cadastrada com sucesso.", "funcao": nome})
+
+    if chave_nova != chave_original and chave_nova in catalogo:
+        return erro("Já existe outra função operacional com este nome.")
+
+    with transaction.atomic():
+        regras_afetadas = RegraFornecimento.objects.filter(
+            cargo__iexact=f"{PREFIXO_FUNCAO}{original}"
+        ).update(cargo=f"{PREFIXO_FUNCAO}{nome}")
+        funcionarios_afetados = 0
+        for u in Usuario.objects.filter(ativo=True):
+            ficha = rh.obter_ficha_rh(u)
+            if (ficha.get("funcao") or "").strip().lower() == chave_original:
+                rh.salvar_metadados_rh(request, u, funcao=nome)
+                funcionarios_afetados += 1
+
+        _registrar_evento_catalogo(
+            request,
+            "Funcao",
+            "FUNCAO_ATUALIZADA",
+            nome,
+            f"Renomeou a função operacional '{original}' para '{nome}'",
+            funcao=nome,
+            funcao_anterior=original,
+            funcionarios_afetados=funcionarios_afetados,
+            regras_afetadas=regras_afetadas,
+        )
+    return JsonResponse({"sucesso": True, "mensagem": "Função operacional atualizada com sucesso.", "funcao": nome})
+
+
+@require_POST
+@api_backoffice("pessoas")
+def api_excluir_funcao(request):
+    """Remove uma função operacional do catálogo desde que não possua colaboradores ativos vinculados."""
+    dados, erro_json = ler_json(request)
+    if erro_json:
+        return erro_json
+    try:
+        nome = texto(
+            dados.get("funcao") or dados.get("nome") or dados.get("cargo"),
+            "Função operacional",
+            obrigatorio=True,
+            maximo=100,
+        )
+    except EntradaInvalida as e:
+        return erro(str(e))
+
+    chave = nome.lower()
+    for u in Usuario.objects.filter(ativo=True):
+        ficha = rh.obter_ficha_rh(u)
+        if (ficha.get("funcao") or "").strip().lower() == chave:
+            return erro("Não é possível remover uma função que possui colaboradores ativos vinculados.", status=409)
+
+    with transaction.atomic():
+        RegraFornecimento.objects.filter(cargo__iexact=f"{PREFIXO_FUNCAO}{nome}").delete()
+        _registrar_evento_catalogo(
+            request,
+            "Funcao",
+            "FUNCAO_EXCLUIDA",
+            nome,
+            f"Removeu a função operacional '{nome}'",
+            funcao=nome,
+        )
+    return JsonResponse({"sucesso": True, "mensagem": f"Função operacional '{nome}' removida."})
+
+
+@require_POST
+@api_backoffice("pessoas")
+def api_salvar_habilitacao(request):
+    """Cadastra ou edita uma Habilitação / Credencial de Risco (NR / Licença)."""
+    dados, erro_json = ler_json(request)
+    if erro_json:
+        return erro_json
+    try:
+        nome = texto(
+            dados.get("habilitacao") or dados.get("nome") or dados.get("cargo"),
+            "Habilitação / NR",
+            obrigatorio=True,
+            maximo=80,
+        )
+        original = texto(
+            dados.get("habilitacao_original") or dados.get("cargo_original") or dados.get("original"),
+            "Habilitação original",
+            maximo=80,
+        )
+        descricao = texto(dados.get("descricao"), "Descrição", maximo=200)
+    except EntradaInvalida as e:
+        return erro(str(e))
+
+    if _eh_prefixado_especial(nome):
+        return erro("Nome reservado pelo sistema.")
+
+    exige_validade = bool(dados.get("exige_validade", True))
+    catalogo = _catalogo_habilitacoes()
+    chave_nova = nome.lower()
+    chave_original = original.lower() if original else ""
+
+    if not original:
+        _registrar_evento_catalogo(
+            request,
+            "Habilitacao",
+            "HABILITACAO_CADASTRADA",
+            nome,
+            f"Cadastrou a habilitação/NR '{nome}'",
+            habilitacao=nome,
+            exige_validade=exige_validade,
+            descricao=descricao,
+        )
+        return JsonResponse({
+            "sucesso": True,
+            "mensagem": "Habilitação / NR salva com sucesso.",
+            "habilitacao": nome,
+        })
+
+    if chave_nova != chave_original and chave_nova in catalogo:
+        return erro("Já existe outra habilitação cadastrada com este nome.")
+
+    with transaction.atomic():
+        if chave_nova != chave_original:
+            RegraFornecimento.objects.filter(
+                cargo__iexact=f"{PREFIXO_HABILITACAO}{original}"
+            ).update(cargo=f"{PREFIXO_HABILITACAO}{nome}")
+            for u in Usuario.objects.filter(ativo=True):
+                ficha = rh.obter_ficha_rh(u)
+                habs = ficha.get("habilitacoes") or []
+                if any((h.get("nome") or "").strip().lower() == chave_original for h in habs):
+                    novas = [
+                        {"nome": nome if (h.get("nome") or "").strip().lower() == chave_original else h["nome"],
+                         "validade": h.get("validade") or ""}
+                        for h in habs
+                    ]
+                    rh.salvar_metadados_rh(request, u, habilitacoes=novas)
+
+        _registrar_evento_catalogo(
+            request,
+            "Habilitacao",
+            "HABILITACAO_ATUALIZADA",
+            nome,
+            f"Atualizou a habilitação/NR '{original}' para '{nome}'",
+            habilitacao=nome,
+            habilitacao_anterior=original,
+            exige_validade=exige_validade,
+            descricao=descricao,
+        )
+    return JsonResponse({
+        "sucesso": True,
+        "mensagem": "Habilitação / NR atualizada com sucesso.",
+        "habilitacao": nome,
+    })
+
+
+@require_POST
+@api_backoffice("pessoas")
+def api_excluir_habilitacao(request):
+    """Remove uma Habilitação / NR do catálogo desde que não possua colaboradores ativos vinculados."""
+    dados, erro_json = ler_json(request)
+    if erro_json:
+        return erro_json
+    try:
+        nome = texto(
+            dados.get("habilitacao") or dados.get("nome") or dados.get("cargo"),
+            "Habilitação / NR",
+            obrigatorio=True,
+            maximo=80,
+        )
+    except EntradaInvalida as e:
+        return erro(str(e))
+
+    chave = nome.lower()
+    for u in Usuario.objects.filter(ativo=True):
+        ficha = rh.obter_ficha_rh(u)
+        if any((h.get("nome") or "").strip().lower() == chave for h in (ficha.get("habilitacoes") or [])):
+            return erro(
+                "Não é possível remover uma habilitação que possui colaboradores ativos vinculados.",
+                status=409,
+            )
+
+    with transaction.atomic():
+        RegraFornecimento.objects.filter(cargo__iexact=f"{PREFIXO_HABILITACAO}{nome}").delete()
+        _registrar_evento_catalogo(
+            request,
+            "Habilitacao",
+            "HABILITACAO_EXCLUIDA",
+            nome,
+            f"Removeu a habilitação/NR '{nome}'",
+            habilitacao=nome,
+        )
+    return JsonResponse({"sucesso": True, "mensagem": f"Habilitação / NR '{nome}' removida."})
+
+
+@require_POST
+@api_backoffice("pessoas")
+def api_salvar_cargo(request):
+    """Cadastra um novo cargo (RF-03) ou delega para Função/Habilitação quando `tipo` é informado."""
+    dados, erro_json = ler_json(request)
+    if erro_json:
+        return erro_json
+
+    tipo = (dados.get("tipo") or "CARGO").strip().upper()
+    if tipo == "FUNCAO":
+        return api_salvar_funcao(request)
+    if tipo == "HABILITACAO":
+        return api_salvar_habilitacao(request)
+
     try:
         nome = texto(dados.get("cargo"), "Nome do cargo / função", obrigatorio=True, maximo=100)
         original = texto(dados.get("cargo_original"), "Cargo original", maximo=100)
     except EntradaInvalida as e:
         return erro(str(e))
 
-    if nome.upper().startswith(PREFIXO_FUNCIONARIO):
+    if _eh_prefixado_especial(nome):
         return erro("Nome de cargo reservado pelo sistema.")
 
     catalogo = _catalogo_cargos()
@@ -1211,10 +1774,17 @@ def api_salvar_cargo(request):
 @require_POST
 @api_backoffice("pessoas")
 def api_excluir_cargo(request):
-    """Remove um cargo/função do catálogo desde que não possua funcionários ativos vinculados (RF-03, RF-04)."""
+    """Remove um cargo do catálogo desde que não possua funcionários ativos vinculados (RF-03)."""
     dados, erro_json = ler_json(request)
     if erro_json:
         return erro_json
+
+    tipo = (dados.get("tipo") or "CARGO").strip().upper()
+    if tipo == "FUNCAO":
+        return api_excluir_funcao(request)
+    if tipo == "HABILITACAO":
+        return api_excluir_habilitacao(request)
+
     try:
         nome = texto(dados.get("cargo"), "Cargo / função", obrigatorio=True, maximo=100)
     except EntradaInvalida as e:

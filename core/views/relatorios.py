@@ -267,6 +267,8 @@ def api_ficha_epi(request, funcionario_id):
             "nome": colaborador.nome,
             "matricula": colaborador.codigo_matricula,
             "cargo": colaborador.cargo or "",
+            "funcao": ficha_rh.get("funcao", ""),
+            "habilitacoes": ficha_rh.get("habilitacoes", []),
             "setor": colaborador.setor.nome if colaborador.setor else "",
             "centro_custo": colaborador.setor.centro_custo if colaborador.setor else "",
             "ativo": colaborador.ativo,

@@ -2,10 +2,8 @@
    SupplyFlow — Políticas de Fornecimento (RF-12, RF-13, RF-14)
    ---------------------------------------------------------------------
    Define limites mensais e periodicidade de troca específicos por
-   setor/centro de custo, cargo/função ou funcionário individual.
-   Quando mais de uma política se aplica ao mesmo funcionário, o
-   servidor prioriza a mais específica:
-   Funcionário > (Setor + Cargo) > (Somente Cargo) > (Somente Setor) > Padrão.
+   setor/centro de custo, cargo (RH), função/atividade (SST),
+   habilitação/credencial NR (SST) ou funcionário individual.
    ===================================================================== */
 
 (function () {
@@ -37,10 +35,16 @@
     if (regra.cargo) {
       partesEscopo.push("Cargo: " + regra.cargo);
     }
+    if (regra.funcao) {
+      partesEscopo.push("Função: " + regra.funcao);
+    }
+    if (regra.habilitacao) {
+      partesEscopo.push("Habilitação/NR: " + regra.habilitacao);
+    }
     if (regra.funcionario) {
       partesEscopo.push("Funcionário: " + regra.funcionario);
     }
-    var textoEscopo = partesEscopo.join(" · ");
+    var textoEscopo = partesEscopo.join(" · ") || "—";
 
     var htmlLimiteMensal;
     if (regra.limite_mensal != null) {
@@ -98,9 +102,26 @@
         if (selectFunc) {
           selectFunc.innerHTML = montarOpcoesSelect(dados.funcionarios || [], "Qualquer funcionário do escopo");
         }
-        document.getElementById("lista-cargos").innerHTML = (dados.cargos || []).map(function (cargo) {
-          return '<option value="' + escapar(cargo) + '">';
+        document.getElementById("lista-cargos").innerHTML = (dados.cargos || []).map(function (item) {
+          var valor = typeof item === "string" ? item : (item.cargo || item.nome || "");
+          return '<option value="' + escapar(valor) + '">';
         }).join("");
+
+        var datalistFuncoes = document.getElementById("lista-funcoes");
+        if (datalistFuncoes) {
+          datalistFuncoes.innerHTML = (dados.funcoes || []).map(function (item) {
+            var valor = typeof item === "string" ? item : (item.funcao || item.nome || "");
+            return '<option value="' + escapar(valor) + '">';
+          }).join("");
+        }
+
+        var datalistHabs = document.getElementById("lista-habilitacoes");
+        if (datalistHabs) {
+          datalistHabs.innerHTML = (dados.habilitacoes || []).map(function (item) {
+            var valor = typeof item === "string" ? item : (item.habilitacao || item.nome || "");
+            return '<option value="' + escapar(valor) + '">';
+          }).join("");
+        }
 
         var corpo = document.getElementById("corpo-regras");
         if (regras.length === 0) {
@@ -122,6 +143,14 @@
       document.getElementById("regra-produto").value = regra.produto_id;
       document.getElementById("regra-setor").value = regra.setor_id || "";
       document.getElementById("regra-cargo").value = regra.cargo || "";
+      var campoFuncao = document.getElementById("regra-funcao");
+      if (campoFuncao) {
+        campoFuncao.value = regra.funcao || "";
+      }
+      var campoHab = document.getElementById("regra-habilitacao");
+      if (campoHab) {
+        campoHab.value = regra.habilitacao || "";
+      }
       var selectFunc = document.getElementById("regra-funcionario");
       if (selectFunc) {
         selectFunc.value = regra.funcionario_id || "";
@@ -159,11 +188,15 @@
   form.addEventListener("submit", function (evento) {
     evento.preventDefault();
     var selectFunc = document.getElementById("regra-funcionario");
+    var campoFuncao = document.getElementById("regra-funcao");
+    var campoHab = document.getElementById("regra-habilitacao");
     var dadosFormulario = {
       id: document.getElementById("regra-id").value || null,
       produto_id: document.getElementById("regra-produto").value,
       setor_id: document.getElementById("regra-setor").value || null,
       cargo: document.getElementById("regra-cargo").value.trim(),
+      funcao: campoFuncao ? campoFuncao.value.trim() : "",
+      habilitacao: campoHab ? campoHab.value.trim() : "",
       funcionario_id: selectFunc ? (selectFunc.value || null) : null,
       limite_mensal: document.getElementById("regra-limite").value,
       periodicidade_dias: document.getElementById("regra-periodicidade").value

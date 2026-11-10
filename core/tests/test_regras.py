@@ -8,7 +8,7 @@ from django.utils import timezone
 from core.models import (AnaliseIA, Devolucao, Entrega, EstoqueTotem, MovimentacaoEstoque, Produto, RegraFornecimento,
                          Solicitacao, Usuario)
 from core.servicos import rh
-from core.servicos.elegibilidade import TAMANHO_DIFERENTE, avaliar
+from core.servicos.elegibilidade import HABILITACAO_VENCIDA, TAMANHO_DIFERENTE, avaliar
 from core.servicos.solicitacoes import _proximo_codigo
 
 from .base import BaseTeste
@@ -330,6 +330,8 @@ class CadastrosValidacaoTeste(BaseTeste):
             "nome": "Carlos Admissao",
             "matricula": "009911",
             "cargo": "Soldador",
+            "funcao": "Soldagem MIG/TIG",
+            "habilitacoes": [{"nome": "NR-35", "validade": "2028-12-31"}],
             "setor_id": str(self.setor.id),
             "pin": "5924",
             "tamanhos": {"calcado": "41", "luva": "M", "vestimenta": "G"},
@@ -344,6 +346,9 @@ class CadastrosValidacaoTeste(BaseTeste):
         novo_func = Usuario.objects.get(codigo_matricula="009911")
         ficha = rh.obter_ficha_rh(novo_func)
         self.assertTrue(ficha["pin_provisorio"])
+        self.assertEqual(ficha["funcao"], "Soldagem MIG/TIG")
+        self.assertEqual(ficha["habilitacoes"][0]["nome"], "NR-35")
+        self.assertFalse(ficha["habilitacoes"][0]["vencida"])
         self.assertEqual(ficha["tamanhos"]["calcado"], "41")
         self.assertTrue(any(h["acao"] == "ADMISSAO" for h in ficha["historico_funcional"]))
 
@@ -354,9 +359,10 @@ class CadastrosValidacaoTeste(BaseTeste):
         self.assertEqual(self.estoque_luva.quantidade_reservada, 1)
 
     def test_mudanca_de_funcao_registra_historico_na_ficha_epi(self):
-        """Mudança de função atualiza cargo/setor e registra a transição no histórico funcional da Ficha de EPI."""
+        """Mudança de função atualiza cargo/função/setor e registra a transição no histórico funcional da Ficha de EPI."""
         r = self.post(f"/api/funcionarios/{self.colaborador.id}/mudar-funcao/", {
             "novo_cargo": "Líder de Solda",
+            "nova_funcao": "Supervisão de Soldagem",
             "novo_setor_id": str(self.setor.id),
             "observacao": "Promoção semestral",
             "gerar_kit": False,
@@ -366,8 +372,16 @@ class CadastrosValidacaoTeste(BaseTeste):
         self.assertEqual(self.colaborador.cargo, "Líder de Solda")
 
         ficha_api = self.client.get(f"/api/funcionarios/{self.colaborador.id}/ficha/").json()
+        self.assertEqual(ficha_api["funcionario"]["funcao"], "Supervisão de Soldagem")
         historico = ficha_api["historico_funcional"]
-        self.assertTrue(any(h["acao"] == "MUDANCA_FUNCAO" and h["cargo_novo"] == "Líder de Solda" for h in historico))
+        self.assertTrue(
+            any(
+                h["acao"] == "MUDANCA_FUNCAO"
+                and h["cargo_novo"] == "Líder de Solda"
+                and h["funcao_novo"] == "Supervisão de Soldagem"
+                for h in historico
+            )
+        )
 
     def test_desligamento_cancela_reservas_pendentes_e_retorna_nada_consta(self):
         """Inativar colaborador cancela solicitações/reservas abertas e retorna o resumo de Nada Consta."""
@@ -388,11 +402,11 @@ class CadastrosValidacaoTeste(BaseTeste):
         self.assertEqual(self.estoque_luva.quantidade_reservada, 0)
 
     def test_importacao_funcionarios_csv_cria_e_atualiza_em_lote(self):
-        """Importação via CSV cria novos colaboradores e atualiza existentes com tamanhos e setor."""
+        """Importação via CSV cria novos colaboradores e atualiza existentes com tamanhos, função e habilitações."""
         csv_conteudo = (
-            "matricula;nome;cargo;setor;pin_inicial;calcado;luva;vestimenta\n"
-            "001245;João da Silva;Soldador Sênior;Produção Industrial;7391;42;G;G\n"
-            "008877;Marina Costa;Eletricista;Manutenção Elétrica;5184;38;P;M\n"
+            "matricula;nome;cargo;setor;pin_inicial;calcado;luva;vestimenta;funcao;habilitacoes\n"
+            "001245;João da Silva;Soldador Sênior;Produção Industrial;7391;42;G;G;Soldagem MIG;NR-35:2028-10-01\n"
+            "008877;Marina Costa;Eletricista;Manutenção Elétrica;5184;38;P;M;Manutenção AT;NR-10:2028-06-30|Brigadista\n"
         )
         r = self.post("/api/funcionarios/importar-csv/", {
             "csv_texto": csv_conteudo,
@@ -410,4 +424,76 @@ class CadastrosValidacaoTeste(BaseTeste):
         self.assertEqual(marina.setor.nome, "Manutenção Elétrica")
         ficha_marina = rh.obter_ficha_rh(marina)
         self.assertEqual(ficha_marina["tamanhos"], {"calcado": "38", "luva": "P", "vestimenta": "M"})
+        self.assertEqual(ficha_marina["funcao"], "Manutenção AT")
+        self.assertEqual([h["nome"] for h in ficha_marina["habilitacoes"]], ["Brigadista", "NR-10"])
         self.assertTrue(ficha_marina["pin_provisorio"])
+
+    def test_tres_categorias_ocupacionais_precedencia_e_habilitacao_vencida(self):
+        """Testa Cargo vs Função vs Habilitação (NR) nas políticas de fornecimento e bloqueio de NR vencida."""
+        # Cadastra função operacional e habilitação via API
+        self.assertEqual(self.post("/api/funcoes/salvar/", {"funcao": "Trabalho em Altura"}).status_code, 200)
+        self.assertEqual(
+            self.post("/api/habilitacoes/salvar/", {
+                "habilitacao": "NR-35",
+                "exige_validade": True,
+                "descricao": "Trabalho em Altura",
+            }).status_code,
+            200,
+        )
+
+        # Cria políticas para Cargo (limite 2), Função (limite 4) e Habilitação NR-35 (limite 6)
+        self.assertEqual(
+            self.post("/api/politicas/salvar/", {
+                "produto_id": str(self.disco.id),
+                "cargo": "Soldador",
+                "limite_mensal": 2,
+            }).status_code,
+            200,
+        )
+        self.assertEqual(
+            self.post("/api/politicas/salvar/", {
+                "produto_id": str(self.disco.id),
+                "funcao": "Trabalho em Altura",
+                "limite_mensal": 4,
+            }).status_code,
+            200,
+        )
+        self.assertEqual(
+            self.post("/api/politicas/salvar/", {
+                "produto_id": str(self.disco.id),
+                "habilitacao": "NR-35",
+                "limite_mensal": 6,
+            }).status_code,
+            200,
+        )
+
+        # Colaborador apenas com Cargo = Soldador -> limite 2
+        av_cargo = avaliar(self.colaborador, self.disco, 1, self.estoque_disco)
+        self.assertEqual(av_cargo.regra.limite_mensal, 2)
+
+        # Colaborador recebe Função = Trabalho em Altura -> Função sobrepõe Cargo (limite 4)
+        rh.salvar_metadados_rh(None, self.colaborador, funcao="Trabalho em Altura")
+        av_funcao = avaliar(self.colaborador, self.disco, 1, self.estoque_disco)
+        self.assertEqual(av_funcao.regra.limite_mensal, 4)
+        self.assertIn("Função: Trabalho em Altura", av_funcao.regra.origem)
+
+        # Colaborador recebe Habilitação NR-35 válida -> Habilitação sobrepõe Função (limite 6)
+        rh.salvar_metadados_rh(
+            None,
+            self.colaborador,
+            habilitacoes=[{"nome": "NR-35", "validade": "2099-12-31"}],
+        )
+        av_hab_ok = avaliar(self.colaborador, self.disco, 1, self.estoque_disco)
+        self.assertEqual(av_hab_ok.regra.limite_mensal, 6)
+        self.assertIn("Habilitação: NR-35", av_hab_ok.regra.origem)
+        self.assertNotIn(HABILITACAO_VENCIDA, av_hab_ok.motivos)
+
+        # Habilitação NR-35 vencida -> sinaliza exceção HABILITACAO_VENCIDA
+        rh.salvar_metadados_rh(
+            None,
+            self.colaborador,
+            habilitacoes=[{"nome": "NR-35", "validade": "2020-01-01"}],
+        )
+        av_hab_venc = avaliar(self.colaborador, self.disco, 1, self.estoque_disco)
+        self.assertIn(HABILITACAO_VENCIDA, av_hab_venc.motivos)
+        self.assertEqual(av_hab_venc.motivo_principal, "Habilitação/credencial vencida")

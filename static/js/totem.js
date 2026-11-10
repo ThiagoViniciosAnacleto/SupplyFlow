@@ -380,7 +380,11 @@
   function carregarVitrineProdutos() {
     var nomeExibicao = estado.colaborador.primeiro_nome || estado.colaborador.nome;
     document.getElementById("vitrine-nome").textContent = nomeExibicao;
-    document.getElementById("vitrine-cargo").textContent = estado.colaborador.cargo;
+    var textoCargoFuncao = estado.colaborador.cargo || "";
+    if (estado.colaborador.funcao && estado.colaborador.funcao.toLowerCase() !== textoCargoFuncao.toLowerCase()) {
+      textoCargoFuncao = textoCargoFuncao ? (textoCargoFuncao + " · " + estado.colaborador.funcao) : estado.colaborador.funcao;
+    }
+    document.getElementById("vitrine-cargo").textContent = textoCargoFuncao;
     document.getElementById("vitrine-setor").textContent = estado.colaborador.setor;
     atualizarResumoTamanhosVitrine();
 
@@ -426,6 +430,8 @@
         rotuloBotaoExcecao = "Solicitar substituição antecipada";
       } else if (produto.motivo_excecao === "Tamanho inadequado") {
         rotuloBotaoExcecao = "Solicitar outro tamanho (justificar)";
+      } else if (produto.motivo_excecao === "Habilitação/credencial vencida") {
+        rotuloBotaoExcecao = "Solicitar (habilitação vencida)";
       }
       return (
         '<button type="button" class="btn-solicitar-substituicao w-100" data-acao="justificar" data-id="' + escapar(produto.id) + '">' +
