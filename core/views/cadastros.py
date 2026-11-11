@@ -128,6 +128,7 @@ def api_salvar_funcionario(request):
         matricula = texto(dados.get("matricula"), "Matrícula", obrigatorio=True, maximo=30).upper()
         email = texto(dados.get("email"), "E-mail", maximo=150).lower() or None
         cargo = texto(dados.get("cargo"), "Cargo", maximo=100)
+        cargo = _normalizar_cargo_catalogo(cargo)
         funcao_informada = "funcao" in dados
         funcao = texto(dados.get("funcao"), "Função", maximo=100) if funcao_informada else None
         perfil = texto(dados.get("perfil"), "Perfil").upper() or "COLABORADOR"
@@ -310,6 +311,7 @@ def api_mudar_funcao_funcionario(request, funcionario_id):
             if cargo_in is not None
             else (func.cargo or "").strip()
         )
+        novo_cargo = _normalizar_cargo_catalogo(novo_cargo)
         nova_funcao = (
             texto(funcao_in, "Nova função", maximo=100)
             if funcao_in is not None
@@ -566,7 +568,7 @@ def api_importar_funcionarios_csv(request):
 
         matricula = matricula.strip().upper()
         nome = nome.strip()
-        cargo = cargo.strip()
+        cargo = _normalizar_cargo_catalogo(cargo.strip())
         setor_txt = setor_txt.strip()
         pin_inicial = pin_inicial.strip()
         funcao_csv = funcao_csv.strip()
@@ -1148,6 +1150,7 @@ def api_salvar_regra(request):
     funcionario = Usuario.objects.filter(id=dados.get("funcionario_id")).first() if dados.get("funcionario_id") else None
     try:
         cargo = texto(dados.get("cargo"), "Cargo", maximo=100)
+        cargo = _normalizar_cargo_catalogo(cargo)
         funcao = texto(dados.get("funcao"), "Função", maximo=100)
         habilitacao = texto(dados.get("habilitacao"), "Habilitação", maximo=100)
         limite = inteiro(dados.get("limite_mensal"), "Limite mensal", minimo=0, maximo=10000) \
@@ -1244,6 +1247,22 @@ def _catalogo_cargos():
             catalogo.setdefault(limpo.lower(), limpo)
 
     return catalogo
+
+
+def _normalizar_cargo_catalogo(cargo_informado):
+    """Normaliza o cargo informado para a grafia canônica existente no catálogo
+    (evitando duplicidades como 'Auxiliar de producao' vs 'Auxiliar de Produção').
+    Se o cargo não existir no catálogo, retorna o texto original limpo."""
+    if not cargo_informado:
+        return cargo_informado
+    limpo = str(cargo_informado).strip()
+    if not limpo:
+        return limpo
+    catalogo = _catalogo_cargos()
+    chave = limpo.lower()
+    if chave in catalogo:
+        return catalogo[chave]
+    return limpo
 
 
 def _catalogo_funcoes(fichas_ativos=None):

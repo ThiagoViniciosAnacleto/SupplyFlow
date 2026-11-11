@@ -225,16 +225,58 @@
       });
   }
 
+  var cargosDisponiveis = [];
+
+  function renderizarOpcoesCargos(selectEl, listaCargos, placeholder, valorSelecionado) {
+    if (!selectEl) return;
+    var opcoes = ['<option value="">' + escapar(placeholder || "Selecione um cargo...") + '</option>'];
+    var valorEncontrado = false;
+    (listaCargos || []).forEach(function (item) {
+      var nome = typeof item === "string" ? item : (item.cargo || item.nome || "");
+      if (!nome) return;
+      var selecionado = Boolean(valorSelecionado && nome.toLowerCase() === String(valorSelecionado).toLowerCase());
+      if (selecionado) {
+        valorEncontrado = true;
+      }
+      opcoes.push(
+        '<option value="' + escapar(nome) + '"' + (selecionado ? " selected" : "") + ">" +
+          escapar(nome) +
+        "</option>"
+      );
+    });
+    // Se for edição e o colaborador possuir um cargo pré-existente fora do catálogo, preserva a opção:
+    if (valorSelecionado && !valorEncontrado) {
+      opcoes.push(
+        '<option value="' + escapar(valorSelecionado) + '" selected>' +
+          escapar(valorSelecionado) +
+        "</option>"
+      );
+    }
+    selectEl.innerHTML = opcoes.join("");
+    if (valorSelecionado) {
+      selectEl.value = valorSelecionado;
+    }
+  }
+
   /* Carrega o catálogo de cargos (RH), funções (SST) e habilitações (NRs) */
   function carregarCargosSugeridos() {
+    var selectCargo = document.getElementById("func-cargo");
+    var selectMudancaCargo = document.getElementById("mudanca-novo-cargo");
     var datalistCargos = document.getElementById("lista-cargos-func");
     var datalistFuncoes = document.getElementById("lista-funcoes-func");
     var datalistHabs = document.getElementById("lista-habs-func");
 
-    SF.api.get("/api/cargos/")
+    return SF.api.get("/api/cargos/")
       .then(function (dados) {
+        cargosDisponiveis = dados.cargos || [];
+        if (selectCargo) {
+          renderizarOpcoesCargos(selectCargo, cargosDisponiveis, "Selecione o cargo...", selectCargo.value);
+        }
+        if (selectMudancaCargo) {
+          renderizarOpcoesCargos(selectMudancaCargo, cargosDisponiveis, "Selecione o novo cargo...", selectMudancaCargo.value);
+        }
         if (datalistCargos) {
-          datalistCargos.innerHTML = (dados.cargos || []).map(function (item) {
+          datalistCargos.innerHTML = cargosDisponiveis.map(function (item) {
             var nome = typeof item === "string" ? item : (item.cargo || item.nome || "");
             return '<option value="' + escapar(nome) + '">';
           }).join("");
@@ -447,7 +489,10 @@
     document.getElementById("func-nome").value = funcionario.nome;
     document.getElementById("func-matricula").value = funcionario.matricula;
     document.getElementById("func-email").value = (funcionario.email === "—") ? "" : funcionario.email;
-    document.getElementById("func-cargo").value = funcionario.cargo;
+    var selectCargo = document.getElementById("func-cargo");
+    if (selectCargo) {
+      renderizarOpcoesCargos(selectCargo, cargosDisponiveis, "Selecione o cargo...", funcionario.cargo || "");
+    }
     var campoFuncao = document.getElementById("func-funcao");
     if (campoFuncao) {
       campoFuncao.value = funcionario.funcao || "";
@@ -500,7 +545,10 @@
       "Cargo atual: " + (funcionario.cargo || "—") +
       (funcionario.funcao ? " · Função: " + funcionario.funcao : "") +
       " · Setor atual: " + (funcionario.setor_nome || "Sem setor");
-    document.getElementById("mudanca-novo-cargo").value = funcionario.cargo || "";
+    var selectMudancaCargo = document.getElementById("mudanca-novo-cargo");
+    if (selectMudancaCargo) {
+      renderizarOpcoesCargos(selectMudancaCargo, cargosDisponiveis, "Selecione o novo cargo...", funcionario.cargo || "");
+    }
     var campoNovaAtividade = document.getElementById("mudar-funcao-atividade");
     if (campoNovaAtividade) {
       campoNovaAtividade.value = funcionario.funcao || "";
@@ -710,6 +758,10 @@
       document.getElementById("modalFuncTitulo").textContent = "Novo Funcionário Operacional";
       document.getElementById("func-id").value = "";
       document.getElementById("func-perfil").value = "COLABORADOR";
+      var selectCargo = document.getElementById("func-cargo");
+      if (selectCargo) {
+        renderizarOpcoesCargos(selectCargo, cargosDisponiveis, "Selecione o cargo...", "");
+      }
       var campoFuncao = document.getElementById("func-funcao");
       if (campoFuncao) {
         campoFuncao.value = "";
@@ -969,6 +1021,11 @@
       }
     });
   }
+
+  /* Atualiza automaticamente a lista de cargos caso o usuário cadastre ou altere cargos em outra aba */
+  window.addEventListener("focus", function () {
+    carregarCargosSugeridos();
+  });
 
   atualizarEstadoDominioNoModal();
   renderizarTagsHabilitacoesNoModal();

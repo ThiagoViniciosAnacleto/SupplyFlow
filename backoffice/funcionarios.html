@@ -133,9 +133,15 @@
 
               <div class="row g-2 mb-3">
                 <div class="col-12 col-sm-4">
-                  <label for="func-cargo" class="form-label small fw-semibold">Cargo (RH) *</label>
-                  <input type="text" id="func-cargo" class="form-control" list="lista-cargos-func" required placeholder="Ex.: Operador de Caldeira">
-                  <datalist id="lista-cargos-func"></datalist>
+                  <div class="d-flex justify-content-between align-items-center mb-1">
+                    <label for="func-cargo" class="form-label small fw-semibold mb-0">Cargo (RH) *</label>
+                    <a href="cargos.html" target="_blank" class="small text-decoration-none" title="Abrir catálogo para gerenciar ou cadastrar novos cargos">
+                      <i class="bi bi-plus-circle me-1" aria-hidden="true"></i>Gerenciar cargos
+                    </a>
+                  </div>
+                  <select id="func-cargo" class="form-select" required>
+                    <option value="">Selecione o cargo...</option>
+                  </select>
                 </div>
                 <div class="col-12 col-sm-4">
                   <label for="func-funcao" class="form-label small fw-semibold">Função / Atividade (SST)</label>
@@ -271,8 +277,15 @@
             </div>
 
             <div class="mb-3">
-              <label for="mudanca-novo-cargo" class="form-label small fw-semibold">Novo Cargo (RH) *</label>
-              <input type="text" id="mudanca-novo-cargo" class="form-control" list="lista-cargos-func" required placeholder="Ex.: Operador de Empilhadeira">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <label for="mudanca-novo-cargo" class="form-label small fw-semibold mb-0">Novo Cargo (RH) *</label>
+                <a href="cargos.html" target="_blank" class="small text-decoration-none" title="Abrir catálogo para gerenciar ou cadastrar novos cargos">
+                  <i class="bi bi-plus-circle me-1" aria-hidden="true"></i>Gerenciar cargos
+                </a>
+              </div>
+              <select id="mudanca-novo-cargo" class="form-select" required>
+                <option value="">Selecione o novo cargo...</option>
+              </select>
             </div>
 
             <div class="mb-3">

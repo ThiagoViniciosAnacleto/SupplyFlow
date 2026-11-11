@@ -102,10 +102,25 @@
         if (selectFunc) {
           selectFunc.innerHTML = montarOpcoesSelect(dados.funcionarios || [], "Qualquer funcionário do escopo");
         }
-        document.getElementById("lista-cargos").innerHTML = (dados.cargos || []).map(function (item) {
-          var valor = typeof item === "string" ? item : (item.cargo || item.nome || "");
-          return '<option value="' + escapar(valor) + '">';
-        }).join("");
+        var selectCargo = document.getElementById("regra-cargo");
+        if (selectCargo) {
+          var cargosHtml = ['<option value="">Todos os cargos</option>'];
+          (dados.cargos || []).forEach(function (item) {
+            var valor = typeof item === "string" ? item : (item.cargo || item.nome || "");
+            if (valor) {
+              cargosHtml.push('<option value="' + escapar(valor) + '">' + escapar(valor) + '</option>');
+            }
+          });
+          selectCargo.innerHTML = cargosHtml.join("");
+        }
+
+        var datalistCargos = document.getElementById("lista-cargos");
+        if (datalistCargos) {
+          datalistCargos.innerHTML = (dados.cargos || []).map(function (item) {
+            var valor = typeof item === "string" ? item : (item.cargo || item.nome || "");
+            return '<option value="' + escapar(valor) + '">';
+          }).join("");
+        }
 
         var datalistFuncoes = document.getElementById("lista-funcoes");
         if (datalistFuncoes) {
@@ -142,7 +157,19 @@
     if (regra) {
       document.getElementById("regra-produto").value = regra.produto_id;
       document.getElementById("regra-setor").value = regra.setor_id || "";
-      document.getElementById("regra-cargo").value = regra.cargo || "";
+      var selectCargo = document.getElementById("regra-cargo");
+      if (selectCargo && regra.cargo) {
+        var temOpcao = Array.from(selectCargo.options).some(function (opt) { return opt.value === regra.cargo; });
+        if (!temOpcao) {
+          var opt = document.createElement("option");
+          opt.value = regra.cargo;
+          opt.textContent = regra.cargo;
+          selectCargo.appendChild(opt);
+        }
+      }
+      if (selectCargo) {
+        selectCargo.value = regra.cargo || "";
+      }
       var campoFuncao = document.getElementById("regra-funcao");
       if (campoFuncao) {
         campoFuncao.value = regra.funcao || "";
