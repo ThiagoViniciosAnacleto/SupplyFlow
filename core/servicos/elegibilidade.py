@@ -19,6 +19,7 @@ ACIMA_DA_COTA = "acima_da_cota"
 EXIGE_JUSTIFICATIVA = "exige_justificativa"
 TAMANHO_DIFERENTE = "tamanho_diferente"
 HABILITACAO_VENCIDA = "habilitacao_vencida"
+HABILITACAO_EXIGIDA = "habilitacao_exigida"
 
 DESCRICAO_MOTIVO = {
     ANTECIPADA: "Substituição antecipada",
@@ -26,6 +27,7 @@ DESCRICAO_MOTIVO = {
     EXIGE_JUSTIFICATIVA: "Produto exige justificativa",
     TAMANHO_DIFERENTE: "Tamanho inadequado",
     HABILITACAO_VENCIDA: "Habilitação/credencial vencida",
+    HABILITACAO_EXIGIDA: "Habilitação/credencial não cadastrada",
 }
 
 PREFIXO_FUNCIONARIO = "MAT:"
@@ -39,6 +41,7 @@ class Regra:
     periodicidade_dias: int | None
     origem: str  # texto para a tela: "Funcionário: ...", "Habilitação: NR-35", "Função: Soldagem", "Cargo: Eletricista", "Setor: Manutenção", "Padrão do produto"
     habilitacao_vencida: str = ""
+    habilitacao_exigida: str = ""
 
 
 @dataclass
@@ -87,6 +90,19 @@ def regra_para(colaborador, produto, ficha_rh=None):
 
     melhor = None
     hab_vencida_detectada = ""
+    hab_exigida_detectada = ""
+
+    # C3: Verifica se o produto possui alguma política ativa que exija habilitação/NR (HAB:)
+    regras_hab_produto = RegraFornecimento.objects.filter(
+        produto=produto,
+        ativo=True,
+        cargo__istartswith=PREFIXO_HABILITACAO,
+    )
+    if regras_hab_produto.exists():
+        nomes_habs_produto = [r.cargo[len(PREFIXO_HABILITACAO):].strip() for r in regras_hab_produto]
+        tem_alguma = any(nh.lower() in mapa_hab for nh in nomes_habs_produto)
+        if not tem_alguma:
+            hab_exigida_detectada = nomes_habs_produto[0]
 
     for r in candidatas:
         alvo = (r.cargo or "").strip()
@@ -117,13 +133,16 @@ def regra_para(colaborador, produto, ficha_rh=None):
             if funcao and nome_func.lower() == funcao.lower():
                 peso = 4 + bonus_setor
                 rotulo_escopo = f"Função: {funcao}"
-        elif funcao and alvo.lower() == funcao.lower() and (not cargo or funcao.lower() != cargo.lower()):
-            peso = 4 + bonus_setor
-            rotulo_escopo = f"Função: {funcao}"
         elif cargo and alvo.lower() == cargo.lower():
+            # A3: alvo sem prefixo que coincida com o cargo formal
             peso = 2 + bonus_setor
             rotulo_escopo = f"Cargo: {r.cargo}"
+        elif funcao and alvo.lower() == funcao.lower() and (not cargo or funcao.lower() != cargo.lower()):
+            # Fallback para regras legadas de função que foram cadastradas sem o prefixo FUNC:
+            peso = 4 + bonus_setor
+            rotulo_escopo = f"Função: {funcao}"
         elif alvo.lower() in mapa_hab:
+            # Fallback para regras legadas de habilitação cadastradas sem prefixo HAB:
             info_hab = mapa_hab[alvo.lower()]
             peso = 6 + bonus_setor
             rotulo_escopo = f"Habilitação: {info_hab['nome']}"
@@ -148,12 +167,14 @@ def regra_para(colaborador, produto, ficha_rh=None):
             ),
             origem=" · ".join(partes) or "Política geral",
             habilitacao_vencida=hab_vencida_regra or hab_vencida_detectada,
+            habilitacao_exigida=hab_exigida_detectada,
         )
     return Regra(
         produto.limite_padrao_mensal,
         produto.periodicidade_dias,
         "Padrão do produto",
         habilitacao_vencida=hab_vencida_detectada,
+        habilitacao_exigida=hab_exigida_detectada,
     )
 
 
@@ -205,6 +226,8 @@ def avaliar(colaborador, produto, quantidade=1, estoque=None, agora=None):
 
     if regra.habilitacao_vencida and HABILITACAO_VENCIDA not in av.motivos:
         av.motivos.append(HABILITACAO_VENCIDA)
+    elif regra.habilitacao_exigida and HABILITACAO_EXIGIDA not in av.motivos:
+        av.motivos.append(HABILITACAO_EXIGIDA)
 
     if produto.eh_epi and (produto.tamanho or "").strip():
         _, esperado = rh.tamanho_esperado_para_produto(ficha_rh, produto)

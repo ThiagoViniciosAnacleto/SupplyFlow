@@ -4,7 +4,7 @@ from django.db.models.functions import Length
 from django.utils import timezone
 
 from ..ia import CATEGORIAS
-from ..models import AnaliseIA, DecisaoSolicitacao, Solicitacao, SolicitacaoItem
+from ..models import AnaliseIA, DecisaoSolicitacao, MovimentacaoEstoque, Solicitacao, SolicitacaoItem
 from . import RegraViolada, classificador, estados, estoque
 from .elegibilidade import ANTECIPADA, DESCRICAO_MOTIVO, avaliar
 
@@ -164,8 +164,14 @@ def cancelar(solicitacao, usuario, motivo="Cancelada pelo solicitante"):
         estava_aprovada = estados.normalizar(solicitacao.status) in estados.ESTADOS_APROVADOS
         estados.mudar_status(solicitacao, estados.CANCELADA)
         if estava_aprovada:
-            for item in solicitacao.itens.select_related("produto"):
-                estoque.liberar(estoque.travar(solicitacao.totem, item.produto),
-                                item.quantidade_aprovada or 0, usuario, solicitacao, motivo)
+            # Só estorna reserva de estoque se a solicitação efetivamente gerou reserva
+            houve_reserva = MovimentacaoEstoque.objects.filter(
+                solicitacao=solicitacao,
+                tipo=MovimentacaoEstoque.RESERVA,
+            ).exists()
+            if houve_reserva:
+                for item in solicitacao.itens.select_related("produto"):
+                    estoque.liberar(estoque.travar(solicitacao.totem, item.produto),
+                                    item.quantidade_aprovada or 0, usuario, solicitacao, motivo)
         solicitacao.save()
     return solicitacao

@@ -432,6 +432,8 @@
         rotuloBotaoExcecao = "Solicitar outro tamanho (justificar)";
       } else if (produto.motivo_excecao === "Habilitação/credencial vencida") {
         rotuloBotaoExcecao = "Solicitar (habilitação vencida)";
+      } else if (produto.motivo_excecao === "Habilitação/credencial não cadastrada") {
+        rotuloBotaoExcecao = "Solicitar (exige NR/credencial)";
       }
       return (
         '<button type="button" class="btn-solicitar-substituicao w-100" data-acao="justificar" data-id="' + escapar(produto.id) + '">' +

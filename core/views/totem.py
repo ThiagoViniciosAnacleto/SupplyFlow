@@ -29,6 +29,7 @@ from ..servicos.elegibilidade import (
     ACIMA_DA_COTA,
     ANTECIPADA,
     EXIGE_JUSTIFICATIVA,
+    HABILITACAO_EXIGIDA,
     HABILITACAO_VENCIDA,
     TAMANHO_DIFERENTE,
     avaliar,
@@ -91,19 +92,28 @@ def api_totem(view):
 @require_POST
 def api_totem_identificar(request):
     """Confere se a matrícula existe. Devolve só o primeiro nome (como no protótipo),
-    sem cargo, setor ou outros dados pessoais antes do PIN (RNF-05)."""
+    sem cargo, setor ou outros dados pessoais antes do PIN (RNF-05).
+    Aplica rate-limiting por IP e por matrícula para evitar varredura/enumeração (C4)."""
     dados, erro_json = ler_json(request)
     if erro_json:
         return erro_json
     matricula = normalizar_matricula(dados.get("matricula"))
-    if bloqueado("pin", matricula):
+    ip = request.META.get("REMOTE_ADDR") or "local"
+    chave_ip = f"ident:{ip}"
+
+    if bloqueado("ident", chave_ip) or (matricula and bloqueado("pin", matricula)):
         return JsonResponse(
-            {"encontrado": False, "erro": "Muitas tentativas. Aguarde 15 minutos ou procure o almoxarifado."},
+            {"encontrado": False, "erro": "Muitas tentativas de consulta. Aguarde 15 minutos ou procure o almoxarifado."},
             status=429,
         )
-    colaborador = Usuario.objects.filter(codigo_matricula=matricula, ativo=True).first()
+
+    colaborador = Usuario.objects.filter(codigo_matricula=matricula, ativo=True).first() if matricula else None
     if not colaborador:
+        registrar_falha("ident", chave_ip)
+        if matricula:
+            registrar_falha("pin", matricula)
         return JsonResponse({"encontrado": False, "erro": "Matrícula não localizada no sistema."}, status=404)
+
     return JsonResponse({"encontrado": True, "matricula": matricula, "primeiro_nome": primeiro_nome(colaborador.nome)})
 
 
@@ -233,6 +243,10 @@ def api_totem_produtos(request):
                 ),
                 HABILITACAO_VENCIDA: (
                     f"Habilitação/credencial ({getattr(av.regra, 'habilitacao_vencida', '') or 'NR'}) vencida. "
+                    "Pode solicitar com justificativa para análise do Gestor/SST."
+                ),
+                HABILITACAO_EXIGIDA: (
+                    f"Exige credencial/NR ({getattr(av.regra, 'habilitacao_exigida', '') or 'específica'}) não associada ao seu perfil. "
                     "Pode solicitar com justificativa para análise do Gestor/SST."
                 ),
                 EXIGE_JUSTIFICATIVA: "Este item exige justificativa.",

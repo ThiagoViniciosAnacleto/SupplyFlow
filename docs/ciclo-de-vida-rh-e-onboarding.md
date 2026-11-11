@@ -124,8 +124,10 @@ Para garantir compatibilidade imediata com o banco de dados PostgreSQL em produ�
 
 - Os metadados estendidos de RH (`tamanhos`, `pin_provisorio` e `historico_funcional`) são persistidos na tabela existente `auditoria` ([`RegistroAuditoria`](file:///c:/Users/Usuario/Documents/GitHub/SupplyFlow/core/models.py#L317-L339)) utilizando o namespace dedicado `entidade="RH_FUNCIONARIO"` e `entidade_id=str(usuario.id)`, com payload estruturado no campo `detalhes` (`JSONField`).
 - Essa abordagem oferece **duplo benefício arquitetural**:
-  1. **Imutabilidade e Rastreabilidade (`RNF-07`, `RNF-18`):** Cada alteração de tamanho, redefinição de PIN provisório, admissão, mudança de função ou desligamento é naturalmente um evento auditado com data, hora, IP e responsável.
+  1. **Imutabilidade e Rastreabilidade (`RNF-07`, `RNF-18`):** Cada alteração de tamanho, redefinição de PIN provisório, admissão, mudança de função ou desligamento é naturalmente um evento auditado com data, hora, IP e responsável (*Event Sourcing*).
   2. **Deploy Zero-Downtime:** Nenhuma tabela existente precisou sofrer alteração estrutural destrutiva.
+  3. **Diretriz de Retenção de Dados:** Em eventuais expurgos de logs de segurança/auditoria geral, registros com `entidade="RH_FUNCIONARIO"` devem ser preservados para assegurar a continuidade do histórico funcional e cadastral do trabalhador.
+  4. **Performance com Cache de Instância:** As consultas à ficha do colaborador utilizam cache em memória anexado à requisição (`usuario._cache_ficha_rh`), garantindo avaliação rápida na vitrine do Totem e em listagens sem sobrecarga ao banco.
 
 ---
 

@@ -119,7 +119,7 @@ def normalizar_habilitacoes(habilitacoes, hoje_iso=None):
 def obter_ficha_rh(usuario):
     """Reconstrói os metadados de RH (tamanhos, função operacional, habilitações,
     PIN provisório e histórico funcional) a partir da trilha imutável de auditoria
-    (`entidade="RH_FUNCIONARIO"`)."""
+    (`entidade="RH_FUNCIONARIO"`). Possui cache anexado à instância do usuário para alta performance (A1)."""
     ficha = {
         "tamanhos": {"calcado": "", "luva": "", "vestimenta": ""},
         "funcao": "",
@@ -130,6 +130,11 @@ def obter_ficha_rh(usuario):
     }
     if usuario is None or not getattr(usuario, "id", None):
         return ficha
+
+    # Cache em memória na instância do modelo (evita N consultas na mesma requisição / vitrine de produtos)
+    cache_ficha = getattr(usuario, "_cache_ficha_rh", None)
+    if isinstance(cache_ficha, dict):
+        return cache_ficha
 
     hoje_iso = timezone.localdate().isoformat()
     eventos = RegistroAuditoria.objects.filter(
@@ -187,6 +192,11 @@ def obter_ficha_rh(usuario):
             ficha["historico_funcional"].append(item_historico)
             if ev.acao == "DESLIGAMENTO":
                 ficha["ultimo_desligamento"] = item_historico
+
+    try:
+        usuario._cache_ficha_rh = ficha
+    except Exception:
+        pass
 
     return ficha
 
@@ -279,6 +289,11 @@ def salvar_metadados_rh(
         detalhes=detalhes,
         ip=ip,
     )
+    if hasattr(usuario, "_cache_ficha_rh"):
+        try:
+            delattr(usuario, "_cache_ficha_rh")
+        except Exception:
+            pass
     return obter_ficha_rh(usuario)
 
 
@@ -361,27 +376,17 @@ def gerar_kit_admissional(colaborador, responsavel, motivo="Kit Admissional"):
             produtos_kit.append(prod)
             vistos_ids.add(prod.id)
 
+    # C2 corrigido: Kit Admissional é estritamente derivado das regras cadastradas
+    # (políticas de Cargo, Função, Habilitações válidas ou Setor do colaborador).
+    # Se não houver políticas específicas associadas, não inventa kit aleatório com todo o catálogo.
     if not produtos_kit:
-        categorias_tam_incluidas = set()
-        for prod in todos_epis:
-            if prod.id in vistos_ids:
-                continue
-            cat_tam, esperado = tamanho_esperado_para_produto(ficha_rh, prod)
-            tam_prod = (prod.tamanho or "").strip()
-            if tam_prod and esperado:
-                if tam_prod.upper() != esperado.strip().upper():
-                    continue
-                produtos_kit.append(prod)
-                vistos_ids.add(prod.id)
-            elif tam_prod and cat_tam and not esperado:
-                if cat_tam in categorias_tam_incluidas:
-                    continue
-                categorias_tam_incluidas.add(cat_tam)
-                produtos_kit.append(prod)
-                vistos_ids.add(prod.id)
-            else:
-                produtos_kit.append(prod)
-                vistos_ids.add(prod.id)
+        return {
+            "gerado": False,
+            "quantidade_itens": 0,
+            "codigos": [],
+            "itens": [],
+            "aviso": "Nenhuma política de fornecimento cadastrada para o cargo/função/habilitação deste colaborador.",
+        }
 
     ja_em_andamento = set(
         SolicitacaoItem.objects.filter(
@@ -394,12 +399,26 @@ def gerar_kit_admissional(colaborador, responsavel, motivo="Kit Admissional"):
     if not produtos_elegiveis:
         return {"gerado": False, "quantidade_itens": 0, "codigos": [], "itens": []}
 
-    totem = Totem.objects.filter(status_online=True).first() or Totem.objects.first()
+    # M3: Escolhe preferencialmente o totem vinculado ao setor do colaborador se houver
+    totem = None
+    if colaborador.setor_id:
+        totem = Totem.objects.filter(status_online=True, localizacao__icontains=colaborador.setor.nome).first()
+    if totem is None:
+        totem = Totem.objects.filter(status_online=True).first() or Totem.objects.first()
     codigos = []
     itens_nomes = []
 
     with transaction.atomic():
         for prod in produtos_elegiveis:
+            # C1 corrigido: trava o estoque antes de definir o status da solicitação.
+            # Se houver saldo livre no totem, cria APROVADA e reserva.
+            # Se não houver estoque suficiente no momento, cria como AGUARDANDO (sem reservar)
+            # para aguardar reposição sem inflar falsamente a contabilidade de reservas.
+            estoque_totem = estoque.travar(totem, prod) if totem is not None else None
+            tem_saldo = bool(estoque_totem is not None and estoque_totem.livre >= 1)
+            status_inicial = estados.APROVADA if tem_saldo else estados.AGUARDANDO
+            motivo_status = motivo if tem_saldo else f"{motivo} (Aguardando reposição de estoque)"
+
             for tentativa in range(3):
                 try:
                     with transaction.atomic():
@@ -407,10 +426,10 @@ def gerar_kit_admissional(colaborador, responsavel, motivo="Kit Admissional"):
                             codigo=_proximo_codigo(),
                             solicitante=colaborador,
                             totem=totem,
-                            status=estados.APROVADA,
+                            status=status_inicial,
                             motivo_categoria=motivo,
                             justificativa_solicitante=(
-                                f"{motivo} gerado para {colaborador.nome} ({colaborador.cargo or 'Colaborador'})"
+                                f"{motivo_status} gerado para {colaborador.nome} ({colaborador.cargo or 'Colaborador'})"
                             ),
                             fora_da_cota=False,
                             valor_total_estimado=prod.custo_unitario,
@@ -424,22 +443,20 @@ def gerar_kit_admissional(colaborador, responsavel, motivo="Kit Admissional"):
                 solicitacao=solicitacao,
                 produto=prod,
                 quantidade_solicitada=1,
-                quantidade_aprovada=1,
+                quantidade_aprovada=1 if tem_saldo else None,
                 custo_unitario_momento=prod.custo_unitario,
             )
-            DecisaoSolicitacao.objects.create(
-                solicitacao=solicitacao,
-                aprovador=responsavel,
-                decisao_final=estados.APROVADA,
-                seguiu_recomendacao_ia=False,
-                exige_devolucao=False,
-                justificativa_decisao=motivo,
-            )
 
-            if totem is not None:
-                estoque_totem = estoque.travar(totem, prod)
-                if estoque_totem is not None and estoque_totem.livre >= 1:
-                    estoque.reservar(estoque_totem, 1, responsavel, solicitacao)
+            if tem_saldo:
+                DecisaoSolicitacao.objects.create(
+                    solicitacao=solicitacao,
+                    aprovador=responsavel,
+                    decisao_final=estados.APROVADA,
+                    seguiu_recomendacao_ia=False,
+                    exige_devolucao=False,
+                    justificativa_decisao=motivo,
+                )
+                estoque.reservar(estoque_totem, 1, responsavel, solicitacao)
 
             codigos.append(solicitacao.codigo)
             itens_nomes.append(prod.nome)
