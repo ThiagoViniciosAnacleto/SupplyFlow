@@ -122,20 +122,28 @@
           }).join("");
         }
 
-        var datalistFuncoes = document.getElementById("lista-funcoes");
-        if (datalistFuncoes) {
-          datalistFuncoes.innerHTML = (dados.funcoes || []).map(function (item) {
+        var selectFuncao = document.getElementById("regra-funcao");
+        if (selectFuncao) {
+          var funcoesHtml = ['<option value="">Todas as funções</option>'];
+          (dados.funcoes || []).forEach(function (item) {
             var valor = typeof item === "string" ? item : (item.funcao || item.nome || "");
-            return '<option value="' + escapar(valor) + '">';
-          }).join("");
+            if (valor) {
+              funcoesHtml.push('<option value="' + escapar(valor) + '">' + escapar(valor) + '</option>');
+            }
+          });
+          selectFuncao.innerHTML = funcoesHtml.join("");
         }
 
-        var datalistHabs = document.getElementById("lista-habilitacoes");
-        if (datalistHabs) {
-          datalistHabs.innerHTML = (dados.habilitacoes || []).map(function (item) {
+        var selectHab = document.getElementById("regra-habilitacao");
+        if (selectHab) {
+          var habsHtml = ['<option value="">Todas as habilitações / NRs</option>'];
+          (dados.habilitacoes || []).forEach(function (item) {
             var valor = typeof item === "string" ? item : (item.habilitacao || item.nome || "");
-            return '<option value="' + escapar(valor) + '">';
-          }).join("");
+            if (valor) {
+              habsHtml.push('<option value="' + escapar(valor) + '">' + escapar(valor) + '</option>');
+            }
+          });
+          selectHab.innerHTML = habsHtml.join("");
         }
 
         var corpo = document.getElementById("corpo-regras");
@@ -171,10 +179,28 @@
         selectCargo.value = regra.cargo || "";
       }
       var campoFuncao = document.getElementById("regra-funcao");
+      if (campoFuncao && regra.funcao) {
+        var temOpcaoF = Array.from(campoFuncao.options).some(function (opt) { return opt.value === regra.funcao; });
+        if (!temOpcaoF) {
+          var optF = document.createElement("option");
+          optF.value = regra.funcao;
+          optF.textContent = regra.funcao;
+          campoFuncao.appendChild(optF);
+        }
+      }
       if (campoFuncao) {
         campoFuncao.value = regra.funcao || "";
       }
       var campoHab = document.getElementById("regra-habilitacao");
+      if (campoHab && regra.habilitacao) {
+        var temOpcaoH = Array.from(campoHab.options).some(function (opt) { return opt.value === regra.habilitacao; });
+        if (!temOpcaoH) {
+          var optH = document.createElement("option");
+          optH.value = regra.habilitacao;
+          optH.textContent = regra.habilitacao;
+          campoHab.appendChild(optH);
+        }
+      }
       if (campoHab) {
         campoHab.value = regra.habilitacao || "";
       }

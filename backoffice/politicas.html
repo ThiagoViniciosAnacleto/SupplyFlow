@@ -85,14 +85,26 @@
 
           <div class="row g-2 mb-3">
             <div class="col-12 col-sm-6">
-              <label for="regra-funcao" class="form-label fw-semibold">Função / Atividade (SST)</label>
-              <input id="regra-funcao" class="form-control" list="lista-funcoes" maxlength="100" placeholder="Ex.: Manutenção Elétrica">
-              <datalist id="lista-funcoes"></datalist>
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <label for="regra-funcao" class="form-label fw-semibold mb-0">Função / Atividade (SST)</label>
+                <a href="cargos.html" target="_blank" class="small text-decoration-none" title="Abrir catálogo para gerenciar ou cadastrar novas funções">
+                  <i class="bi bi-plus-circle me-1" aria-hidden="true"></i>Gerenciar funções
+                </a>
+              </div>
+              <select id="regra-funcao" class="form-select">
+                <option value="">Todas as funções</option>
+              </select>
             </div>
             <div class="col-12 col-sm-6">
-              <label for="regra-habilitacao" class="form-label fw-semibold">Habilitação / Credencial NR (SST)</label>
-              <input id="regra-habilitacao" class="form-control" list="lista-habilitacoes" maxlength="100" placeholder="Ex.: NR-35 Trabalho em Altura">
-              <datalist id="lista-habilitacoes"></datalist>
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <label for="regra-habilitacao" class="form-label fw-semibold mb-0">Habilitação / Credencial NR (SST)</label>
+                <a href="cargos.html" target="_blank" class="small text-decoration-none" title="Abrir catálogo para gerenciar ou cadastrar novas habilitações/NRs">
+                  <i class="bi bi-plus-circle me-1" aria-hidden="true"></i>Gerenciar NRs
+                </a>
+              </div>
+              <select id="regra-habilitacao" class="form-select">
+                <option value="">Todas as habilitações / NRs</option>
+              </select>
             </div>
           </div>
 

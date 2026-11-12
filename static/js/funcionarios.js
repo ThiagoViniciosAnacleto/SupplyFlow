@@ -226,13 +226,16 @@
   }
 
   var cargosDisponiveis = [];
+  var funcoesDisponiveis = [];
+  var habilitacoesDisponiveis = [];
 
-  function renderizarOpcoesCargos(selectEl, listaCargos, placeholder, valorSelecionado) {
+  function renderizarOpcoesCatalogo(selectEl, listaItens, placeholder, valorSelecionado, chaveProp) {
     if (!selectEl) return;
-    var opcoes = ['<option value="">' + escapar(placeholder || "Selecione um cargo...") + '</option>'];
+    var opcoes = ['<option value="">' + escapar(placeholder || "Selecione...") + '</option>'];
     var valorEncontrado = false;
-    (listaCargos || []).forEach(function (item) {
-      var nome = typeof item === "string" ? item : (item.cargo || item.nome || "");
+    var chave = chaveProp || "nome";
+    (listaItens || []).forEach(function (item) {
+      var nome = typeof item === "string" ? item : (item[chave] || item.nome || "");
       if (!nome) return;
       var selecionado = Boolean(valorSelecionado && nome.toLowerCase() === String(valorSelecionado).toLowerCase());
       if (selecionado) {
@@ -244,7 +247,7 @@
         "</option>"
       );
     });
-    // Se for edição e o colaborador possuir um cargo pré-existente fora do catálogo, preserva a opção:
+    // Se for edição e o colaborador possuir valor pré-existente fora do catálogo, preserva a opção:
     if (valorSelecionado && !valorEncontrado) {
       opcoes.push(
         '<option value="' + escapar(valorSelecionado) + '" selected>' +
@@ -258,40 +261,46 @@
     }
   }
 
+  function renderizarOpcoesCargos(selectEl, listaCargos, placeholder, valorSelecionado) {
+    renderizarOpcoesCatalogo(selectEl, listaCargos, placeholder, valorSelecionado, "cargo");
+  }
+
+  function renderizarOpcoesFuncoes(selectEl, listaFuncoes, placeholder, valorSelecionado) {
+    renderizarOpcoesCatalogo(selectEl, listaFuncoes, placeholder, valorSelecionado, "funcao");
+  }
+
+  function renderizarOpcoesHabilitacoes(selectEl, listaHabs, placeholder, valorSelecionado) {
+    renderizarOpcoesCatalogo(selectEl, listaHabs, placeholder, valorSelecionado, "habilitacao");
+  }
+
   /* Carrega o catálogo de cargos (RH), funções (SST) e habilitações (NRs) */
   function carregarCargosSugeridos() {
     var selectCargo = document.getElementById("func-cargo");
     var selectMudancaCargo = document.getElementById("mudanca-novo-cargo");
-    var datalistCargos = document.getElementById("lista-cargos-func");
-    var datalistFuncoes = document.getElementById("lista-funcoes-func");
-    var datalistHabs = document.getElementById("lista-habs-func");
+    var selectFuncao = document.getElementById("func-funcao");
+    var selectMudancaFuncao = document.getElementById("mudar-funcao-atividade");
+    var selectHab = document.getElementById("hab-nome-input");
 
     return SF.api.get("/api/cargos/")
       .then(function (dados) {
         cargosDisponiveis = dados.cargos || [];
+        funcoesDisponiveis = dados.funcoes || [];
+        habilitacoesDisponiveis = dados.habilitacoes || [];
+
         if (selectCargo) {
           renderizarOpcoesCargos(selectCargo, cargosDisponiveis, "Selecione o cargo...", selectCargo.value);
         }
         if (selectMudancaCargo) {
           renderizarOpcoesCargos(selectMudancaCargo, cargosDisponiveis, "Selecione o novo cargo...", selectMudancaCargo.value);
         }
-        if (datalistCargos) {
-          datalistCargos.innerHTML = cargosDisponiveis.map(function (item) {
-            var nome = typeof item === "string" ? item : (item.cargo || item.nome || "");
-            return '<option value="' + escapar(nome) + '">';
-          }).join("");
+        if (selectFuncao) {
+          renderizarOpcoesFuncoes(selectFuncao, funcoesDisponiveis, "Selecione a função...", selectFuncao.value);
         }
-        if (datalistFuncoes) {
-          datalistFuncoes.innerHTML = (dados.funcoes || []).map(function (item) {
-            var nome = typeof item === "string" ? item : (item.funcao || item.nome || "");
-            return '<option value="' + escapar(nome) + '">';
-          }).join("");
+        if (selectMudancaFuncao) {
+          renderizarOpcoesFuncoes(selectMudancaFuncao, funcoesDisponiveis, "Selecione a nova função...", selectMudancaFuncao.value);
         }
-        if (datalistHabs) {
-          datalistHabs.innerHTML = (dados.habilitacoes || []).map(function (item) {
-            var nome = typeof item === "string" ? item : (item.habilitacao || item.nome || "");
-            return '<option value="' + escapar(nome) + '">';
-          }).join("");
+        if (selectHab) {
+          renderizarOpcoesHabilitacoes(selectHab, habilitacoesDisponiveis, "Selecione uma habilitação / NR...", selectHab.value);
         }
       })
       .catch(function (erro) {
@@ -495,7 +504,7 @@
     }
     var campoFuncao = document.getElementById("func-funcao");
     if (campoFuncao) {
-      campoFuncao.value = funcionario.funcao || "";
+      renderizarOpcoesFuncoes(campoFuncao, funcoesDisponiveis, "Selecione a função...", funcionario.funcao || "");
     }
     document.getElementById("func-setor").value = funcionario.setor_id || "";
     document.getElementById("func-perfil").value = funcionario.perfil || "COLABORADOR";
@@ -517,7 +526,10 @@
           };
         })
       : [];
-    if (inputHabNome) inputHabNome.value = "";
+    if (inputHabNome) {
+      renderizarOpcoesHabilitacoes(inputHabNome, habilitacoesDisponiveis, "Selecione uma habilitação / NR...", "");
+      inputHabNome.value = "";
+    }
     if (inputHabValidade) inputHabValidade.value = "";
     renderizarTagsHabilitacoesNoModal();
 
@@ -551,7 +563,7 @@
     }
     var campoNovaAtividade = document.getElementById("mudar-funcao-atividade");
     if (campoNovaAtividade) {
-      campoNovaAtividade.value = funcionario.funcao || "";
+      renderizarOpcoesFuncoes(campoNovaAtividade, funcoesDisponiveis, "Selecione a nova função...", funcionario.funcao || "");
     }
     document.getElementById("mudanca-novo-setor").value = funcionario.setor_id || "";
     document.getElementById("mudanca-observacao").value = "";
@@ -764,13 +776,16 @@
       }
       var campoFuncao = document.getElementById("func-funcao");
       if (campoFuncao) {
-        campoFuncao.value = "";
+        renderizarOpcoesFuncoes(campoFuncao, funcoesDisponiveis, "Selecione a função...", "");
       }
       document.getElementById("func-tam-calcado").value = "";
       document.getElementById("func-tam-luva").value = "";
       document.getElementById("func-tam-vestimenta").value = "";
       habilitacoesModal = [];
-      if (inputHabNome) inputHabNome.value = "";
+      if (inputHabNome) {
+        renderizarOpcoesHabilitacoes(inputHabNome, habilitacoesDisponiveis, "Selecione uma habilitação / NR...", "");
+        inputHabNome.value = "";
+      }
       if (inputHabValidade) inputHabValidade.value = "";
       renderizarTagsHabilitacoesNoModal();
 

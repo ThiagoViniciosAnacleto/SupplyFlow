@@ -144,9 +144,15 @@
                   </select>
                 </div>
                 <div class="col-12 col-sm-4">
-                  <label for="func-funcao" class="form-label small fw-semibold">Função / Atividade (SST)</label>
-                  <input type="text" id="func-funcao" class="form-control" list="lista-funcoes-func" maxlength="100" placeholder="Ex.: Manutenção Elétrica">
-                  <datalist id="lista-funcoes-func"></datalist>
+                  <div class="d-flex justify-content-between align-items-center mb-1">
+                    <label for="func-funcao" class="form-label small fw-semibold mb-0">Função / Atividade (SST)</label>
+                    <a href="cargos.html" target="_blank" class="small text-decoration-none" title="Abrir catálogo para gerenciar ou cadastrar novas funções">
+                      <i class="bi bi-plus-circle me-1" aria-hidden="true"></i>Gerenciar funções
+                    </a>
+                  </div>
+                  <select id="func-funcao" class="form-select">
+                    <option value="">Selecione a função...</option>
+                  </select>
                 </div>
                 <div class="col-12 col-sm-4">
                   <label for="func-setor" class="form-label small fw-semibold">Setor / Centro Custo</label>
@@ -163,9 +169,15 @@
                 </div>
                 <div class="row g-2 align-items-end">
                   <div class="col-12 col-sm-6">
-                    <label for="hab-nome-input" class="form-label small fw-semibold mb-1">Habilitação / NR</label>
-                    <input type="text" id="hab-nome-input" class="form-control form-control-sm" list="lista-habs-func" placeholder="Ex.: NR-35 Trabalho em Altura">
-                    <datalist id="lista-habs-func"></datalist>
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                      <label for="hab-nome-input" class="form-label small fw-semibold mb-0">Habilitação / NR</label>
+                      <a href="cargos.html" target="_blank" class="small text-decoration-none" title="Abrir catálogo para gerenciar ou cadastrar novas habilitações/NRs">
+                        <i class="bi bi-plus-circle me-1" aria-hidden="true"></i>Gerenciar NRs
+                      </a>
+                    </div>
+                    <select id="hab-nome-input" class="form-select form-select-sm">
+                      <option value="">Selecione uma habilitação / NR...</option>
+                    </select>
                   </div>
                   <div class="col-8 col-sm-4">
                     <label for="hab-validade-input" class="form-label small fw-semibold mb-1">Validade (opcional)</label>
@@ -289,8 +301,15 @@
             </div>
 
             <div class="mb-3">
-              <label for="mudar-funcao-atividade" class="form-label small fw-semibold">Nova Função / Atividade (SST)</label>
-              <input type="text" id="mudar-funcao-atividade" class="form-control" list="lista-funcoes-func" maxlength="100" placeholder="Ex.: Movimentação de Cargas">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <label for="mudar-funcao-atividade" class="form-label small fw-semibold mb-0">Nova Função / Atividade (SST)</label>
+                <a href="cargos.html" target="_blank" class="small text-decoration-none" title="Abrir catálogo para gerenciar ou cadastrar novas funções">
+                  <i class="bi bi-plus-circle me-1" aria-hidden="true"></i>Gerenciar funções
+                </a>
+              </div>
+              <select id="mudar-funcao-atividade" class="form-select">
+                <option value="">Selecione a nova função...</option>
+              </select>
             </div>
 
             <div class="mb-3">

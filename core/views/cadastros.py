@@ -131,13 +131,24 @@ def api_salvar_funcionario(request):
         cargo = _normalizar_cargo_catalogo(cargo)
         funcao_informada = "funcao" in dados
         funcao = texto(dados.get("funcao"), "Função", maximo=100) if funcao_informada else None
+        funcao = _normalizar_funcao_catalogo(funcao) if funcao else funcao
         perfil = texto(dados.get("perfil"), "Perfil").upper() or "COLABORADOR"
         pin = texto(dados.get("pin"), "PIN")
         tamanhos = _extrair_tamanhos(dados)
     except EntradaInvalida as e:
         return erro(str(e))
 
-    habilitacoes = dados.get("habilitacoes") if "habilitacoes" in dados else None
+    habilitacoes_raw = dados.get("habilitacoes") if "habilitacoes" in dados else None
+    if habilitacoes_raw is not None and isinstance(habilitacoes_raw, list):
+        habilitacoes = []
+        for h in habilitacoes_raw:
+            if isinstance(h, dict):
+                nome_h = _normalizar_habilitacao_catalogo(h.get("nome") or h.get("habilitacao") or "")
+                habilitacoes.append({"nome": nome_h, "validade": h.get("validade") or ""})
+            elif isinstance(h, str):
+                habilitacoes.append({"nome": _normalizar_habilitacao_catalogo(h), "validade": ""})
+    else:
+        habilitacoes = habilitacoes_raw
 
     if not re.fullmatch(r"[A-Z0-9-]+", matricula):
         return erro("Matrícula: use apenas letras, números e hífen.")
@@ -317,6 +328,7 @@ def api_mudar_funcao_funcionario(request, funcionario_id):
             if funcao_in is not None
             else None
         )
+        nova_funcao = _normalizar_funcao_catalogo(nova_funcao) if nova_funcao else nova_funcao
         observacao = texto(dados.get("observacao"), "Observação", maximo=255)
     except EntradaInvalida as e:
         return erro(str(e))
@@ -1152,7 +1164,9 @@ def api_salvar_regra(request):
         cargo = texto(dados.get("cargo"), "Cargo", maximo=100)
         cargo = _normalizar_cargo_catalogo(cargo)
         funcao = texto(dados.get("funcao"), "Função", maximo=100)
+        funcao = _normalizar_funcao_catalogo(funcao)
         habilitacao = texto(dados.get("habilitacao"), "Habilitação", maximo=100)
+        habilitacao = _normalizar_habilitacao_catalogo(habilitacao)
         limite = inteiro(dados.get("limite_mensal"), "Limite mensal", minimo=0, maximo=10000) \
             if dados.get("limite_mensal") not in (None, "") else None
         periodicidade = inteiro(dados.get("periodicidade_dias"), "Periodicidade", minimo=1, maximo=3650) \
@@ -1262,6 +1276,34 @@ def _normalizar_cargo_catalogo(cargo_informado):
     chave = limpo.lower()
     if chave in catalogo:
         return catalogo[chave]
+    return limpo
+
+
+def _normalizar_funcao_catalogo(funcao_informada):
+    """Normaliza a função operacional informada para a grafia canônica existente no catálogo."""
+    if not funcao_informada:
+        return funcao_informada
+    limpo = str(funcao_informada).strip()
+    if not limpo:
+        return limpo
+    catalogo = _catalogo_funcoes()
+    chave = limpo.lower()
+    if chave in catalogo:
+        return catalogo[chave]
+    return limpo
+
+
+def _normalizar_habilitacao_catalogo(hab_informada):
+    """Normaliza a habilitação/NR informada para a grafia canônica existente no catálogo."""
+    if not hab_informada:
+        return hab_informada
+    limpo = str(hab_informada).strip()
+    if not limpo:
+        return limpo
+    catalogo = _catalogo_habilitacoes()
+    chave = limpo.lower()
+    if chave in catalogo:
+        return catalogo[chave]["habilitacao"]
     return limpo
 
 
