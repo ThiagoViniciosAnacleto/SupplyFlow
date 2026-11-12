@@ -1,25 +1,31 @@
 /* =====================================================================
-   SupplyFlow — Estilos do Totem de Autoatendimento
+   SupplyFlow — Estilos do Totem de Autoatendimento Industrial
    ---------------------------------------------------------------------
    Projetado para telas touch, tablets, terminais POS (1024x768 / 1366x768),
    smartphones (360px+) e monitores de alta resolução (1080p a 4K).
-   Utiliza tipografia e alturas fluidas (clamp / vh) para que o teclado
-   numérico de matrícula e PIN nunca seja cortado verticalmente.
+   Visual Dark Mode Industrial de Alto Contraste com Laranja de Segurança.
    ===================================================================== */
 
 :root {
-  --totem-verde: #0d9488;
-  --totem-verde-hover: #0f766e;
-  --totem-verde-claro: #f0fdfa;
-  --totem-bg: #f4f7fb;
-  --totem-card-bg: #ffffff;
-  --totem-borda: #e2e8f0;
-  --totem-texto: #0f172a;
-  --totem-suave: #475569;
-  --totem-amber: #d97706;
-  --totem-amber-bg: #fef3c7;
-  --totem-azul: #2563eb;
-  --totem-sombra-card: 0 4px 12px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+  --totem-bg: #070b12;
+  --totem-card-bg: #121824;
+  --totem-card-sutil: #172030;
+  --totem-card-hover: #1e2b40;
+  --totem-borda: #222f44;
+  --totem-borda-forte: #2f405c;
+  --totem-texto: #f8fafc;
+  --totem-suave: #94a3b8;
+  --totem-laranja: #f97316;
+  --totem-laranja-hover: #ea580c;
+  --totem-laranja-ativo: #c2410c;
+  --totem-verde: #10b981;
+  --totem-verde-hover: #059669;
+  --totem-amber: #f59e0b;
+  --totem-amber-bg: rgba(245, 158, 11, 0.15);
+  --totem-azul: #38bdf8;
+  --totem-raio-sm: 4px;
+  --totem-raio: 6px;
+  --totem-sombra-card: 0 4px 16px -2px rgba(0, 0, 0, 0.5), 0 2px 6px -1px rgba(0, 0, 0, 0.3);
 }
 
 body.totem-body {
@@ -31,13 +37,15 @@ body.totem-body {
   display: flex;
   flex-direction: column;
   user-select: none;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11", "tnum";
 }
 
-/* ---------- Cabeçalho do Totem ---------- */
+/* ---------- Cabeçalho do Totem Industrial ---------- */
 .totem-header {
-  background: rgba(255, 255, 255, 0.94);
+  background: rgba(13, 19, 31, 0.95);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--totem-borda);
+  border-top: 2px solid var(--totem-laranja);
   padding: clamp(0.625rem, 1.5vh, 0.875rem) clamp(1rem, 2.5vw, 1.75rem);
   display: flex;
   align-items: center;
@@ -59,13 +67,13 @@ body.totem-body {
 .totem-marca__icone {
   width: clamp(2.375rem, 4vw, 2.75rem);
   height: clamp(2.375rem, 4vw, 2.75rem);
-  background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
   color: #ffffff;
-  border-radius: 0.75rem;
+  border-radius: var(--totem-raio-sm);
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  box-shadow: 0 4px 10px rgba(13, 148, 136, 0.25);
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.35);
 }
 
 .totem-marca__icone svg {
@@ -76,7 +84,7 @@ body.totem-body {
 .totem-marca__titulo {
   font-weight: 700;
   font-size: clamp(0.9375rem, 0.5vw + 0.8rem, 1.0625rem);
-  color: var(--totem-texto);
+  color: #f8fafc;
   line-height: 1.2;
 }
 
@@ -96,24 +104,24 @@ body.totem-body {
 }
 
 .btn-reiniciar {
-  background: #ffffff;
+  background: var(--totem-card-sutil);
   border: 1px solid var(--totem-borda);
   color: var(--totem-texto);
   font-weight: 600;
   font-size: 0.875rem;
   min-height: 2.5rem;
   padding: 0.4375rem 0.9375rem;
-  border-radius: 0.5rem;
+  border-radius: var(--totem-raio-sm);
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .btn-reiniciar:hover {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
-  color: #000000;
+  background: var(--totem-card-hover);
+  border-color: var(--totem-laranja);
+  color: #ffffff;
 }
 
 /* ---------- Área Central de Conteúdo (Container Fluido) ---------- */
@@ -123,7 +131,7 @@ body.totem-body {
   flex-direction: column;
   justify-content: center;
   padding: clamp(1rem, 2.5vh, 2rem) clamp(1rem, 3vw, 2rem);
-  max-width: 78rem; /* 1248px: evita esticar cards em telas Full HD / 4K */
+  max-width: 78rem;
   margin: 0 auto;
   width: 100%;
 }
@@ -147,13 +155,13 @@ body.totem-body {
 .totem-hero-icone {
   width: clamp(3.5rem, 7vh, 4.5rem);
   height: clamp(3.5rem, 7vh, 4.5rem);
-  border-radius: 1.125rem;
-  background: var(--totem-verde);
+  border-radius: var(--totem-raio);
+  background: var(--totem-laranja);
   color: #ffffff;
   display: grid;
   place-items: center;
   margin: 0 auto clamp(0.75rem, 1.8vh, 1.25rem);
-  box-shadow: 0 10px 25px -5px rgba(13, 148, 136, 0.28);
+  box-shadow: 0 10px 25px -5px rgba(249, 115, 22, 0.35);
 }
 
 .totem-hero-icone svg,
@@ -164,9 +172,9 @@ body.totem-body {
 }
 
 .totem-hero-icone--lock {
-  background: #f0fdfa;
-  border: 2px solid var(--totem-verde);
-  color: var(--totem-verde);
+  background: rgba(249, 115, 22, 0.12);
+  border: 2px solid var(--totem-laranja);
+  color: #fb923c;
   box-shadow: none;
 }
 
@@ -174,7 +182,7 @@ body.totem-body {
   font-weight: 700;
   font-size: clamp(1.5rem, 2vw + 0.75rem, 2rem);
   text-align: center;
-  color: var(--totem-texto);
+  color: #f8fafc;
   margin-bottom: 0.375rem;
   letter-spacing: -0.02em;
 }
@@ -188,7 +196,7 @@ body.totem-body {
   line-height: 1.5;
 }
 
-/* ---------- Cartões de Seleção (Passo 1 — Botões Nativos) ---------- */
+/* ---------- Cartões de Seleção (Passo 1 — Identificação) ---------- */
 .totem-opcoes-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 15.5rem), 1fr));
@@ -200,10 +208,10 @@ body.totem-body {
 .totem-card-opcao {
   width: 100%;
   font-family: inherit;
-  color: inherit;
+  color: #f8fafc;
   background: var(--totem-card-bg);
   border: 2px solid var(--totem-borda);
-  border-radius: 1rem;
+  border-radius: var(--totem-raio);
   padding: clamp(1.5rem, 3.5vh, 2.25rem) 1.5rem;
   text-align: center;
   cursor: pointer;
@@ -212,40 +220,44 @@ body.totem-body {
 }
 
 .totem-card-opcao:hover:not(.desabilitado):not(:disabled) {
-  border-color: var(--totem-verde);
-  transform: translateY(-3px);
-  box-shadow: 0 12px 24px -6px rgba(13, 148, 136, 0.18);
+  border-color: var(--totem-laranja);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px -6px rgba(249, 115, 22, 0.25);
+  background: var(--totem-card-hover);
 }
 
 .totem-card-opcao.desabilitado,
 .totem-card-opcao:disabled {
-  opacity: 0.58;
+  opacity: 0.45;
   cursor: not-allowed;
-  background: #f8fafc;
+  background: var(--totem-bg);
 }
 
 .totem-card-opcao__icone {
   width: 3.5rem;
   height: 3.5rem;
-  border-radius: 0.75rem;
-  background: #f0fdfa;
-  color: var(--totem-verde);
+  border-radius: var(--totem-raio-sm);
+  background: rgba(249, 115, 22, 0.12);
+  color: #fb923c;
   display: grid;
   place-items: center;
   margin: 0 auto 0.875rem;
   font-size: 1.625rem;
+  border: 1px solid rgba(249, 115, 22, 0.25);
 }
 
 .totem-card-opcao.desabilitado .totem-card-opcao__icone,
 .totem-card-opcao:disabled .totem-card-opcao__icone {
-  background: #e2e8f0;
-  color: #94a3b8;
+  background: #172030;
+  color: #64748b;
+  border-color: var(--totem-borda);
 }
 
 .totem-card-opcao__titulo {
   font-weight: 700;
   font-size: 1.1875rem;
   margin-bottom: 0.375rem;
+  color: #f8fafc;
 }
 
 .totem-card-opcao__sub {
@@ -261,22 +273,24 @@ body.totem-body {
 }
 
 .totem-display-input {
-  background: #ffffff;
+  background: #0e1522;
   border: 2px solid var(--totem-borda);
-  border-radius: 0.75rem;
+  border-radius: var(--totem-raio-sm);
   padding: clamp(0.625rem, 1.5vh, 0.875rem) 1.125rem;
   font-size: clamp(1.35rem, 2.5vh, 1.625rem);
   font-weight: 700;
   letter-spacing: 2px;
   text-align: center;
-  color: var(--totem-texto);
+  color: #ffffff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   margin-bottom: clamp(0.875rem, 2vh, 1.25rem);
-  box-shadow: inset 0 2px 4px rgba(15, 23, 42, 0.03);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
 }
 
 .totem-display-input:focus {
-  border-color: var(--totem-verde);
+  border-color: var(--totem-laranja);
   outline: none;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.3);
 }
 
 .totem-teclado {
@@ -287,48 +301,60 @@ body.totem-body {
 
 .btn-tecla {
   height: clamp(3.125rem, 7.2vh, 4rem);
-  background: #ffffff;
+  background: #141c2b;
   border: 1px solid var(--totem-borda);
-  border-radius: 0.75rem;
+  border-radius: var(--totem-raio-sm);
   font-size: clamp(1.25rem, 2.4vh, 1.5rem);
-  font-weight: 600;
-  color: var(--totem-texto);
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: #f8fafc;
   display: grid;
   place-items: center;
-  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.04);
-  transition: transform 0.1s ease, background-color 0.12s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  transition: transform 0.1s ease, background-color 0.12s ease, border-color 0.12s ease;
   cursor: pointer;
 }
 
 .btn-tecla:hover {
-  border-color: #cbd5e1;
-  background: #f8fafc;
+  border-color: var(--totem-laranja);
+  background: #1d273a;
+  color: #ffffff;
 }
 
 .btn-tecla:active {
   transform: scale(0.96);
-  background: #f1f5f9;
+  background: var(--totem-laranja);
+  color: #ffffff;
 }
 
 .btn-tecla--acao {
   font-size: 0.9375rem;
-  font-weight: 600;
+  font-weight: 700;
+  font-family: "Inter", system-ui, sans-serif;
 }
 
 .btn-tecla--verde {
-  background: var(--totem-verde);
+  background: var(--totem-laranja);
   color: #ffffff;
-  border-color: var(--totem-verde);
+  border-color: var(--totem-laranja);
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.35);
 }
 
 .btn-tecla--verde:hover {
-  background: var(--totem-verde-hover);
-  border-color: var(--totem-verde-hover);
+  background: var(--totem-laranja-hover);
+  border-color: var(--totem-laranja-hover);
   color: #ffffff;
 }
 
 .btn-tecla--apagar {
-  color: #dc2626;
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.btn-tecla--apagar:hover {
+  background: #ef4444;
+  color: #ffffff;
 }
 
 /* Indicador de PIN (4 bolinhas) */
@@ -343,16 +369,16 @@ body.totem-body {
   width: 1.125rem;
   height: 1.125rem;
   border-radius: 50%;
-  border: 2px solid #cbd5e1;
-  background: #ffffff;
+  border: 2px solid var(--totem-borda-forte);
+  background: #0e1522;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .pin-dot.preenchido {
-  background: var(--totem-verde);
-  border-color: var(--totem-verde);
+  background: var(--totem-laranja);
+  border-color: var(--totem-laranja);
   transform: scale(1.15);
-  box-shadow: 0 0 10px rgba(13, 148, 136, 0.4);
+  box-shadow: 0 0 12px rgba(249, 115, 22, 0.5);
 }
 
 /* ---------- Vitrine de Produtos (Passo 4) ---------- */
@@ -371,6 +397,7 @@ body.totem-body {
   font-size: clamp(1.35rem, 1.5vw + 0.8rem, 1.625rem);
   font-weight: 700;
   margin-bottom: 0.25rem;
+  color: #f8fafc;
 }
 
 .totem-vitrine-usuario p {
@@ -380,30 +407,33 @@ body.totem-body {
 }
 
 .btn-minhas-sols {
-  background: #ffffff;
+  background: var(--totem-card-bg);
   border: 1px solid var(--totem-borda);
-  border-radius: 0.625rem;
+  border-radius: var(--totem-raio-sm);
   min-height: 2.625rem;
   padding: 0.5rem 1rem;
   font-weight: 600;
   font-size: 0.875rem;
+  color: var(--totem-texto);
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.03);
+  box-shadow: var(--totem-sombra-card);
 }
 
 .btn-minhas-sols:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
+  background: var(--totem-card-hover);
+  border-color: var(--totem-laranja);
+  color: #ffffff;
 }
 
 .badge-sols-count {
-  background: var(--totem-verde);
+  background: var(--totem-laranja);
   color: #ffffff;
-  border-radius: 999px;
+  border-radius: var(--totem-raio-sm);
   padding: 0.125rem 0.5rem;
   font-size: 0.75rem;
+  font-weight: 700;
 }
 
 .totem-produtos-grid {
@@ -413,20 +443,21 @@ body.totem-body {
 }
 
 .totem-card-produto {
-  background: #ffffff;
+  background: var(--totem-card-bg);
   border: 1px solid var(--totem-borda);
-  border-radius: 1rem;
+  border-radius: var(--totem-raio);
   padding: clamp(1.125rem, 2vw, 1.375rem);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   box-shadow: var(--totem-sombra-card);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .totem-card-produto:hover {
   transform: translateY(-2px);
-  box-shadow: 0 12px 20px -4px rgba(15, 23, 42, 0.09);
+  border-color: var(--totem-laranja);
+  box-shadow: 0 12px 24px -4px rgba(0, 0, 0, 0.7);
 }
 
 .totem-card-produto__cabecalho {
@@ -439,39 +470,42 @@ body.totem-body {
 .totem-produto-icone {
   width: 2.75rem;
   height: 2.75rem;
-  border-radius: 0.75rem;
-  background: #eff6ff;
+  border-radius: var(--totem-raio-sm);
+  background: rgba(56, 189, 248, 0.1);
   color: var(--totem-azul);
+  border: 1px solid rgba(56, 189, 248, 0.25);
   display: grid;
   place-items: center;
   font-size: 1.25rem;
 }
 
 .totem-badge-tipo {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  padding: 0.1875rem 0.625rem;
-  border-radius: 999px;
-  letter-spacing: 0.03em;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--totem-raio-sm);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-family: ui-monospace, SFMono-Regular, monospace;
 }
 
 .totem-badge-tipo--epi {
-  background: #eff6ff;
-  color: #2563eb;
-  border: 1px solid #bfdbfe;
+  background: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.35);
 }
 
 .totem-badge-tipo--consumivel {
-  background: #fffbeb;
-  color: #b45309;
-  border: 1px solid #fde68a;
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
 }
 
 .totem-card-produto__nome {
   font-weight: 700;
   font-size: 1.0625rem;
   margin-bottom: 0.625rem;
-  color: var(--totem-texto);
+  color: #f8fafc;
 }
 
 .totem-card-produto__info {
@@ -483,73 +517,88 @@ body.totem-body {
   gap: 0.25rem;
 }
 
+.totem-card-produto__info strong {
+  color: #cbd5e1;
+}
+
 .totem-status-badge {
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
   padding: 0.25rem 0.625rem;
-  border-radius: 0.375rem;
+  border-radius: var(--totem-raio-sm);
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 700;
   margin-bottom: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .totem-status-badge--disponivel {
-  background: #ecfdf5;
-  color: #065f46;
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
 }
 
 .totem-status-badge--aguardando {
-  background: #fffbeb;
-  color: #b45309;
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
 }
 
 .totem-status-badge--fora {
-  background: #fef2f2;
-  color: #991b1b;
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.35);
 }
 
 .btn-solicitar-retirada,
 .btn-solicitar-substituicao {
   color: #ffffff;
   border: none;
-  font-weight: 600;
+  font-weight: 700;
   min-height: 2.875rem;
   padding: 0.6875rem 1rem;
-  border-radius: 0.625rem;
-  transition: background-color 0.15s ease;
+  border-radius: var(--totem-raio-sm);
+  transition: background-color 0.15s ease, transform 0.1s ease;
+  letter-spacing: 0.01em;
 }
 
 .btn-solicitar-retirada {
-  background: var(--totem-verde);
+  background: var(--totem-laranja);
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
 }
 
 .btn-solicitar-retirada:hover {
-  background: var(--totem-verde-hover);
+  background: var(--totem-laranja-hover);
   color: #ffffff;
+  transform: translateY(-1px);
 }
 
 .btn-solicitar-substituicao {
-  background: var(--totem-amber);
+  background: #d97706;
+  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.3);
 }
 
 .btn-solicitar-substituicao:hover {
   background: #b45309;
   color: #ffffff;
+  transform: translateY(-1px);
 }
 
 /* ---------- Tela de Justificativa (Passo 5) ---------- */
 .totem-alerta-substituicao {
-  background: #fffbeb;
-  border: 1px solid #fcd34d;
-  border-radius: 0.75rem;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: var(--totem-raio);
   padding: 1rem 1.25rem;
   margin-bottom: 1.25rem;
+  border-left: 3px solid var(--totem-amber);
 }
 
 .totem-alerta-substituicao__titulo {
   font-weight: 700;
-  color: #92400e;
+  color: #fbbf24;
   font-size: 1rem;
   display: flex;
   align-items: center;
@@ -559,22 +608,24 @@ body.totem-body {
 
 .totem-alerta-substituicao__texto {
   font-size: 0.875rem;
-  color: #b45309;
+  color: #fde68a;
   margin-bottom: 0;
 }
 
 .totem-card-resumo-produto {
-  background: #ffffff;
+  background: var(--totem-card-bg);
   border: 1px solid var(--totem-borda);
-  border-radius: 0.875rem;
+  border-radius: var(--totem-raio);
   padding: 1.25rem;
   margin-bottom: 1.25rem;
   box-shadow: var(--totem-sombra-card);
 }
 
 .totem-textarea-justificativa {
-  border: 2px solid var(--totem-borda);
-  border-radius: 0.75rem;
+  background: #0e1522;
+  border: 1px solid var(--totem-borda);
+  border-radius: var(--totem-raio-sm);
+  color: #f8fafc;
   padding: 0.875rem;
   font-size: 0.9375rem;
   resize: vertical;
@@ -582,8 +633,9 @@ body.totem-body {
 }
 
 .totem-textarea-justificativa:focus {
-  border-color: var(--totem-verde);
-  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.18);
+  border-color: var(--totem-laranja);
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.3);
+  outline: none;
 }
 
 .btn-voltar-totem {
@@ -601,7 +653,7 @@ body.totem-body {
 }
 
 .btn-voltar-totem:hover {
-  color: var(--totem-texto);
+  color: #fb923c;
 }
 
 /* ---------- Adaptações Mobile Compacto (360px a 575px) ---------- */
@@ -641,6 +693,6 @@ body.totem-body {
 .totem-card-opcao:focus-visible,
 .btn-tecla:focus-visible,
 .btn-reiniciar:focus-visible {
-  outline: 3px solid var(--totem-verde);
+  outline: 2px solid var(--totem-laranja);
   outline-offset: 2px;
 }

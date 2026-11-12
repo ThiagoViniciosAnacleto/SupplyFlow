@@ -43,7 +43,7 @@
     }
 
     Chart.defaults.font.family = '"Inter", system-ui, sans-serif';
-    Chart.defaults.color = "#64748b";
+    Chart.defaults.color = "#94a3b8";
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       Chart.defaults.animation = false;
     }
@@ -64,8 +64,8 @@
           datasets: [{
             label: "Entregas",
             data: entregasPorMes.valores,
-            backgroundColor: "#2563eb",
-            borderRadius: 6,
+            backgroundColor: "#f97316",
+            borderRadius: 4,
             maxBarThickness: 44
           }]
         },
@@ -73,8 +73,8 @@
           maintainAspectRatio: false,
           plugins: { legend: { display: false } },
           scales: {
-            x: { grid: { display: false } },
-            y: { beginAtZero: true, grid: { color: "#f1f5f9" }, ticks: { precision: 0 } }
+            x: { grid: { display: false }, ticks: { color: "#94a3b8" } },
+            y: { beginAtZero: true, grid: { color: "rgba(255, 255, 255, 0.08)" }, ticks: { precision: 0, color: "#94a3b8" } }
           }
         }
       });
@@ -92,8 +92,8 @@
           datasets: [{
             data: consumoPorCentro.valores,
             borderWidth: 2,
-            borderColor: "#ffffff",
-            backgroundColor: ["#2563eb", "#0d9488", "#d97706", "#64748b", "#8b5cf6"]
+            borderColor: "#121824",
+            backgroundColor: ["#f97316", "#38bdf8", "#10b981", "#f59e0b", "#a855f7"]
           }]
         },
         options: {
