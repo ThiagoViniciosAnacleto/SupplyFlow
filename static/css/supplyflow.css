@@ -155,20 +155,93 @@ body {
   box-shadow: 0 1px 3px rgba(249, 115, 22, 0.3);
 }
 
+.btn-outline-primary,
+.btn-outline-info,
+.btn-outline-secondary,
+.btn-outline-danger,
+.btn-outline-success,
+.btn-outline-warning,
+.btn-outline-dark {
+  border-width: 2px !important;
+  font-weight: 600;
+  background-color: rgba(18, 24, 36, 0.6);
+  transition: all 0.15s ease;
+}
+
+.tabela-solicitacoes td .btn i,
+.btn-outline-primary i,
+.btn-outline-info i,
+.btn-outline-secondary i,
+.btn-outline-danger i,
+.btn-outline-success i,
+.btn-outline-warning i {
+  font-size: 0.95rem;
+  color: #ffffff !important;
+}
+
 .btn-outline-primary {
-  --bs-btn-color: var(--sf-laranja);
-  --bs-btn-border-color: var(--sf-laranja);
-  --bs-btn-hover-bg: var(--sf-laranja);
-  --bs-btn-hover-border-color: var(--sf-laranja);
-  --bs-btn-hover-color: #ffffff;
+  --bs-btn-color: #f97316;
+  --bs-btn-border-color: #f97316;
+  border-color: #f97316 !important;
+  color: #ffffff !important;
+}
+
+.btn-outline-primary:hover {
+  background-color: #f97316 !important;
+  border-color: #ea580c !important;
+  color: #ffffff !important;
+}
+
+.btn-outline-info {
+  --bs-btn-color: #38bdf8;
+  --bs-btn-border-color: #0284c7;
+  border-color: #38bdf8 !important;
+  color: #ffffff !important;
+}
+
+.btn-outline-info:hover {
+  background-color: #0284c7 !important;
+  border-color: #38bdf8 !important;
+  color: #ffffff !important;
 }
 
 .btn-outline-secondary {
-  --bs-btn-color: var(--sf-texto-secundario);
-  --bs-btn-border-color: var(--sf-borda-forte);
-  --bs-btn-hover-bg: var(--sf-superficie-hover);
-  --bs-btn-hover-border-color: var(--sf-texto-suave);
-  --bs-btn-hover-color: #ffffff;
+  --bs-btn-color: #cbd5e1;
+  --bs-btn-border-color: #64748b;
+  border-color: #64748b !important;
+  color: #ffffff !important;
+}
+
+.btn-outline-secondary:hover {
+  background-color: #334155 !important;
+  border-color: #94a3b8 !important;
+  color: #ffffff !important;
+}
+
+.btn-outline-danger {
+  --bs-btn-color: #ef4444;
+  --bs-btn-border-color: #ef4444;
+  border-color: #ef4444 !important;
+  color: #ffffff !important;
+}
+
+.btn-outline-danger:hover {
+  background-color: #dc2626 !important;
+  border-color: #ef4444 !important;
+  color: #ffffff !important;
+}
+
+.btn-outline-success {
+  --bs-btn-color: #10b981;
+  --bs-btn-border-color: #10b981;
+  border-color: #10b981 !important;
+  color: #ffffff !important;
+}
+
+.btn-outline-success:hover {
+  background-color: #059669 !important;
+  border-color: #10b981 !important;
+  color: #ffffff !important;
 }
 
 .form-control,
@@ -1797,10 +1870,85 @@ code {
   color: #6ee7b7;
 }
 
+/* ---------- Badges Industriais Técnicos (Dark Mode & Alto Contraste) ---------- */
 .badge {
-  border-radius: var(--sf-raio-xs);
-  font-weight: 600;
+  border-radius: var(--sf-raio-xs) !important;
+  font-weight: 600 !important;
   letter-spacing: 0.03em;
+  padding: 0.35rem 0.55rem;
+  font-size: 0.75rem;
+  border: 1px solid transparent;
+}
+
+/* Badge Primário (Backoffice / Domínio) */
+.badge.bg-primary-subtle,
+.bg-primary-subtle {
+  background-color: rgba(249, 115, 22, 0.18) !important;
+  border-color: rgba(249, 115, 22, 0.45) !important;
+  color: #fb923c !important;
+}
+
+/* Badge Info (NRs, Habilitações, Credenciais de Risco) */
+.badge.bg-info-subtle,
+.bg-info-subtle {
+  background-color: rgba(56, 189, 248, 0.15) !important;
+  border-color: rgba(56, 189, 248, 0.4) !important;
+  color: #38bdf8 !important;
+}
+.text-info-emphasis {
+  color: #7dd3fc !important;
+}
+
+/* Badge Sucesso (Ativo) */
+.badge.bg-success-subtle,
+.bg-success-subtle {
+  background-color: rgba(16, 185, 129, 0.18) !important;
+  border-color: rgba(16, 185, 129, 0.45) !important;
+  color: #34d399 !important;
+}
+.text-success {
+  color: #34d399 !important;
+}
+
+/* Badge Atenção (PIN Provisório / Alertas) */
+.badge.bg-warning-subtle,
+.bg-warning-subtle {
+  background-color: rgba(245, 158, 11, 0.18) !important;
+  border-color: rgba(245, 158, 11, 0.45) !important;
+  color: #fbbf24 !important;
+}
+.text-warning-emphasis {
+  color: #fde047 !important;
+}
+
+/* Badge Perigo (Inativo / Vencido) */
+.badge.bg-danger-subtle,
+.bg-danger-subtle {
+  background-color: rgba(239, 68, 68, 0.18) !important;
+  border-color: rgba(239, 68, 68, 0.45) !important;
+  color: #f87171 !important;
+}
+.text-danger {
+  color: #f87171 !important;
+}
+
+/* Badge Neutro / Light (Operacional · Totem PIN / Grades de Tamanhos) */
+.badge.bg-light,
+.badge.bg-light.text-dark {
+  background-color: rgba(148, 163, 184, 0.12) !important;
+  border-color: rgba(148, 163, 184, 0.3) !important;
+  color: #e2e8f0 !important;
+}
+
+/* Tipografia reforçada dentro de células da tabela */
+.tabela-solicitacoes td .fw-semibold {
+  color: #f8fafc !important;
+}
+.tabela-solicitacoes td .text-secondary {
+  color: #94a3b8 !important;
+}
+.tabela-solicitacoes td .text-muted {
+  color: #94a3b8 !important;
 }
 
 @media print {
