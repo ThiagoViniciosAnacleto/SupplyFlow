@@ -60,10 +60,13 @@
         faixa.quantidade + '" title="' + escapar(faixa.rotulo + ": " + faixa.quantidade) + '"></span>';
     }).join("");
 
+    // A barra mostra a situação mais grave de cada pessoa (soma 100%); a legenda conta
+    // quantas pessoas têm cada pendência — quem tem NR vencida E outra vencendo entra nas duas.
     document.getElementById("prontidao-legenda").innerHTML = dados.faixas.map(function (faixa) {
-      return '<li class="' + (faixa.quantidade ? "" : "painel-legenda__zero") + '">' +
+      var pessoas = (faixa.pessoas != null) ? faixa.pessoas : faixa.quantidade;
+      return '<li class="' + (pessoas ? "" : "painel-legenda__zero") + '">' +
         '<span class="painel-legenda__cor ' + CORES_SITUACAO[faixa.codigo] + '"></span>' +
-        '<strong>' + escapar(faixa.quantidade) + "</strong> " + escapar(faixa.rotulo) + "</li>";
+        '<strong>' + escapar(pessoas) + "</strong> " + escapar(faixa.rotulo) + "</li>";
     }).join("");
   }
 

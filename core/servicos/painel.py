@@ -97,11 +97,14 @@ def _prontidao(hoje):
         if u.perfil == "COLABORADOR" or u.id in ultimas or obter_ficha_rh(u).get("habilitacoes")
     ]
 
-    contagem = {codigo: 0 for codigo, _ in SITUACOES}
+    contagem = {codigo: 0 for codigo, _ in SITUACOES}   # pela pior situação (soma o total: usado na barra)
+    com_pendencia = {codigo: 0 for codigo, _ in SITUACOES}  # quem tem cada tipo de pendência (usado na legenda)
     atencao = []
     for colaborador in colaboradores:
         situacao, pendencias = _avaliar_colaborador(colaborador, ultimas, hoje)
         contagem[situacao] += 1
+        for tipo in {p["tipo"] for p in pendencias} or {"em_dia"}:
+            com_pendencia[tipo] += 1
         if pendencias:
             atencao.append({
                 "id": str(colaborador.id),
@@ -119,7 +122,8 @@ def _prontidao(hoje):
         "total": total,
         "em_dia": contagem["em_dia"],
         "percentual": round(100 * contagem["em_dia"] / total) if total else None,
-        "faixas": [{"codigo": c, "rotulo": r, "quantidade": contagem[c]} for c, r in SITUACOES],
+        "faixas": [{"codigo": c, "rotulo": r, "quantidade": contagem[c], "pessoas": com_pendencia[c]}
+                   for c, r in SITUACOES],
         "atencao": atencao,
     }, colaboradores
 
@@ -167,10 +171,10 @@ def _acoes(usuario_acoes, atencao, agora):
     for pessoa in [a for a in atencao if a["situacao"] in ("nr_vencida", "troca_vencida")][:3]:
         itens.append({
             "tipo": "risco",
-            "titulo": f"{pessoa['nome']} · {pessoa['pendencias'][0]}",
+            "titulo": f"{pessoa['nome']} · {' · '.join(pessoa['pendencias'][:2])}",
             "detalhe": " · ".join(filter(None, [pessoa["cargo"], pessoa["setor"]])),
-            "link": f"ficha-epi.html?id={pessoa['id']}",
-            "acao": "Ver ficha",
+            "link": f"funcionarios.html?abrir={pessoa['id']}",
+            "acao": "Ver funcionário",
         })
     return itens[:6]
 

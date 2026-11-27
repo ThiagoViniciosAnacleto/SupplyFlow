@@ -40,7 +40,7 @@ class PainelTeste(BaseTeste):
         dados = self.client.get("/api/painel/").json()
         self.assertEqual(self.faixa(dados, "troca_vencida"), 1)
         self.assertEqual(dados["prontidao"]["percentual"], 0)
-        self.assertTrue(any(a["tipo"] == "risco" for a in dados["acoes"]))
+        self.assertTrue(any(a["tipo"] == "risco" and "funcionarios.html?abrir=" in a["link"] for a in dados["acoes"]))
 
     def test_nr_vencendo_aparece_no_radar(self):
         validade = (timezone.localdate() + timedelta(days=10)).isoformat()
@@ -76,3 +76,16 @@ class PainelTeste(BaseTeste):
         dados = self.client.get("/api/painel/").json()
         self.assertEqual(dados["prontidao"]["total"], 2)  # o colaborador + o gestor com NR
         self.assertTrue(any(p["pessoa"] == self.gestor.nome and p["dias"] == 4 for p in dados["radar_nrs"]["pontos"]))
+
+    def test_legenda_conta_todas_as_pendencias_da_pessoa(self):
+        """NR vencida e outra NR vencendo na mesma pessoa: a barra conta a pior, a legenda conta as duas."""
+        hoje = timezone.localdate()
+        rh.salvar_metadados_rh(None, self.colaborador, habilitacoes=[
+            {"nome": "NR-35", "validade": (hoje - timedelta(days=25)).isoformat()},
+            {"nome": "NR-10", "validade": (hoje + timedelta(days=4)).isoformat()},
+        ])
+        self.entrar(self.gestor)
+        faixas = {f["codigo"]: f for f in self.client.get("/api/painel/").json()["prontidao"]["faixas"]}
+        self.assertEqual(faixas["nr_vencida"]["quantidade"], 1)
+        self.assertEqual(faixas["nr_vencendo"]["quantidade"], 0)
+        self.assertEqual(faixas["nr_vencendo"]["pessoas"], 1)

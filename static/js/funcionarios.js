@@ -323,6 +323,7 @@
       .then(function (dados) {
         funcionariosCache = dados.funcionarios || [];
         renderizarTabela(funcionariosCache);
+        abrirFuncionarioDoLink();
       })
       .catch(function (erro) {
         tabelaCorpo.innerHTML =
@@ -719,6 +720,19 @@
           conteudoEl.classList.remove("d-none");
         }
       });
+  }
+
+  /* Vindo da Visão Geral (funcionarios.html?abrir=<id>): abre e mostra a linha dessa pessoa uma vez */
+  var idParaAbrir = new URLSearchParams(window.location.search).get("abrir");
+
+  function abrirFuncionarioDoLink() {
+    if (!idParaAbrir) return;
+    var linha = tabelaCorpo.querySelector('tr.linha-funcionario[data-id="' + CSS.escape(idParaAbrir) + '"]');
+    idParaAbrir = null;
+    if (!linha) return;
+    alternarExpansaoFuncionario(linha);
+    linha.scrollIntoView({ behavior: "smooth", block: "center" });
+    linha.focus({ preventScroll: true });
   }
 
   function alternarExpansaoFuncionario(linhaResumo) {
